@@ -20,7 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ro" className={fontVariables}>
-      <body>{children}</body>
+      {/* suppressHydrationWarning: расширения браузера дописывают в <body>
+          свои атрибуты, и без этого Next ругается на несовпадение HTML. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
