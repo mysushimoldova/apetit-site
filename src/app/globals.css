@@ -34,6 +34,10 @@
   --glass-bg-fallback: rgba(250, 247, 242, 0.96);
   --glass-blur: blur(16px) saturate(130%);
 
+  /* Сила фоновых линий (DESIGN.md → Background): 0.5 / 0.8 / 1.0 — варианты
+     A / B / C, выбран B. Цвет линий (Ash) — в самой картинке. */
+  --bg-lines-opacity: 0.8;
+
   /* Затемнение фона под листом блюда */
   --scrim: rgba(26, 23, 20, 0.35);
 
@@ -174,9 +178,10 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Кремовый фон даёт html (он же фон всего окна). body прозрачный — иначе
+     он закрыл бы слой фоновых линий, который лежит под контентом (z-index -1). */
   body {
     min-height: 100dvh;
-    background-color: var(--color-cream);
     color: var(--color-ink);
   }
 
@@ -184,6 +189,33 @@
     background-color: var(--color-yellow);
     color: var(--color-ink);
   }
+}
+
+/* ---------- Фон: контурные линии бренда (DESIGN.md → Background) ----------
+   Неподвижный слой на весь экран под контентом; клики проходят сквозь.
+   Внутри — «лента» из трёх экранов (обычный, зеркальный, обычный): её
+   сдвигает BrandBackground через transform, через два экрана — по кругу,
+   без шва. Картинка — как cover на каждый экран. */
+.brand-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--bg-lines-opacity);
+}
+.brand-bg-track {
+  will-change: transform;
+}
+.brand-bg-tile {
+  /* lvh — высота экрана без учёта панелей браузера: слой не прыгает,
+     когда на телефоне прячется адресная строка */
+  height: 100vh;
+  height: 100lvh;
+  background: url("/img/bg/linii.webp") center / cover no-repeat;
+}
+.brand-bg-tile-flip {
+  transform: scaleY(-1);
 }
 
 /* ---------- Утилиты дизайн-системы ---------- */

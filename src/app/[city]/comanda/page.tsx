@@ -3,6 +3,7 @@
 // без фото); форма и корзина — на клиенте (CheckoutView).
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BrandBackground } from "@/components/brand/brand-background";
 import { CheckoutView } from "@/components/checkout/checkout-view";
 import type { PointView } from "@/components/checkout/point-picker";
 import { SiteHeader } from "@/components/menu/site-header";
@@ -58,6 +59,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   return (
     <div lang={locale}>
+      <BrandBackground />
       <SiteHeader city={city} locale={locale} t={t} cart={false} />
       <CheckoutView
         city={city.slug}

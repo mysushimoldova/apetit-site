@@ -71,4 +71,15 @@ describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
     expect(css).toContain("--size-price-pill-lg: 32px");
     expect(css).toContain("--text-price: 18px");
   });
+
+  it("фон — линии: слой под контентом, клики сквозь, сила B = 0.8", () => {
+    expect(css).toContain("--bg-lines-opacity: 0.8");
+    const layer = css.slice(css.indexOf(".brand-bg {"));
+    const rule = layer.slice(0, layer.indexOf("}"));
+    expect(rule).toContain("position: fixed");
+    expect(rule).toContain("z-index: -1");
+    expect(rule).toContain("pointer-events: none");
+    expect(rule).toContain("opacity: var(--bg-lines-opacity)");
+    expect(css).toContain('url("/img/bg/linii.webp") center / cover no-repeat');
+  });
 });

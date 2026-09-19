@@ -5,6 +5,7 @@
 // оформлении заказа).
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BrandBackground } from "@/components/brand/brand-background";
 import { CartProvider } from "@/components/cart/cart-provider";
 import { RememberCity } from "@/components/city/remember-city";
 import { CategoryChips } from "@/components/menu/category-chips";
@@ -62,6 +63,7 @@ export default async function CityPage({ params }: Props) {
 
   return (
     <div lang={locale}>
+      <BrandBackground />
       <RememberCity slug={city.slug} />
       <CartProvider
         city={city.slug}

@@ -37,3 +37,6 @@ __pycache__/
 
 # Отчёты semgrep (если скилл положит их в корень)
 static_analysis_semgrep_*/
+
+# Кадры из видео фона (scripts/bg-lines.py frames) — только для выбора, не в git
+docs/bg-frames/
