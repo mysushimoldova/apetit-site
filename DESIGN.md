@@ -132,14 +132,17 @@ Fallback: `background: rgba(250,247,242,0.96)`. Нигде больше.
 
 ### Background — линии с телевизоров Apetit
 Фон — Cream (#FAF7F2) + слой контурных линий бренда (как на меню-экранах в
-точках): исходник `assets/brand/linii-fundal.png` (4K, чёрные линии на белом).
+точках): исходник — видео `assets/brand/linii-fundal.mp4` (4K, чёрные линии на
+белом; отдельной картинки нет). Из него берётся один кадр в полном размере
+(ffmpeg, кадр примерно с 1-й секунды, PNG) → `public/img/brand/linii-fundal.png`.
 При сборке белый убирается, линии становятся Ink с opacity ≈ .5–.6, слой
 повторяется (tile) и лежит под всем контентом (`position: fixed`, z-index 0,
 `pointer-events: none`). При скролле слой сдвигается на ~0.35 от прокрутки
 (`transform: translateY`, только transform, requestAnimationFrame), стоит — когда
 не скроллят. На слабых устройствах и при reduced-motion — слой статичный.
-Никаких других пятен, градиентов, текстур. Видео `linii-fundal.mp4` — только
-для экрана городов, если решим (фаза 2), не для меню.
+Никаких других пятен, градиентов, текстур. Само видео на сайте не крутится:
+оно только источник кадра; движение линий даёт скролл. Видео на экране
+городов — фаза 2, если решим.
 
 ## Components
 
@@ -356,7 +359,7 @@ Ink; никаких перекрасок в жёлтый.
 - radii: 9999 pills · 12 inputs · 16 tiles/cards · 24 sheet
 - no box-shadow except sheet lift; food gets a faint radial puddle (.13)
 - billboard word: outline only (transparent fill, 2px #1A1714 stroke)
-- background: cream + brand contour lines layer (assets/brand/linii-fundal.png), shifts with scroll
+- background: cream + brand contour lines layer (frame from assets/brand/linii-fundal.mp4), shifts with scroll
 - glass: header, cart bar, city overlay only
 
 **Example Component Prompts**
