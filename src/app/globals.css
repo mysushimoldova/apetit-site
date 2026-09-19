@@ -187,3 +187,45 @@
     backdrop-filter: var(--glass-blur);
   }
 }
+
+/* Плитка города (экран входа): без заливки, рамка Ink, 88px, Oswald 44px.
+   Нажатие — заливка Ink, текст Cream, --dur-fast. Значения — из задачи
+   архитектора (обновлённый раздел City Screen); токен --radius-tile пока 24px. */
+@utility city-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88px;
+  border: 1px solid var(--color-ink);
+  border-radius: 16px;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-city);
+  line-height: var(--text-city--line-height);
+  font-weight: var(--text-city--font-weight);
+  letter-spacing: var(--text-city--letter-spacing);
+  text-transform: uppercase;
+  /* Без задержки двойного тапа и без синей подсветки тапа — у нас своя */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+
+  /* Hover только для мыши: на тачскрине тап даёт ложный hover */
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: var(--color-milk);
+    }
+  }
+
+  &:active {
+    background-color: var(--color-ink);
+    color: var(--color-cream);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 4px;
+  }
+}
