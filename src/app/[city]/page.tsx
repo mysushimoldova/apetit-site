@@ -10,6 +10,7 @@ import { RememberCity } from "@/components/city/remember-city";
 import { CategoryChips } from "@/components/menu/category-chips";
 import { ProductTile } from "@/components/menu/product-tile";
 import { RevealGrid } from "@/components/menu/reveal-grid";
+import { SiteFooter } from "@/components/menu/site-footer";
 import { SiteHeader } from "@/components/menu/site-header";
 import { getMenuForCity } from "@/data/menu";
 import { CITIES, getCity, isCitySlug, pointsOfCity } from "@/data/points";
@@ -107,6 +108,7 @@ export default async function CityPage({ params }: Props) {
             </section>
           ))}
         </main>
+        <SiteFooter locale={locale} t={t} />
       </CartProvider>
     </div>
   );

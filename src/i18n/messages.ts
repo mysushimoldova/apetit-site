@@ -92,6 +92,14 @@ export interface Messages {
     sending: string;
     /** Строка под кнопкой отправки */
     callNote: string;
+    /** Строка согласия под callNote: {terms} и {privacy} — ссылки */
+    consent: {
+      text: string;
+      /** Текст ссылки на /termeni внутри фразы (в ru — в падеже фразы) */
+      terms: string;
+      /** Текст ссылки на /confidentialitate внутри фразы */
+      privacy: string;
+    };
     errors: {
       point: string;
       name: string;
@@ -113,6 +121,15 @@ export interface Messages {
     callSoon: string;
     /** Secondary с телефоном точки (DESIGN: «Sună la local») */
     call: string;
+    back: string;
+  };
+  /** Правовые страницы и подвал меню */
+  legal: {
+    /** Ссылка на /confidentialitate в подвале */
+    privacy: string;
+    /** Ссылка на /termeni в подвале */
+    terms: string;
+    /** Ссылка внизу правовой страницы */
     back: string;
   };
   meta: {
@@ -181,6 +198,12 @@ export const messages: Record<Locale, Messages> = {
       submit: "Trimite comanda",
       sending: "Se trimite…",
       callNote: "Casierul te va suna pentru confirmare",
+      // Строка согласия и подвал — утверждены архитектором 19.09.2026
+      consent: {
+        text: "Trimițând comanda, ești de acord cu {terms} și {privacy}.",
+        terms: "Termenii",
+        privacy: "Politica de confidențialitate",
+      },
       errors: {
         point: "Alege punctul",
         name: "Scrie numele (2–40 de litere)",
@@ -199,6 +222,11 @@ export const messages: Record<Locale, Messages> = {
       number: "Nr. {n}",
       callSoon: "Te sunăm în câteva minute",
       call: "Sună la local",
+      back: "Înapoi la meniu",
+    },
+    legal: {
+      privacy: "Politica de confidențialitate",
+      terms: "Termeni",
       back: "Înapoi la meniu",
     },
     meta: {
@@ -262,6 +290,11 @@ export const messages: Record<Locale, Messages> = {
       submit: "Отправить заказ",
       sending: "Отправляем…",
       callNote: "Кассир перезвонит для подтверждения",
+      consent: {
+        text: "Отправляя заказ, вы соглашаетесь с {terms} и {privacy}.",
+        terms: "Условиями",
+        privacy: "Политикой конфиденциальности",
+      },
       errors: {
         point: "Выберите пункт",
         name: "Введите имя (2–40 букв)",
@@ -281,6 +314,11 @@ export const messages: Record<Locale, Messages> = {
       number: "№ {n}",
       callSoon: "Перезвоним через несколько минут",
       call: "Позвонить в заведение",
+      back: "Вернуться в меню",
+    },
+    legal: {
+      privacy: "Политика конфиденциальности",
+      terms: "Условия",
       back: "Вернуться в меню",
     },
     meta: {

@@ -3,7 +3,7 @@
 // показывает экран подтверждения. Базы ещё нет — снимок живёт в
 // sessionStorage вкладки (прочитанное проверяется этой же схемой).
 // Следующая задача отправит его в Telegram и запишет в Supabase.
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { LocalizedSchema } from "@/data/menu/schema";
 import { isCitySlug, type CitySlug } from "@/data/points";
 

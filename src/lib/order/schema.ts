@@ -1,7 +1,7 @@
 // Вход заказа (SPEC §3 шаг 5, §9.3, §9.4) — одна zod-схема для формы и
 // сервера. Клиент присылает только состав (id и количество) и контакты;
 // лишние поля (сумма, цена) — отказ: цену считает только сервер.
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { CartLineSchema } from "@/lib/cart/lines";
 import { normalizePhone } from "./phone";
 

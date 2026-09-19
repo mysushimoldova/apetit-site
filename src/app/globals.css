@@ -1242,4 +1242,148 @@
       scroll-padding-bottom: calc(var(--size-cart-bar) + 16px);
     }
   }
+
+  /* ---------- Правовые страницы, подвал, строка согласия ---------- */
+
+  /* Видна версия текста на языке обёртки (data-lang, src/lib/legal-lang.ts) */
+  .legal-root[data-lang="ro"] [data-variant="ru"],
+  .legal-root[data-lang="ru"] [data-variant="ro"] {
+    display: none;
+  }
+
+  /* Переключатель RO/RU: выделен язык обёртки — верно с первого кадра */
+  .lang-switch button {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    color: var(--color-smoke);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--dur-fast) var(--ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: var(--color-ink);
+      }
+    }
+    &:focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 2px;
+    }
+  }
+  .legal-root[data-lang="ro"] .lang-switch [data-code="ro"],
+  .legal-root[data-lang="ru"] .lang-switch [data-code="ru"] {
+    color: var(--color-ink);
+  }
+
+  /* Заголовок: Oswald заглавными. Самое длинное слово — «КОНФИДЕНЦИАЛЬНОСТИ»,
+     ≈10.8em: размер от ширины экрана (÷11), чтобы оно всегда стояло целиком
+     (на 390px ≈ 33px), потолок 36px; на десктопе — 44px, как города */
+  .legal-title {
+    font-family: var(--font-display);
+    font-size: min(36px, calc((100vw - 2 * var(--gutter)) / 11));
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+
+    @media (min-width: 1024px) {
+      font-size: var(--text-city);
+    }
+  }
+  .legal-updated {
+    margin-top: 12px;
+    color: var(--color-smoke);
+    font-size: var(--text-meta);
+    line-height: 1.5;
+  }
+
+  /* Текст: Montserrat 16px, строка до 640px, подзаголовки Manrope 700 */
+  .legal-text {
+    max-width: 640px;
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+
+    & h2 {
+      margin-top: 32px;
+      margin-bottom: 8px;
+      font-family: var(--font-ui);
+      font-size: var(--text-title);
+      font-weight: 700;
+      line-height: var(--text-title--line-height);
+      letter-spacing: var(--text-title--letter-spacing);
+      text-wrap: balance;
+    }
+    & p + p {
+      margin-top: 12px;
+    }
+    & ol {
+      margin-top: 32px;
+      padding-left: 1.5em;
+      list-style: decimal;
+    }
+    & li + li {
+      margin-top: 16px;
+    }
+    & li::marker {
+      font-family: var(--font-ui);
+      font-weight: 700;
+    }
+  }
+
+  /* Подвал меню: Section Rule (1px Ink, 48px воздуха), две строки 13px Smoke.
+     Под панелью корзины (телефон) — ещё её высота, чтобы строки не закрывало */
+  .site-footer {
+    padding-bottom: 48px;
+
+    @media (max-width: 1023.98px) {
+      html:has(.cart-bar[data-visible]) & {
+        padding-bottom: calc(
+          48px + var(--size-cart-bar) + env(safe-area-inset-bottom)
+        );
+      }
+    }
+  }
+  .site-footer-inner {
+    padding-top: 48px;
+    border-top: var(--rule);
+    color: var(--color-smoke);
+    font-family: var(--font-body);
+    font-size: var(--text-meta);
+    line-height: 1.5;
+
+    & p + p {
+      margin-top: 4px;
+    }
+    /* Зона нажатия ссылки ≥ 24px (WCAG 2.5.8) — за счёт отступов */
+    & a {
+      display: inline-block;
+      padding-block: 4px;
+    }
+  }
+
+  /* Ссылки в тихом тексте (подвал, строка согласия): цвет текста,
+     подчёркнуты, при наведении — Ink */
+  .site-footer-inner a,
+  .consent-note a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    -webkit-tap-highlight-color: transparent;
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: var(--color-ink);
+      }
+    }
+    &:focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 2px;
+    }
+  }
 }

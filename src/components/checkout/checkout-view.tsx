@@ -21,6 +21,7 @@ import { submitOrderAction } from "@/app/[city]/comanda/actions";
 import { ClosedBanner } from "@/components/order/closed-banner";
 import type { Localized } from "@/data/menu/schema";
 import type { CitySlug, Locale } from "@/data/points";
+import { fillNodes } from "@/i18n/fill-nodes";
 import { formatPrice, type Messages } from "@/i18n/messages";
 import { describeParts, lineParts } from "@/lib/cart/describe";
 import { lineKey, type CartLine } from "@/lib/cart/lines";
@@ -390,6 +391,22 @@ export function CheckoutView({
           )}
           <p className="mt-3 text-center font-body text-meta text-charcoal">
             {t.checkout.callNote}
+          </p>
+          {/* Согласие с условиями — без галочки. Ссылки открываются в новой
+              вкладке, чтобы не потерять заполненную форму. */}
+          <p className="consent-note mt-2 text-center font-body text-meta text-smoke">
+            {fillNodes(t.checkout.consent.text, {
+              terms: (
+                <Link href="/termeni" target="_blank" rel="noopener">
+                  {t.checkout.consent.terms}
+                </Link>
+              ),
+              privacy: (
+                <Link href="/confidentialitate" target="_blank" rel="noopener">
+                  {t.checkout.consent.privacy}
+                </Link>
+              ),
+            })}
           </p>
         </div>
       </form>
