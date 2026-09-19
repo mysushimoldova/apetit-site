@@ -1,210 +1,258 @@
 # Apetit — DESIGN.md
-> Тёплый кремовый стол, на котором лежит еда. Один жёлтый акцент — цена и кнопка «в корзину». Стекло только там, где интерфейс парит над едой: шапка, корзина, экран городов.
+> Витрина фастфуда на тёплой кремовой бумаге. Еда стоит на фоне одна, без рамок. Над ней — огромное слово категории, как вывеска. Один жёлтый — цена и кнопка. Тонкие чёрные линии, рисованные штрихи вместо иконок, продукт живёт при скролле.
 
-**Тема:** светлая · **Основа:** Apple (продукт — герой, сдержанность) + ElevenLabs (тёплая бумага вместо белого) + бренд Apetit (PSD меню)
-**Главный экран:** телефон 390 px. Десктоп — та же система, шире.
+**Тема:** светлая · **Главный экран:** телефон 390 px, десктоп — та же система шире
+**Версия:** 2.1 · 19.09.2026 · утверждено по макетам docs/mock-*.png · собрана по референсам Амяна (см. ниже) + бренд Apetit из PSD меню
 
 Apetit — фастфуд, и еда должна выглядеть так, чтобы хотелось есть. Поэтому фото
-блюд — единственный «декор». Всё остальное отступает: тёплый кремовый фон вместо
-белого, тонкие линии вместо рамок, мягкие тени вместо резких, одна жёлтая
-краска для денег и действий. Заголовки — узкий плотный Oswald заглавными, как в
-печатном меню; названия и цены — Manrope Bold; текст — Montserrat. Никаких
-украшений ради украшений: если элемент не помогает выбрать блюдо — его нет.
+блюд — единственный декор. Всё остальное отступает: тёплый кремовый фон вместо
+белого, тонкие линии вместо рамок и теней, одна жёлтая краска для денег и
+действий. Заголовки — узкий плотный Oswald заглавными, во всю ширину, как в
+печатном меню; названия и цены — Manrope; текст — Montserrat. Немного характера:
+иконки категорий нарисованы одной линией от руки, а не взяты из набора. Если
+элемент не помогает выбрать блюдо — его нет.
+
+## Референсы (выбор Амяна) — что берём, что нет
+
+| Сайт | Что берём | Что НЕ берём |
+|---|---|---|
+| **Hungry Tiger** eathungrytiger.com | Продукт живёт при скролле: растёт, наклоняется. Мягкий скролл (Lenis). Огромный заголовок-вывеска. Точечные разделители. Один акцент. | Тёмный ржавый фон. Текст крупнее продукта. |
+| **Hartzler Dairy** hartzlerdairy.com | Гигантское слово во всю ширину ЗА продуктами (DAIRY / FRESH). Продукты стоят на чистом фоне без карточек. Мелкие подписи заглавными. Воздух. Ничего не мешает. | Чисто белый фон. Бирюза/пастель. |
+| **Franky's** frankys-hats.com | Экран-витрина: один продукт крупно. Продукт крутится (кадры). Тонкие чёрные линии-рамки. Рисованные штрихи вместо иконок (их зверушки → наши кебаб, бургер, стакан). Ощущение «сделано человеком с юмором». | Шрифт с засечками. Шахматка. Розовый оттенок крема. |
+
+Общее во всех трёх — и это наш закон: **один продукт крупно и в одиночестве на
+чистом фоне · огромная типографика · один цвет-акцент · тёплый фон · тонкие линии
+вместо теней · продукт двигается · немного рукотворного характера.**
 
 ## Tokens — Colors
 
 | Name | Value | Token | Role |
 |------|-------|-------|------|
-| Cream | `#F6F1E9` | `--color-cream` | Фон страницы. Тёплый крем, не белый — глаз отдыхает, еда выглядит теплее |
-| Milk | `#FCFAF6` | `--color-milk` | Поверхность карточек, панелей, инпутов. Светлее фона — карточка «лежит» на столе |
-| Sand | `#EAE2D5` | `--color-sand` | Тонкие линии, разделители, рамки инпутов, фон выключенных элементов |
-| Yellow | `#FFBC0D` | `--color-yellow` | ЕДИНСТВЕННЫЙ цветной акцент: цена, кнопка «+», кнопка «Заказать», активный переключатель размера. Только заливка, никогда текст |
+| Cream | `#FAF7F2` | `--color-cream` | Фон всего сайта. Тёплый белый: крем, но ближе к белому (выбор Амяна; варианты в docs/fon-variante.png — A #FAF7F2, B #F6F1E9, C #F2EBDF). Фон не меняется ни в одной секции — нет тёмных полос, нет цветных блоков |
+| Milk | `#FFFDFA` | `--color-milk` | Только поверхности, которые лежат НАД страницей: лист блюда, инпуты, карточка точки, подтверждение заказа |
+| Sand | `#EAE2D5` | `--color-sand` | Фон выключенных элементов, плитка-заглушка без фото |
+| Yellow | `#FFBC0D` | `--color-yellow` | ЕДИНСТВЕННЫЙ цветной акцент: цена, кнопка «+», Primary-кнопка, активный размер. Только заливка, никогда текст |
 | Yellow Deep | `#E9A800` | `--color-yellow-deep` | Нажатое состояние жёлтого |
-| Ink | `#1A1714` | `--color-ink` | Основной текст, чёрные кнопки, активная категория. Тёплый чёрный из меню |
-| Charcoal | `#3D3733` | `--color-charcoal` | Второстепенный текст, состав блюда |
+| Ink | `#1A1714` | `--color-ink` | Текст, линии-рамки, разделители, активный чип, рисованные иконки. Тёплый чёрный из меню |
+| Charcoal | `#3D3733` | `--color-charcoal` | Второстепенный текст, состав |
 | Smoke | `#7A716A` | `--color-smoke` | Граммы, подписи, плейсхолдеры |
-| Ash | `#A79E95` | `--color-ash` | Самый тихий текст: подвал, мелкий шрифт |
-| Open | `#2F8F5B` | `--color-open` | Только точка-индикатор «открыто сейчас» |
-| Closed | `#C9473A` | `--color-closed` | Только «закрыто» и ошибки формы. Никогда для акций или кнопок |
-| Peach Glow | `#FFD9A8` | `--color-peach-glow` | Второе размытое пятно на фоне (с жёлтым). Декор, только blur ≥ 120px, opacity ≤ 0.35 |
+| Ash | `#A79E95` | `--color-ash` | Подвал, самый тихий текст |
+| Open | `#2F8F5B` | `--color-open` | Только точка-индикатор «открыто» |
+| Closed | `#C9473A` | `--color-closed` | Только «закрыто» и ошибки формы |
 
-Правило: жёлтый — это поверхность, а не цвет текста. Текст на жёлтом — всегда Ink.
-Жёлтый на кремовом фоне как текст не читается — так не делаем никогда.
+Правила:
+- Жёлтый — поверхность, не цвет текста. Текст на жёлтом всегда Ink.
+- Второго акцента нет. Зелёный и красный — только статус, никогда кнопки или акции.
+- Линии — Ink. Не серые, не полупрозрачные: тонкая чёрная линия — часть характера (Franky's).
 
 ## Tokens — Typography
 
-### Oswald — заголовки категорий, названия городов, номер заказа. Всегда ЗАГЛАВНЫМИ · `--font-display`
+### Oswald — вывески: слово категории, города на входе, номер заказа. Всегда ЗАГЛАВНЫМИ · `--font-display`
 - **Weights:** 600
-- **Sizes:** 44px (города на входе), 28px (категории), 22px (заголовок листа блюда)
-- **Line height:** 1.0–1.05
-- **Letter spacing:** +0.02em (Oswald узкий, лёгкий разлёт даёт воздух)
-- **Роль:** только крупные надписи. Никогда для текста и кнопок.
+- **Sizes:** billboard `clamp(72px, 22vw, 180px)` (слово категории во всю ширину), 44px (города), 22px (заголовок листа)
+- **Line height:** 0.9 для billboard, 1.0 для остального
+- **Letter spacing:** −0.01em billboard, +0.02em при 44px и меньше
+- **Роль:** только вывески. Никогда текст, кнопки, цены.
 
-### Manrope — названия блюд, цены, кнопки, чипы категорий · `--font-ui`
+### Manrope — названия блюд, цены, кнопки, чипы · `--font-ui`
 - **Weights:** 600, 700, 800
 - **Sizes:** 15px (чип, кнопка), 17px (название), 18px (цена), 20px (итого)
-- **Line height:** 1.25
-- **Letter spacing:** −0.01em
-- **Роль:** всё, что нажимают или сравнивают. 800 — только цена и итого.
+- **Line height:** 1.25 · **Letter spacing:** −0.01em
+- 800 — только цена и итого.
 
-### Montserrat — состав, описания, формы, подвал · `--font-body`
+### Montserrat — состав, описания, формы, подписи, подвал · `--font-body`
 - **Weights:** 400, 500
-- **Sizes:** 12px (подпись), 13px (граммы, состав), 15px (текст, инпуты)
+- **Sizes:** 12px (подпись ЗАГЛАВНЫМИ, +0.08em), 13px (граммы, состав), 15px (текст, инпуты)
 - **Line height:** 1.5
-- **Роль:** всё остальное. 500 — подписи полей и мелкие акценты.
 
 ### Type Scale
 
-| Role | Size | Line Height | Font / Weight | Token |
-|------|------|-------------|---------------|-------|
-| caption | 12px | 1.4 | Montserrat 500 | `--text-caption` |
+| Role | Size | LH | Font / Weight | Token |
+|------|------|----|---------------|-------|
+| caption-caps | 12px | 1.4 | Montserrat 500, caps, +0.08em | `--text-caption` |
 | meta | 13px | 1.5 | Montserrat 400 | `--text-meta` |
 | body | 15px | 1.5 | Montserrat 400 | `--text-body` |
 | label | 15px | 1.25 | Manrope 600 | `--text-label` |
 | title | 17px | 1.25 | Manrope 700 | `--text-title` |
 | price | 18px | 1.2 | Manrope 800 | `--text-price` |
 | total | 20px | 1.2 | Manrope 800 | `--text-total` |
-| sheet-title | 22px | 1.05 | Oswald 600 caps | `--text-sheet-title` |
-| category | 28px | 1.05 | Oswald 600 caps | `--text-category` |
+| sheet-title | 22px | 1.0 | Oswald 600 caps | `--text-sheet-title` |
 | city | 44px | 1.0 | Oswald 600 caps | `--text-city` |
+| billboard | clamp(72px, 22vw, 180px) | 0.9 | Oswald 600 caps | `--text-billboard` |
 
-Шрифты лежат в проекте (`/public/fonts`, woff2, latin + latin-ext для румынских ș ț ă â î и cyrillic). Не грузить с Google CDN.
+Шрифты в проекте (`/public/fonts`, woff2, latin + latin-ext для ș ț ă â î + cyrillic). Не с CDN.
 
 ## Tokens — Spacing & Shapes
 
-**Base unit:** 4px · **Density:** comfortable · **Боковой отступ на телефоне:** 16px · **Максимальная ширина контента:** 1200px
+**Base unit:** 4px · **Боковой отступ:** 16px телефон / 40px десктоп · **Контент:** до 1200px
 
 ### Spacing Scale
-4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 96
+4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 96 · 128
 
 ### Border Radius
 
 | Element | Value |
 |---------|-------|
 | buttons, chips, price pill | 9999px |
-| product card | 20px |
-| city tile | 24px |
-| bottom sheet (верх) | 28px |
-| inputs | 14px |
-| images inside cards | 16px |
-| small (badge) | 8px |
+| inputs | 12px |
+| bottom sheet (верх), модалка | 24px |
+| city tile, point card, promo | 16px |
+| images (атмосферные) | 12px |
 
-### Shadows
+Радиусов ровно четыре. Плитки блюд радиуса не имеют — у них нет поверхности.
+
+### Lines — вместо теней (Franky's, Hungry Tiger)
 
 | Name | Value | Where |
 |------|-------|-------|
-| card | `0 1px 2px rgba(26,23,20,.04), 0 8px 24px rgba(26,23,20,.06)` | карточки блюд, панели |
-| lift | `0 12px 32px rgba(26,23,20,.10)` | нажатая/поднятая карточка, открытый лист |
-| glass | `0 8px 24px rgba(26,23,20,.06)` | стеклянные панели |
-| food puddle | см. «Food Image» ниже | тень под фото блюда |
+| rule | `1px solid #1A1714` | рамка витрины города, рамка листа, подчёркивание активного чипа, граница шапки |
+| rule-dotted | `1px dotted rgba(26,23,20,.45)` | разделитель между категориями, между строками корзины |
+| hairline | `1px solid #EAE2D5` | внутри форм, между полями |
 
-Тени всегда тёплые (на основе Ink), никогда чисто чёрные, никогда резкие.
+Теней на сайте почти нет. Исключения ниже — ровно два.
 
-### Glass (ровно три места: шапка, нижняя панель корзины, оверлей выбора города)
+### Shadows (только два места)
+
+| Name | Value | Where |
+|------|-------|-------|
+| food puddle | см. «Food Image» | под каждым фото блюда |
+| lift | `0 12px 32px rgba(26,23,20,.10)` | открытый лист блюда / модалка |
+
+Никаких box-shadow на плитках, кнопках, чипах, шапке.
+
+### Glass (ровно три места: шапка, корзина снизу, оверлей смены города)
 
 ```
-background: rgba(252, 250, 246, 0.72);
-backdrop-filter: blur(18px) saturate(140%);
--webkit-backdrop-filter: blur(18px) saturate(140%);
-border: 1px solid rgba(255, 255, 255, 0.6);
-box-shadow: var(--shadow-glass);
+background: rgba(250, 247, 242, 0.78);
+backdrop-filter: blur(16px) saturate(130%);
+-webkit-backdrop-filter: blur(16px) saturate(130%);
+border-bottom: 1px solid #1A1714;   /* шапка: линия, не тень */
 ```
-Fallback без backdrop-filter: `background: rgba(252,250,246,0.96)`.
-Нигде больше стекло не используем: на дешёвых Android каждый blur стоит кадров.
+Fallback: `background: rgba(250,247,242,0.96)`. Нигде больше.
 
-### Background Glow (фон страницы)
-
-Два неподвижных размытых пятна на Cream: жёлтое (Yellow, opacity .22) справа
-сверху и персиковое (Peach Glow, opacity .30) слева на уровне первой категории.
-`filter: blur(120px)`, `pointer-events: none`, рендерятся один раз, не
-анимируются, не следуют за скроллом. На экране городов — те же пятна, чуть ярче
-(.30 / .38). Это и есть «глубина»: свет, а не градиент.
+### Background — линии с телевизоров Apetit
+Фон — Cream (#FAF7F2) + слой контурных линий бренда (как на меню-экранах в
+точках): исходник `assets/brand/linii-fundal.png` (4K, чёрные линии на белом).
+При сборке белый убирается, линии становятся Ink с opacity ≈ .5–.6, слой
+повторяется (tile) и лежит под всем контентом (`position: fixed`, z-index 0,
+`pointer-events: none`). При скролле слой сдвигается на ~0.35 от прокрутки
+(`transform: translateY`, только transform, requestAnimationFrame), стоит — когда
+не скроллят. На слабых устройствах и при reduced-motion — слой статичный.
+Никаких других пятен, градиентов, текстур. Видео `linii-fundal.mp4` — только
+для экрана городов, если решим (фаза 2), не для меню.
 
 ## Components
 
-### City Tile — экран входа
-Milk fill, 24px radius, shadow card, высота 96px на телефоне, название города
-Oswald 44px caps Ink по центру. Больше ничего внутри: ни иконок, ни телефонов.
-Шесть плиток столбиком с зазором 12px, экран без шапки и подвала. Нажатие:
-плитка чуть приподнимается (scale 1.02, shadow lift), затем раскрывается в меню.
+### City Screen — витрина (Franky's)
+Экран без шапки и подвала. Шесть плиток столбиком, зазор 12px, внутри 16px
+отступа от краёв. Плитка: без заливки, рамка `rule` 1px Ink, 16px radius, высота
+88px, город Oswald 44px caps Ink по центру. Больше ничего внутри. Нажатие:
+плитка заливается Ink, текст Cream, 150ms, затем раскрывается в меню.
+Десктоп: сетка 3×2, плитки 200px высотой. Логотипа нет — решено.
 
-### Header — стекло
-Высота 56px, sticky, glass. Слева логотип APETIT (SVG из assets/logo, высота 22px,
-Ink). По центру ничего. Справа: название города Manrope 600 15px с маленькой
-стрелкой вниз (нажатие = сменить город) и переключатель RO/RU 13px Smoke.
+### Header — стекло + линия
+56px, sticky, glass, снизу `rule`. Слева логотип APETIT (SVG, высота 22px, Ink).
+Справа: город Manrope 600 15px + рисованная стрелка вниз (сменить город), и RO/RU
+13px Smoke. По центру пусто.
 
-### Category Chips — лента категорий
-Горизонтальный скролл под шапкой, sticky вместе с ней. Чип: Manrope 600 15px,
-высота 40px, 9999px, padding 0 16px. Неактивный — Milk fill, Sand border.
-Активный — Ink fill, Milk text. Не жёлтый: жёлтый занят деньгами.
+### Category Chips — с рисованными иконками
+Горизонтальная лента под шапкой (высота ленты 46px), sticky вместе с ней, фон
+glass. Чип: рисованная иконка категории 16px + название Manrope 600 13px, высота
+32px, 9999px, padding 0 12px 0 9px, зазор 8px. Неактивный: без заливки, рамка
+`rule`. Активный: Ink fill, Cream текст и иконка. Не жёлтый.
+Нажатие на чип (Амян): короткая весёлая анимация 350–400ms — иконка в чипе
+делает один оборот (rotate 360°), одновременно страница плавно едет к секции, и
+слово-вывеска категории выезжает из-под маски. Один раз на нажатие, не в цикле.
 
-### Product Card
-Milk fill, 20px radius, shadow card, padding 12px. Сверху фото блюда (см. Food
-Image), под ним название Manrope 700 17px Ink (максимум 2 строки), граммы
-Montserrat 13px Smoke, внизу ряд: цена в Price Pill слева, кнопка Add справа.
-Сетка на телефоне: 2 колонки, зазор 12px. На десктопе: 4 колонки.
+### Hand-drawn Icons — характер сайта
+Один набор, нарисованный нами: kebab, burger, gözleme, crispy, hot dog, sandwich,
+salad, pizza, sos, drinks, menu(комбо), desert. Одна линия 1.6px, Ink, слегка
+неровная, как от руки — в духе зверушек Franky's. 24×24 viewBox, SVG в проекте.
+Рисует Claude, утверждает Амян. Больше нигде рисованных иконок нет: функциональные
+(корзина, стрелка, плюс, крестик, геолокация) — Lucide, stroke 1.75, Ink.
+
+### Category Billboard — слово-вывеска (Hartzler)
+Перед каждой категорией: слово ЗАГЛАВНЫМИ Oswald 600, `--text-billboard`,
+**контурное**: `color: transparent; -webkit-text-stroke: 2px #1A1714` (выбор Амяна,
+вариант A — сплошная чёрная плита давила; сквозь пустые буквы видны линии фона).
+Во всю ширину контента, прижато влево, line-height 0.9, без отступа снизу.
+Первая строка плиток блюд наезжает на нижнюю четверть слова (margin-top
+−0.22em), фото стоят «перед» буквами (z-index). Сверху от слова — `rule-dotted`
+и 48px воздуха. Это главный визуальный приём меню: KEBAB · BURGERS · GÖZLEME.
+
+### Product Tile — без карточки (Hartzler, Franky's)
+Поверхности нет, рамки нет, тени нет. Только: Food Image → название Manrope 700
+17px Ink (2 строки максимум) → состав Montserrat 12px Charcoal (2 строки, дальше
+«…») → граммы Montserrat 13px Smoke → ряд: Price Pill слева, Add справа
+(состав под названием и ценник меньше — правка Амяна). Сетка на телефоне 2 колонки, зазор 16px по горизонтали и 32px
+по вертикали. Десктоп 4 колонки, зазор 32/48. Нажатие на фото или название —
+открывает лист.
 
 ### Food Image
-Вырезка блюда без фона (PNG/WebP) на Milk, высота 140px в карточке, 260px в
-листе блюда. Под фото — «лужица» тени: псевдоэлемент-эллипс шириной 70% фото,
-высотой 14px, `radial-gradient(ellipse, rgba(26,23,20,.22), transparent 70%)`.
-Это дешёвая замена drop-shadow из PSD — выглядит так же, стоит ноль кадров.
-Нет фото → Sand плитка 16px radius с силуэтом тарелки Ash, никакого «No image».
+Вырезка блюда без фона (WebP), высота 150px в плитке, 280px в листе, 60vh в
+витрине города. Под фото «лужица», еле заметная: псевдоэлемент-эллипс 64% ширины × 10px,
+`radial-gradient(ellipse, rgba(26,23,20,.13), transparent 70%)`. Это единственная
+«тень» еды, и она дешёвая. Нет фото → Sand плитка 12px radius с рисованной
+тарелкой Ash. Никакого «No image».
 
 ### Price Pill
-Yellow fill, Ink text, Manrope 800 18px, высота 32px, 9999px, padding 0 12px.
-Формат: `85 lei`, при размерах — `de la 80 lei`. Самый заметный элемент карточки после фото.
+Yellow fill, Ink, Manrope 700 15px, высота 28px, 9999px, padding 0 10px.
+Формат `85 lei`, при размерах `de la 80 lei` («de la» Manrope 600 12px). В листе
+блюда и корзине — крупнее: Manrope 800 18px, высота 32px.
 
 ### Add Button
-Круг 36px, Yellow fill, Ink «+» 2px stroke. Нажатие: scale .92 → 1, значок
-корзины в нижней панели один раз подпрыгивает. После добавления круг становится
-Ink с белой цифрой количества и ±.
+Круг 32px, Yellow fill, «+» Ink 2px. Нажатие: scale .92→1, корзина снизу один
+раз подпрыгивает. После добавления: Ink fill, Cream цифра, ± по бокам.
 
-### Product Sheet — открытая карточка
-Bottom sheet снизу, Milk, 28px радиус сверху, shadow lift, ручка-полоска Sand
-вверху. Фото 260px, название Oswald 22px caps, состав Montserrat 13px Charcoal,
-граммы Smoke. Блоки: Размер (сегменты 9999px, активный Yellow), Убрать
-(галочки, бесплатно, Montserrat 15px), Добавить (строки с ценой справа
-Manrope 600). Внизу прилипшая панель: количество ± слева, кнопка Primary
-«В корзину · 198 lei» справа.
+### Product Sheet — лист блюда
+Bottom sheet, Milk, 24px сверху, рамка `rule` по верху, shadow lift, ручка
+36×4 Sand. Фото 280px с лужицей, название Oswald 22px caps, состав Montserrat
+13px Charcoal, граммы Smoke. Блоки, разделённые `hairline`: Размер (сегменты
+9999px, активный Yellow), Убрать (галочки Montserrat 15px, «gratuit»), Добавить
+(строки, цена справа Manrope 600). Снизу sticky: ± слева, Primary «Adaugă · 198
+lei» справа. Десктоп: модалка 520px по центру, те же правила.
 
 ### Primary Button
-Yellow fill, Ink text Manrope 700 15px, высота 52px, 9999px, полная ширина на
-телефоне. Единственная жёлтая кнопка на экране. Нажатие: Yellow Deep.
-Disabled (закрыто / пустая корзина): Sand fill, Smoke text, без тени.
+Yellow fill, Ink Manrope 700 15px, 52px, 9999px, полная ширина на телефоне.
+Единственная жёлтая кнопка на экране. Нажатие Yellow Deep. Disabled: Sand fill,
+Smoke text.
 
 ### Secondary Button
-Milk fill, Sand border 1px, Ink text Manrope 600 15px, высота 48px, 9999px.
-«Сменить город», «Открыть в Google Maps», «Все отзывы».
+Без заливки, рамка `rule` 1px Ink, Ink Manrope 600 15px, 48px, 9999px.
+Hover/нажатие: Ink fill, Cream текст. «Schimbă orașul», «Deschide în Google
+Maps», «Toate recenziile».
 
-### Cart Bar — стекло
-Fixed снизу, glass, высота 72px, padding 12px 16px, появляется снизу когда в
-корзине ≥ 1. Слева иконка корзины Ink с бейджем количества (Ink круг, Milk
-цифра), по центру «3 poziții», справа Primary «Coș · 250 lei».
+### Cart Bar — стекло + линия
+Fixed снизу, glass, сверху `rule`, 72px, padding 12px 16px, появляется когда в
+корзине ≥ 1. Слева корзина Lucide 24px Ink с бейджем (Ink круг, Cream цифра),
+центр «3 poziții» Montserrat 15px, справа Primary «Coș · 250 lei».
 
-### Point Card — выбор точки в Сороках
-Milk, 20px, shadow card, padding 16px. Название Manrope 700 17px, адрес
-Montserrat 13px Charcoal, часы + точка-индикатор Open/Closed 13px, расстояние
-«1,2 km · 15 min» Manrope 600 15px справа. Выбранная: border 2px Yellow.
+### Point Card — точка в Сороках
+Milk, рамка `rule`, 16px radius, padding 16px. Название Manrope 700 17px, адрес
+13px Charcoal, часы + точка Open/Closed, расстояние «1,2 km · 15 min» Manrope 600
+справа. Выбранная: рамка 2px Yellow.
 
 ### Input
-Milk fill, Sand border 1px, 14px radius, высота 52px, Montserrat 15px Ink,
-label 13px Smoke над полем. Focus: border Ink. Ошибка: border Closed, подпись
-Closed 12px под полем. Никаких плавающих лейблов.
+Milk fill, рамка `hairline`, 12px radius, 52px, Montserrat 15px Ink, label
+caption-caps над полем. Focus: рамка `rule`. Ошибка: рамка Closed + подпись 12px.
 
 ### Order Confirmation
-Cream фон, центр: круг 96px Yellow с галочкой Ink, номер заказа Oswald 44px
-caps, текст Montserrat 15px Charcoal, ниже карточка Milk с составом и итого,
-Secondary «Sună la local».
+Cream фон, круг 96px Yellow с галочкой Ink, номер заказа Oswald 44px caps,
+текст Montserrat 15px Charcoal, ниже блок с составом, разделённый `rule-dotted`,
+итого Manrope 800 20px, Secondary «Sună la local».
 
 ### Promo Card
-Milk, 20px, фото на всю ширину карточки 16px radius, заголовок Manrope 700 17px,
-текст 13px. Горизонтальная лента, одна карточка — 84% ширины экрана.
-Блок отсутствует, когда акций нет.
+Единственная карточка с поверхностью в меню: Milk, рамка `rule`, 16px radius,
+фото на всю ширину 12px radius, заголовок Manrope 700 17px, текст 13px.
+Горизонтальная лента, карточка 84% ширины экрана. Блока нет, когда акций нет.
 
 ### Closed Banner
-Sand fill, 14px radius, Montserrat 15px Ink, точка Closed: «Acum e închis.
-Deschidem la 08:30». Primary кнопка внизу disabled.
+Без заливки, рамка `rule`, 12px radius, Montserrat 15px Ink, точка Closed:
+«Acum e închis. Deschidem la 08:30». Primary внизу disabled.
+
+### Section Rule
+Между крупными блоками страницы (акции / меню / Instagram / подвал) — `rule`
+1px Ink на всю ширину контента, с 48px воздуха сверху и снизу. Как у Franky's.
 
 ## Motion
 
@@ -212,87 +260,108 @@ Deschidem la 08:30». Primary кнопка внизу disabled.
 |-------|-------|
 | `--ease-out` | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
 | `--dur-fast` | 150ms — нажатия, переключатели |
-| `--dur-base` | 240ms — появление карточек, чипы, лист |
+| `--dur-base` | 240ms — появление плиток, чипы, лист |
 | `--dur-slow` | 420ms — экран городов, переход в меню |
 
-- Вход: плитки городов появляются снизу (y 24 → 0, opacity 0 → 1) с задержкой
-  60ms друг за другом. Выбранная плитка увеличивается и растворяется в шапку меню.
-- Карточки блюд: появляются при скролле один раз (y 12 → 0, opacity), группами
-  по строке, задержка 40ms. Больше не анимируются.
-- Фото блюд: лёгкий параллакс при скролле, ±6px, только `transform`, только
-  на десктопе. На телефоне выключен.
-- Лист блюда: выезжает снизу 240ms, фон затемняется до rgba(26,23,20,.35).
-- Всё через `transform` и `opacity`. Ничего через `top/left/height/filter`.
-- `prefers-reduced-motion: reduce` → все длительности 0, параллакс выключен.
+Фаза 1 (в первой версии сайта):
+- Мягкий скролл: Lenis, только на десктопе (≥1024px). На телефоне — нативный,
+  он и так плавный, а Lenis там ест батарею.
+- Вход: плитки городов появляются снизу (y 24→0, opacity) с задержкой 60ms
+  друг за другом. Выбранная заливается Ink и раскрывается в меню.
+- Слово-вывеска категории: при появлении в кадре выезжает снизу из-под маски
+  (clip-path), 420ms. Один раз.
+- Плитки блюд: при появлении в кадре, y 12→0 + opacity, по строкам, 40ms
+  задержка. Один раз.
+- Фото блюд: лёгкий параллакс ±6px, только transform, только десктоп.
+- Лист: снизу 240ms, фон затемняется до rgba(26,23,20,.35).
+- Всё через transform/opacity/clip-path. Никогда top/left/height/filter/box-shadow.
+- `prefers-reduced-motion: reduce` → длительности 0, параллакс и Lenis выключены.
 - Ничего не крутится бесконечно, ничего не всплывает само, нет автокаруселей.
+
+Фаза 2 (после запуска — «штучки», Hungry Tiger / Franky's):
+- Витрина города: один продукт-герой (например, Kebab Cheese) над меню. При
+  скролле растёт с 60vh и наклоняется на ~50°, слово APETIT за ним уходит вверх
+  медленнее (пиннед-секция, GSAP ScrollTrigger scrub). Кадры: 48–72 штук из
+  AI-видео (Kling/Higgsfield: «slow rotation, white background, static camera»)
+  или съёмки на вращающемся столике. Формат — WebP-секвенция на canvas.
+  Загружается лениво, только после меню; на слабых устройствах — статичное фото
+  с 2D-ростом (scale 0.8→1, transform).
+- Одно такое место на сайте. Не на каждое блюдо.
 
 ## Do's and Don'ts
 
 ### Do
-- Фон — Cream, карточки — Milk, линии — Sand. Никогда чистый белый `#FFFFFF`
-  и никогда чистый серый.
-- Жёлтый только как заливка: цена, «+», Primary, активный размер. Одна краска — одна работа.
-- Заголовки категорий — Oswald 600 ЗАГЛАВНЫМИ, как в печатном меню. Это
-  узнаваемость бренда.
-- Фото блюда — самый крупный элемент любой карточки. Текст меньше фото всегда.
-- Тени тёплые и мягкие; под едой — «лужица», а не box-shadow.
-- Все кнопки и чипы — 9999px. Карточки — 20px. Других радиусов нет.
-- Стекло — ровно три места. Проверять на дешёвом Android, что скролл 60 fps.
-- Экран городов — только шесть плиток. Ни логотипа, ни текста, ни крестика.
+- Фон — ровный Cream везде. Никаких тёмных секций, цветных полос, белого `#FFFFFF`.
+- Еда стоит на фоне одна: без карточки, без рамки, без тени — только лужица.
+- Слово категории — огромное, во всю ширину, продукты наезжают на него.
+- Жёлтый только как заливка: цена, «+», Primary, активный размер.
+- Линии — тонкие, чёрные, настоящие. Разделители точечные.
+- Иконки категорий — наши, рисованные одной линией. Функциональные — Lucide.
+- Кнопки и чипы — 9999px. Радиусов ровно четыре.
+- Стекло — три места. Скролл 60 fps на дешёвом Android — проверять.
+- Экран городов — шесть плиток и ничего больше.
 
 ### Don't
-- Не использовать жёлтый как цвет текста, рамки или градиента.
-- Не добавлять второй акцентный цвет. Зелёный и красный — только индикаторы состояния.
-- Не ставить Oswald на текст, кнопки или цены — только крупные заголовки.
-- Не делать чёрных секций, тёмных подвалов, «hero» с фото во весь экран — сайт светлый насквозь.
-- Не использовать эмодзи, иконки в цветных кружочках, стоковые иллюстрации,
-  «три карточки с преимуществами», фиолетовые/синие градиенты, glow-обводки.
-- Не показывать «Lorem ipsum», «Image coming soon», плейсхолдерные тексты.
-- Не анимировать `box-shadow`, `filter`, `height`. Не делать бесконечных анимаций.
-- Не ставить всплывающие окна, cookie-плашки, баннеры «скачай приложение», чат-виджеты.
-- Не сжимать боковой отступ меньше 16px на телефоне.
+- Не использовать жёлтый как текст, рамку, градиент, фон секции.
+- Не добавлять второй акцент. Не красить акции в красный.
+- Не класть еду в карточки с заливкой и тенью. Не ставить box-shadow на плитки, кнопки, чипы, шапку.
+- Не ставить Oswald на текст, кнопки, цены.
+- Не делать тёмных секций, «hero» с фото во весь экран, цветных полос.
+- Не использовать эмодзи, иконки в кружочках, стоковые иллюстрации, «три карточки
+  с преимуществами», фиолетовые/синие градиенты, glow, шахматку, засечки.
+- Не показывать «Lorem ipsum», «Image coming soon», заглушки-тексты.
+- Не анимировать box-shadow, filter, height. Ничего бесконечного.
+- Не ставить всплывающие окна, cookie-плашки, баннеры про приложение, чат-виджеты.
+- Не сжимать боковой отступ меньше 16px.
 
 ## Surfaces
 
 | Level | Name | Value | Purpose |
 |-------|------|-------|---------|
-| 0 | Cream | `#F6F1E9` | Фон страницы + два размытых пятна |
-| 1 | Milk | `#FCFAF6` | Карточки, панели, инпуты, лист |
-| 2 | Glass | `rgba(252,250,246,.72)` + blur 18px | Шапка, корзина, оверлей города |
-| 3 | Ink | `#1A1714` | Активный чип, бейдж количества, «Принят» |
+| 0 | Cream | `#FAF7F2` | Фон всего сайта, всех секций |
+| 1 | Milk | `#FFFDFA` | Лист блюда, инпуты, карточка точки, промо, подтверждение |
+| 2 | Glass | `rgba(250,247,242,.78)` + blur 16px | Шапка, корзина, оверлей города |
+| 3 | Ink | `#1A1714` | Активный чип, нажатая плитка города, бейдж, Secondary hover |
 
 ## Imagery
 
 Только реальные фото блюд Apetit: вырезки без фона из `assets/foto-originale`
-(WebP, 3 размера: 400 / 800 / 1600). Фото всегда на Milk, никогда на Cream
-напрямую. Атмосферные фото (интерьер, команда) — только в блоке Instagram внизу,
-16px radius, без текста поверх. Иконки — Lucide, stroke 1.75px, цвет Ink или
-Smoke, размер 20–24px, без заливки и без кружков вокруг. Логотип — SVG из
-`assets/logo`, Ink на светлом; никаких перекрасок в жёлтый.
+(WebP, 3 размера: 400 / 800 / 1600). Фото всегда прямо на Cream — не в
+карточке. Атмосферные фото (интерьер, команда) — только блок Instagram внизу,
+12px radius, без текста поверх, без фильтров. Логотип — SVG из `assets/logo`,
+Ink; никаких перекрасок в жёлтый.
 
 ## Layout
 
-Телефон: одна колонка, 16px по бокам, сетка блюд 2 × N, зазор 12px. Шапка 56px
-+ лента категорий 52px прилипают вместе. Cart Bar 72px снизу, контент имеет
-padding-bottom 88px, когда корзина не пуста. Десктоп (≥1024px): контент 1200px
-по центру, сетка 4 колонки, лист блюда становится центрированным модальным
-окном 520px с теми же радиусами, Cart Bar превращается в кнопку в шапке.
-Страница меню — единственный длинный скролл; категории — якоря.
+Телефон: одна колонка, 16px по бокам. Шапка 56px + лента чипов 52px прилипают
+вместе (glass). Под ними: [Promo лента, если есть] → Section Rule → для каждой
+категории: rule-dotted → Billboard-слово → сетка плиток 2×N → 64px воздуха.
+Внизу: Section Rule → Instagram (сетка 3×3, 4px зазор) → отзывы Google →
+контакты → подвал. Cart Bar 72px снизу; контент имеет padding-bottom 88px, когда
+корзина не пуста.
+
+Десктоп (≥1024px): контент 1200px по центру, 40px по бокам, сетка блюд 4
+колонки, billboard до 180px, лист блюда — модалка 520px, Cart Bar — кнопка в
+шапке. Страница меню — единственный длинный скролл; категории — якоря.
 
 ## Agent Prompt Guide
 
 **Quick Reference**
-- background: #F6F1E9 · surface: #FCFAF6 · line: #EAE2D5
-- text: #1A1714 (primary) · #3D3733 (secondary) · #7A716A (meta) · #A79E95 (faint)
-- action & price: #FFBC0D fill, #1A1714 text · pressed #E9A800
+- canvas: #FAF7F2 everywhere · raised surfaces only: #FFFDFA
+- text: #1A1714 · #3D3733 · #7A716A · #A79E95
+- lines: 1px solid #1A1714 (rule) · 1px dotted rgba(26,23,20,.45) · 1px #EAE2D5 (hairline)
+- action & price: #FFBC0D fill + #1A1714 text · pressed #E9A800
 - status: #2F8F5B open · #C9473A closed/error
-- fonts: Oswald 600 caps (display) · Manrope 600–800 (UI) · Montserrat 400/500 (body)
-- radii: 9999px pills · 20px cards · 24px city tiles · 28px sheet · 14px inputs
+- fonts: Oswald 600 caps (billboard/city) · Manrope 600–800 (UI) · Montserrat 400/500 (body)
+- radii: 9999 pills · 12 inputs · 16 tiles/cards · 24 sheet
+- no box-shadow except sheet lift; food gets a faint radial puddle (.13)
+- billboard word: outline only (transparent fill, 2px #1A1714 stroke)
+- background: cream + brand contour lines layer (assets/brand/linii-fundal.png), shifts with scroll
 - glass: header, cart bar, city overlay only
 
 **Example Component Prompts**
-1. Product card: Milk `#FCFAF6` surface, 20px radius, shadow `0 1px 2px rgba(26,23,20,.04), 0 8px 24px rgba(26,23,20,.06)`, padding 12px. Food cutout 140px tall with a radial-gradient puddle shadow beneath. Title Manrope 700 17px `#1A1714`, 2 lines max. Meta "290 g" Montserrat 13px `#7A716A`. Bottom row: price pill (Yellow fill, Ink text, Manrope 800 18px, 32px tall, 9999px) left, 36px yellow circle "+" right.
-2. City tile: Milk surface, 24px radius, 96px tall, card shadow, city name Oswald 600 44px uppercase `#1A1714` centered, letter-spacing .02em. Six tiles stacked with 12px gap on a Cream canvas with two static blurred glows (Yellow .30, Peach .38, blur 120px). No header, no footer, no other text.
-3. Cart bar: fixed bottom, 72px, glass (`rgba(252,250,246,.72)`, blur 18px, 1px rgba(255,255,255,.6) border). Left: cart icon Lucide 24px Ink with Ink badge. Center: "3 poziții" Montserrat 15px. Right: Primary pill Yellow fill "Coș · 250 lei" Manrope 700 15px, 52px tall.
-4. Category chips: horizontal scroll, sticky under header. Inactive: Milk fill, 1px Sand border, Manrope 600 15px Ink, 40px tall, 9999px. Active: Ink fill, Milk text. Scroll-snap, 8px gap, 16px side padding.
-5. Product sheet: bottom sheet, Milk, 28px top radius, lift shadow, 36×4px Sand handle. Food image 260px with puddle shadow. Title Oswald 600 22px uppercase. Ingredients Montserrat 13px `#3D3733`. Size segmented control (pills, active Yellow). Sticky footer: quantity stepper left, Primary "Adaugă · 198 lei" right.
+1. Category section: dotted rule `1px dotted rgba(26,23,20,.45)`, 48px gap, then the word "KEBAB" in Oswald 600 uppercase at `clamp(72px,22vw,180px)`, line-height .9, transparent fill with 2px #1A1714 text-stroke, left-aligned full width. Below it a 2-column grid (16px/32px gaps) whose first row overlaps the word by −0.22em; tiles have no background.
+2. Product tile: no surface. Food cutout 150px tall centered with a radial puddle shadow beneath (`radial-gradient(ellipse, rgba(26,23,20,.13), transparent 70%)`, 64% width × 10px). Title Manrope 700 17px #1A1714 max 2 lines. Ingredients Montserrat 12px #3D3733, 2 lines clamp. Meta "290 g" Montserrat 13px #7A716A. Row: price pill (#FFBC0D fill, #1A1714 text, Manrope 700 15px, 28px tall, 9999px) left; 32px #FFBC0D circle with "+" right.
+3. City screen: canvas #FAF7F2, no header/footer. Six tiles stacked, 12px gap, 16px side padding: transparent fill, 1px solid #1A1714 border, 16px radius, 88px tall, city name Oswald 600 44px uppercase #1A1714 centered. Pressed: #1A1714 fill, #FAF7F2 text. Tiles enter from y 24→0 with 60ms stagger.
+4. Category chip: 32px tall pill, transparent, 1px solid #1A1714, hand-drawn 16px single-line icon + label Manrope 600 13px, padding 0 12px 0 9px, 8px gap. Active: #1A1714 fill, #FAF7F2 icon and text. Row sticky under the 56px glass header.
+5. Cart bar: fixed bottom, 72px, glass `rgba(250,247,242,.78)` blur 16px, top border 1px solid #1A1714. Left Lucide cart 24px #1A1714 with #1A1714 badge and #FAF7F2 count; center "3 poziții" Montserrat 15px; right Primary pill #FFBC0D "Coș · 250 lei" Manrope 700 15px, 52px tall.
