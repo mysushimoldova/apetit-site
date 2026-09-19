@@ -248,3 +248,208 @@
     outline-offset: 4px;
   }
 }
+
+/* ---------- Страница меню (DESIGN.md 2.1 → Components) ---------- */
+
+/* Шапка: 56px, стекло, снизу линия rule (не тень) */
+@utility site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: var(--size-header);
+  border-bottom: var(--rule);
+}
+
+/* Лента чипов: 46px, стекло, прилипает под шапкой; полоса прокрутки скрыта */
+@utility chips-row {
+  position: sticky;
+  top: var(--size-header);
+  z-index: 20;
+  height: var(--size-chips-row);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Первый чип стоит на одной линии с контентом (контейнер 1200px по центру),
+     а при прокрутке ленты на телефоне последний не прилипает к краю */
+  & > ul {
+    padding-inline: max(
+      var(--gutter),
+      calc((100% - var(--container-page)) / 2 + var(--gutter))
+    );
+  }
+}
+
+/* Чип категории: 32px, рамка rule, иконка 16px + Manrope 600 13px.
+   Активный — заливка Ink, текст и иконка Cream. Не жёлтый. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--size-chip);
+  padding: 0 12px 0 9px;
+  border: var(--rule);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-chip);
+  font-weight: var(--text-chip--font-weight);
+  letter-spacing: var(--text-chip--letter-spacing);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+
+  /* Hover только для мыши: на тачскрине тап даёт ложный hover */
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--color-sand);
+    }
+  }
+
+  &[aria-current="true"] {
+    background: var(--color-ink);
+    color: var(--color-cream);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
+/* Секция категории: точечная линия сверху, 48px воздуха, 64px снизу.
+   scroll-margin-top — чтобы якорь не прятался под шапкой и лентой. */
+@utility menu-section {
+  border-top: var(--rule-dotted);
+  padding-top: 48px;
+  padding-bottom: 64px;
+  scroll-margin-top: calc(var(--size-header) + var(--size-chips-row));
+  /* Размер слова-вывески — от ширины секции (cqw), чтобы слово легло
+     «во всю ширину» (макет, вариант A). --billboard-em — ширина слова в em
+     из src/lib/billboard-fit.ts, задаётся на секции. Потолок 180px —
+     верхняя граница токена --text-billboard. 0.98 — запас на обводку. */
+  container-type: inline-size;
+  --billboard-size: min(180px, calc(100cqw * 0.98 / var(--billboard-em, 3)));
+}
+
+/* Слово-вывеска категории: Oswald, контур (прозрачная заливка, обводка 2px Ink),
+   во всю ширину, прижато влево, без отступа снизу. Никогда не переносится:
+   размер подогнан под ширину. */
+@utility billboard {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--billboard-size, var(--text-billboard));
+  white-space: nowrap;
+  line-height: var(--text-billboard--line-height);
+  font-weight: var(--text-billboard--font-weight);
+  letter-spacing: var(--text-billboard--letter-spacing);
+  text-transform: uppercase;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--color-ink);
+  user-select: none;
+}
+
+/* Сетка плиток: первая строка наезжает на нижнюю четверть слова, фото — перед буквами */
+@utility tiles {
+  position: relative;
+  z-index: 1;
+  margin-top: calc(var(--billboard-size, var(--text-billboard)) * -0.22);
+}
+
+/* Фото блюда: 150px в плитке, под ним «лужица» — единственная тень еды */
+@utility food {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: var(--size-food-tile);
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: -4px;
+    height: 10px;
+    border-radius: var(--radius-pill);
+    background: var(--puddle);
+  }
+
+  & > * {
+    position: relative;
+  }
+}
+
+/* Ценник: Yellow, Ink, Manrope 700 15px, 28px, pill */
+@utility price-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  height: var(--size-price-pill);
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-yellow);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-price-tile);
+  font-weight: var(--text-price-tile--font-weight);
+  letter-spacing: var(--text-price-tile--letter-spacing);
+  line-height: var(--size-price-pill);
+  white-space: nowrap;
+}
+
+/* Кнопка «+»: круг 32px Yellow, «+» Ink 2px. Нажатие: scale .92 */
+@utility add-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-add);
+  height: var(--size-add);
+  border-radius: var(--radius-pill);
+  background: var(--color-yellow);
+  color: var(--color-ink);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--color-yellow-deep);
+    }
+  }
+
+  &:active {
+    transform: scale(0.92);
+    background: var(--color-yellow-deep);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
+/* Появление плиток при скролле (DESIGN.md → Motion фаза 1): y 12→0 + opacity,
+   один раз. Скрываются только те, что ниже экрана, и только когда есть JS. */
+[data-reveal-ready] [data-reveal]:not([data-visible]) {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+[data-reveal] {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}

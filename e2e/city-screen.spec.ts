@@ -48,11 +48,11 @@ test("клик по Soroca ведёт на /soroca, повторное откр�
   await page.goto("/");
   await page.getByRole("link", { name: "Soroca" }).click();
   await expect(page).toHaveURL("/soroca");
-  await expect(page.locator("h1")).toHaveText("Soroca");
+  await expect(page.locator("h1")).toHaveText("Apetit Soroca");
 
   await page.goto("/", { waitUntil: "commit" });
   await expect(page).toHaveURL("/soroca");
-  await expect(page.locator("h1")).toHaveText("Soroca");
+  await expect(page.locator("h1")).toHaveText("Apetit Soroca");
 });
 
 test("мусор в localStorage не ломает главную", async ({ page }) => {
