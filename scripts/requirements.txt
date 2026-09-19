@@ -1,0 +1,7 @@
+# Зависимости scripts/prepare-images.py (Python 3.14). Установка:
+#   py -3 -m pip install -r scripts/requirements.txt
+# Модели rembg скачиваются сами при первом запуске в ~/.rembg/models.
+rembg[cli]==2.0.84
+onnxruntime==1.30.0
+pillow==12.3.0
+numpy==2.5.3
