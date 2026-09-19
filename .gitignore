@@ -34,3 +34,6 @@ public/img/products/*.png
 
 # Python (скрипты подготовки фото)
 __pycache__/
+
+# Отчёты semgrep (если скилл положит их в корень)
+static_analysis_semgrep_*/

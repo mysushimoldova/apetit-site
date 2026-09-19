@@ -1,0 +1,14 @@
+# Что semgrep не сканирует. Всё из .gitignore (node_modules, .next, секреты) — тоже.
+:include .gitignore
+
+# Чужой код скиллов и плагинов — не код сайта
+.claude/
+.agents/
+
+# Сторонние зависимости и сборка (на случай, если .gitignore изменится)
+node_modules/
+.next/
+.open-next/
+
+# Отчёты сканирования
+static_analysis_semgrep_*/
