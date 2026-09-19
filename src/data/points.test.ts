@@ -2,18 +2,30 @@ import { describe, expect, it } from "vitest";
 import { CITIES, POINTS, getCity, isCitySlug } from "./points";
 
 describe("точки (SPEC 1.1)", () => {
-  it("шесть точек", () => {
-    expect(POINTS).toHaveLength(6);
+  it("пять точек (Florești закрылась)", () => {
+    expect(POINTS).toHaveLength(5);
   });
 
-  it("пять городов в порядке SPEC", () => {
+  it("четыре города в порядке SPEC", () => {
     expect(CITIES.map((c) => c.slug)).toEqual([
       "soroca",
       "sculeni",
-      "floresti",
       "otaci",
       "briceni",
     ]);
+    expect(isCitySlug("floresti")).toBe(false);
+  });
+
+  it("у каждой точки адрес и координаты в Молдове", () => {
+    for (const p of POINTS) {
+      expect(p.address.trim().length, p.id).toBeGreaterThan(0);
+      expect(p.coords, p.id).not.toBeNull();
+      // Молдова: широта 45.4–48.5, долгота 26.6–30.2
+      expect(p.coords!.lat, p.id).toBeGreaterThan(45.4);
+      expect(p.coords!.lat, p.id).toBeLessThan(48.5);
+      expect(p.coords!.lng, p.id).toBeGreaterThan(26.6);
+      expect(p.coords!.lng, p.id).toBeLessThan(30.2);
+    }
   });
 
   it("slug городов уникальны и в нижнем регистре латиницей", () => {
@@ -39,7 +51,7 @@ describe("точки (SPEC 1.1)", () => {
     const count = (slug: string) =>
       POINTS.filter((p) => p.citySlug === slug).length;
     expect(count("soroca")).toBe(2);
-    for (const slug of ["sculeni", "floresti", "otaci", "briceni"]) {
+    for (const slug of ["sculeni", "otaci", "briceni"]) {
       expect(count(slug)).toBe(1);
     }
   });

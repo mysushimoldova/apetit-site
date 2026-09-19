@@ -42,6 +42,10 @@ describe("система переводов", () => {
     }
   });
 
+  it("ни одной заглушки [ТЕКСТ: …] — все тексты утверждены", () => {
+    expect(JSON.stringify(messages)).not.toContain("[ТЕКСТ");
+  });
+
   it("число позиций — по правилам языка", () => {
     const ro = getMessages("ro").cart.positions;
     const ru = getMessages("ru").cart.positions;

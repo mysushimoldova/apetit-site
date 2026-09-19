@@ -1,7 +1,8 @@
 // Точки Apetit — SPEC.md §1.1 (РЕШЕНО). Пока статический список; на этапе
 // админки переедет в Supabase, а эти типы и функции останутся.
 
-export type CitySlug = "soroca" | "sculeni" | "floresti" | "otaci" | "briceni";
+// Florești закрылась (19.09.2026) — точки и города на сайте больше нет.
+export type CitySlug = "soroca" | "sculeni" | "otaci" | "briceni";
 
 /** Язык интерфейса по умолчанию для города (SPEC §3 шаг 1: Otaci → ru). */
 export type Locale = "ro" | "ru";
@@ -31,16 +32,16 @@ export interface Point {
 
 const HOURS = { open: "08:30", close: "23:00" } as const;
 
-/** Пять городов в порядке SPEC §1.1 — в этом порядке рисуются плитки. */
+/** Четыре города в порядке SPEC §1.1 — в этом порядке рисуются плитки. */
 export const CITIES: readonly City[] = [
   { slug: "soroca", name: "Soroca", locale: "ro" },
   { slug: "sculeni", name: "Sculeni", locale: "ro" },
-  { slug: "floresti", name: "Florești", locale: "ro" },
   { slug: "otaci", name: "Otaci", locale: "ru" },
   { slug: "briceni", name: "Briceni", locale: "ro" },
 ];
 
-// TODO: адреса и координаты точек — УТОЧНИТЬ у Амяна (SPEC §1.1)
+// Адреса и координаты — от Амяна (SPEC §1.1). Sculeni в Google называется
+// COFFEEIN (кофейня + Apetit, одна касса), на сайте — «Apetit Sculeni».
 export const POINTS: readonly Point[] = [
   {
     id: "soroca-centru",
@@ -50,9 +51,9 @@ export const POINTS: readonly Point[] = [
     ownership: "own",
     locale: "ro",
     hours: HOURS,
-    address: "",
+    address: "Str. Independenței 72",
     acceptingOrders: true,
-    coords: null,
+    coords: { lat: 48.156795, lng: 28.3036351 },
   },
   {
     id: "soroca-noua",
@@ -62,9 +63,9 @@ export const POINTS: readonly Point[] = [
     ownership: "own",
     locale: "ro",
     hours: HOURS,
-    address: "",
+    address: "Dimitrie Cantemir 24F",
     acceptingOrders: true,
-    coords: null,
+    coords: { lat: 48.1750314, lng: 28.3205164 },
   },
   {
     id: "sculeni",
@@ -74,21 +75,9 @@ export const POINTS: readonly Point[] = [
     ownership: "franchise",
     locale: "ro",
     hours: HOURS,
-    address: "",
+    address: "Calea Ieșilor E58",
     acceptingOrders: true,
-    coords: null,
-  },
-  {
-    id: "floresti",
-    citySlug: "floresti",
-    name: "Apetit Florești",
-    phone: "078879606",
-    ownership: "franchise",
-    locale: "ro",
-    hours: HOURS,
-    address: "",
-    acceptingOrders: true,
-    coords: null,
+    coords: { lat: 47.3272293, lng: 27.6120934 },
   },
   {
     id: "otaci",
@@ -98,9 +87,9 @@ export const POINTS: readonly Point[] = [
     ownership: "franchise",
     locale: "ru",
     hours: HOURS,
-    address: "",
+    address: "Prieteniei 66",
     acceptingOrders: true,
-    coords: null,
+    coords: { lat: 48.4422993, lng: 27.7876133 },
   },
   {
     id: "briceni",
@@ -110,9 +99,9 @@ export const POINTS: readonly Point[] = [
     ownership: "franchise",
     locale: "ro",
     hours: HOURS,
-    address: "",
+    address: "Strada Mihai Eminescu 54",
     acceptingOrders: true,
-    coords: null,
+    coords: { lat: 48.3529048, lng: 27.0849932 },
   },
 ];
 

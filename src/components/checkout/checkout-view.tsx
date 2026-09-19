@@ -1,13 +1,22 @@
 "use client";
-// Оформление заказа (SPEC §3 шаг 5). Сверху вниз (порядок из задачи):
-// [Closed Banner] → заголовок → «Punctul» (если точек > 1) → Nume, Telefon,
-// Adresă → ловушка для ботов → «Trimite comanda» + строка про звонок →
-// итог (позиции и сумма — для показа, сервер считает сам).
-// Корзина очищается только после ответа сервера «принято».
+// Оформление заказа (SPEC §3 шаг 5). Телефон, сверху вниз (ответ
+// архитектора): [Closed Banner] → заголовок → «Punctul» (если точек > 1) →
+// Nume, Telefon, Adresă → ловушка для ботов → «Coș» (позиции и Total — для
+// показа, сервер считает сам) → «Trimite comanda» + строка про звонок.
+// Десктоп: поля и кнопка слева, «Coș» — колонкой справа.
+// Корзина очищается только после ответа сервера «принято»; тогда же имя,
+// телефон и адрес запоминаются на устройстве (SPEC §3 шаг 6).
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import { submitOrderAction } from "@/app/[city]/comanda/actions";
 import { ClosedBanner } from "@/components/order/closed-banner";
 import type { Localized } from "@/data/menu/schema";
@@ -17,6 +26,7 @@ import { describeParts, lineParts } from "@/lib/cart/describe";
 import { lineKey, type CartLine } from "@/lib/cart/lines";
 import { priceLine, type Catalog } from "@/lib/cart/pricing";
 import { cartStore, hydrateCart, useCart } from "@/lib/cart/store";
+import { parseContact, readContactRaw, saveContact } from "@/lib/order/contact";
 import { maskPhoneInput } from "@/lib/order/phone";
 import { saveReceipt } from "@/lib/order/receipt";
 import {
@@ -35,6 +45,7 @@ type ServerError =
 
 const FIELD_ORDER: readonly FormField[] = ["point", "name", "phone", "address"];
 const NO_LINES: CartLine[] = [];
+const noop = () => () => {};
 
 export function CheckoutView({
   city,
@@ -87,6 +98,22 @@ export function CheckoutView({
   const [unavailable, setUnavailable] = useState<number[]>([]);
   const [serverClosed, setServerClosed] = useState(false);
   const honeypot = useRef<HTMLInputElement>(null);
+
+  // Контакты с прошлого заказа: на сервере их нет (null), в браузере —
+  // подставляем один раз; то, что человек уже начал вводить, не затираем
+  const savedRaw = useSyncExternalStore(noop, readContactRaw, () => null);
+  const [prefilled, setPrefilled] = useState(false);
+  if (savedRaw !== null && !prefilled) {
+    setPrefilled(true);
+    const saved = parseContact(savedRaw);
+    if (saved) {
+      setValues((v) => ({
+        name: v.name || saved.name,
+        phone: v.phone || saved.phone,
+        address: v.address || saved.address,
+      }));
+    }
+  }
 
   const open = useIsOpen(point.hours);
   const closed = open === false || serverClosed;
@@ -152,6 +179,7 @@ export function CheckoutView({
       });
       if (result.ok) {
         saveReceipt(result.receipt);
+        saveContact(values);
         submitted.current = true;
         cartStore.getState().clear();
         router.replace(`/${city}/comanda/${result.receipt.number}`);
@@ -215,8 +243,12 @@ export function CheckoutView({
         {t.checkout.title}
       </h1>
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16">
-        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-6">
+      <form
+        noValidate
+        onSubmit={onSubmit}
+        className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-16 lg:gap-y-6"
+      >
+        <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
           {!single && (
             <PointPicker
               points={points}
@@ -276,7 +308,7 @@ export function CheckoutView({
           />
 
           {/* Ловушка для ботов (SPEC §9.4): человек её не видит, скринридер
-              не читает, Tab не заходит, браузер не заполняет */}
+                не читает, Tab не заходит, браузер не заполняет */}
           <div className="hidden" aria-hidden="true">
             <input
               ref={honeypot}
@@ -287,28 +319,12 @@ export function CheckoutView({
               defaultValue=""
             />
           </div>
+        </div>
 
-          <div>
-            <button
-              type="submit"
-              className="btn-primary w-full"
-              disabled={closed || sending || !hydrated}
-              aria-busy={sending || undefined}
-            >
-              {t.checkout.submit}
-            </button>
-            {serverMessage && (
-              <p role="alert" className="field-error mt-3 text-center">
-                {serverMessage}
-              </p>
-            )}
-            <p className="mt-3 text-center font-body text-meta text-charcoal">
-              {t.checkout.callNote}
-            </p>
-          </div>
-        </form>
-
-        <section aria-labelledby={`${ids}-summary`} className="lg:self-start">
+        <section
+          aria-labelledby={`${ids}-summary`}
+          className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start"
+        >
           <h2 id={`${ids}-summary`} className="caption-caps">
             {t.cart.title}
           </h2>
@@ -357,7 +373,26 @@ export function CheckoutView({
             </span>
           </div>
         </section>
-      </div>
+
+        <div className="lg:col-start-1 lg:row-start-2">
+          <button
+            type="submit"
+            className="btn-primary w-full"
+            disabled={closed || sending || !hydrated}
+            aria-busy={sending || undefined}
+          >
+            {sending ? t.checkout.sending : t.checkout.submit}
+          </button>
+          {serverMessage && (
+            <p role="alert" className="field-error mt-3 text-center">
+              {serverMessage}
+            </p>
+          )}
+          <p className="mt-3 text-center font-body text-meta text-charcoal">
+            {t.checkout.callNote}
+          </p>
+        </div>
+      </form>
     </main>
   );
 }

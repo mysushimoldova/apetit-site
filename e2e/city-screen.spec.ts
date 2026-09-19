@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-const CITY_NAMES = ["Soroca", "Sculeni", "Florești", "Otaci", "Briceni"];
+// Florești закрылась (19.09.2026) — городов четыре
+const CITY_NAMES = ["Soroca", "Sculeni", "Otaci", "Briceni"];
 // Невидимый заголовок для скринридеров (DESIGN 2.1, ответ архитектора №4)
 const SR_TITLE = "Alege orașul";
 
-test("главная показывает 5 плиток и никакого другого текста", async ({
+test("главная показывает 4 плитки и никакого другого текста", async ({
   page,
 }) => {
   const consoleErrors: string[] = [];
@@ -13,7 +14,7 @@ test("главная показывает 5 плиток и никакого д�
   });
   await page.goto("/");
   const tiles = page.getByRole("link");
-  await expect(tiles).toHaveCount(5);
+  await expect(tiles).toHaveCount(4);
   await expect(tiles).toHaveText(CITY_NAMES);
   // На экране больше нет никакого текста: ни подписи, ни логотипа. Единственное
   // исключение — заголовок для скринридеров, и он невидим (1×1px).
@@ -60,7 +61,7 @@ test("мусор в localStorage не ломает главную", async ({ pag
   await page.evaluate(() => localStorage.setItem("apetit.city", "chisinau"));
   await page.goto("/");
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("link")).toHaveCount(5);
+  await expect(page.getByRole("link")).toHaveCount(4);
 });
 
 test("prefers-reduced-motion: плитки видны без анимации и без ошибок гидратации", async ({
@@ -83,7 +84,7 @@ test("prefers-reduced-motion: плитки видны без анимации и
 test.describe("десктоп", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test("сетка 3 колонки (ряд 3 + ряд 2), плитки 200px высотой", async ({
+  test("сетка 3 колонки (ряд 3 + ряд 1), плитки 200px высотой", async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -91,7 +92,7 @@ test.describe("десктоп", () => {
     // Ждём гидратацию: при reduced-motion плитки становятся обычными ссылками
     // без inline-стилей; мерить раньше — поймать отвязанный элемент.
     const tiles = page.getByRole("link");
-    await expect(tiles).toHaveCount(5);
+    await expect(tiles).toHaveCount(4);
     await expect(tiles.last()).not.toHaveAttribute("style", /.+/);
     const boxes = [];
     for (const name of CITY_NAMES) {
@@ -99,17 +100,15 @@ test.describe("десктоп", () => {
       expect(box).not.toBeNull();
       boxes.push(box!);
     }
-    // Первые три — в одном ряду, четвёртая и пятая — во втором
+    // Первые три — в одном ряду, четвёртая — во втором, под первой
     expect(boxes[0].y).toBe(boxes[1].y);
     expect(boxes[1].y).toBe(boxes[2].y);
     expect(boxes[3].y).toBeGreaterThan(boxes[0].y);
-    expect(boxes[3].y).toBe(boxes[4].y);
-    // Колонки по 1fr: одинаковая ширина, 4-я под 1-й, 5-я под 2-й
+    // Колонки по 1fr: одинаковая ширина, 4-я под 1-й
     for (const box of boxes) {
       expect(Math.round(box.width)).toBe(Math.round(boxes[0].width));
       expect(Math.round(box.height)).toBe(200);
     }
     expect(boxes[3].x).toBe(boxes[0].x);
-    expect(boxes[4].x).toBe(boxes[1].x);
   });
 });

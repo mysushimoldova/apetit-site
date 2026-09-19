@@ -123,10 +123,10 @@ test("без выбора точки и с плохим телефоном — �
   await phone.pressSequentially("12345");
   await phone.blur();
   await expect(phone).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByText(/ТЕКСТ: ошибка телефона/)).toBeVisible();
+  await expect(page.getByText("Număr în format 0XX XXX XXX")).toBeVisible();
 
   await submit(page).click();
-  await expect(page.getByText(/ТЕКСТ: ошибка — не выбран пункт/)).toBeVisible();
+  await expect(page.getByText("Alege punctul")).toBeVisible();
   // Фокус — на первое неверное: выбор точки
   await expect(
     page.getByRole("radio", { name: /Apetit Centru/ }),
@@ -182,12 +182,14 @@ test("блюда нет в точке (пицца в Сороках) — сер�
   const centru = page.getByRole("radio", { name: /Apetit Centru/ });
   await page.locator("label").filter({ has: centru }).click();
   await expect(page.getByText("1 × Margarita")).toBeVisible();
-  await expect(page.getByText(/ТЕКСТ: нет в этом пункте/)).toBeVisible();
+  await expect(page.getByText("nu este în acest punct")).toBeVisible();
 
   await fillForm(page);
   await submit(page).click();
   await expect(
-    page.getByText(/ТЕКСТ: части блюд нет в этом пункте/),
+    page.getByText(
+      "Unele produse nu sunt disponibile în acest punct. Scoate-le din coș.",
+    ),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/soroca\/comanda$/);
 });
@@ -201,7 +203,9 @@ test("ловушка для ботов заполнена — заказ не п
     .locator('input[name="website"]')
     .evaluate((el: HTMLInputElement) => (el.value = "http://spam.example"));
   await submit(page).click();
-  await expect(page.getByText(/ТЕКСТ: заказ не принят/)).toBeVisible();
+  await expect(
+    page.getByText("Comanda nu a fost primită. Încearcă din nou."),
+  ).toBeVisible();
   await expect(page).toHaveURL(/\/briceni\/comanda$/);
 });
 
@@ -223,10 +227,130 @@ test("нет сети — понятная ошибка, повтор отпра
     }
   });
   await submit(page).click();
-  await expect(page.getByText(/ТЕКСТ: не отправилось/)).toBeVisible();
+  await expect(
+    page.getByText("Nu s-a trimis. Verifică internetul și încearcă din nou."),
+  ).toBeVisible();
   await expect(page.getByLabel("Nume")).toHaveValue("Ion Popescu");
 
   await submit(page).click();
   await expect(page).toHaveURL(/\/briceni\/comanda\/\d{4,}$/);
   await expect(page.locator(".summary-total")).toContainText("66 lei");
+});
+
+test("телефон: поля → «Coș» с Total → кнопка → строка про звонок", async ({
+  page,
+}) => {
+  await seedCart(page, "briceni", [line("cola", 2)]);
+  await page.goto("/briceni/comanda");
+  const address = await page.getByLabel("Adresă").boundingBox();
+  const cart = await page.getByRole("heading", { name: "Coș" }).boundingBox();
+  const total = await page.locator(".summary-total").boundingBox();
+  const button = await submit(page).boundingBox();
+  const note = await page
+    .getByText("Casierul te va suna pentru confirmare")
+    .boundingBox();
+  expect(address!.y).toBeLessThan(cart!.y);
+  expect(total!.y).toBeLessThan(button!.y);
+  expect(button!.y).toBeLessThan(note!.y);
+});
+
+test.describe("десктоп", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("«Coș» — колонкой справа от полей и кнопки", async ({ page }) => {
+    await seedCart(page, "briceni", [line("cola", 2)]);
+    await page.goto("/briceni/comanda");
+    const name = await page.getByLabel("Nume").boundingBox();
+    const button = await submit(page).boundingBox();
+    const cart = await page.getByRole("heading", { name: "Coș" }).boundingBox();
+    expect(cart!.x).toBeGreaterThan(name!.x + name!.width);
+    expect(cart!.x).toBeGreaterThan(button!.x + button!.width);
+    // Верх колонки — на уровне начала формы, а не под кнопкой
+    expect(cart!.y).toBeLessThan(button!.y);
+  });
+});
+
+test("во время отправки кнопка — «Se trimite…» и неактивна", async ({
+  page,
+}) => {
+  await seedCart(page, "briceni", [line("cola")]);
+  await page.goto("/briceni/comanda");
+  await fillForm(page);
+  // Сервер «думает» 1,5 секунды
+  await page.route("**/briceni/comanda", async (route) => {
+    if (route.request().method() === "POST") {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    await route.continue();
+  });
+  await submit(page).click();
+  const sending = page.getByRole("button", { name: "Se trimite…" });
+  await expect(sending).toBeVisible();
+  await expect(sending).toBeDisabled();
+  await expect(page).toHaveURL(/\/briceni\/comanda\/\d{4,}$/);
+});
+
+test("имя, телефон и адрес запоминаются после заказа и подставляются снова", async ({
+  page,
+}) => {
+  await seedCart(page, "briceni", [line("cola")]);
+  await page.goto("/briceni/comanda");
+  const phone = uniquePhone();
+  await fillForm(page, phone);
+  await page.getByLabel("Adresă").fill("Strada Mihai Eminescu 1");
+  // Пока заказ не отправлен — ничего не сохранено
+  expect(
+    await page.evaluate(() => localStorage.getItem("apetit.contact")),
+  ).toBeNull();
+  await submit(page).click();
+  await expect(page).toHaveURL(/\/briceni\/comanda\/\d{4,}$/);
+
+  // Новый заказ: блюдо в корзину → оформление — поля уже заполнены
+  await page.goto("/briceni");
+  await page.waitForFunction(() => document.readyState === "complete");
+  await page.getByRole("button", { name: "Adaugă: Coca-Cola" }).click();
+  await page.goto("/briceni/comanda");
+  await expect(page.getByLabel("Nume")).toHaveValue("Ion Popescu");
+  await expect(page.getByLabel("Telefon")).toHaveValue(
+    `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`,
+  );
+  await expect(page.getByLabel("Adresă")).toHaveValue(
+    "Strada Mihai Eminescu 1",
+  );
+});
+
+test.describe("геолокация разрешена (человек в Сороках)", () => {
+  test.use({
+    geolocation: { latitude: 48.16, longitude: 28.305 },
+    permissions: ["geolocation"],
+  });
+
+  test("в карточках точек — адрес и расстояние", async ({ page }) => {
+    await seedCart(page, "soroca", [line("cola")]);
+    await page.goto("/soroca/comanda");
+    const centru = page.locator(".point-card", { hasText: "Apetit Centru" });
+    const noua = page.locator(".point-card", {
+      hasText: "Apetit Soroca Nouă",
+    });
+    await expect(centru).toContainText("Str. Independenței 72");
+    await expect(centru).toContainText("~0,4 km");
+    await expect(noua).toContainText("Dimitrie Cantemir 24F");
+    await expect(noua).toContainText("~2,0 km");
+  });
+});
+
+test("геолокация запрещена — карточки без расстояния, без ошибок", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  await seedCart(page, "soroca", [line("cola")]);
+  await page.goto("/soroca/comanda");
+  const cards = page.locator(".point-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText("Str. Independenței 72");
+  await expect(cards.first()).not.toContainText("km");
+  expect(errors).toEqual([]);
 });

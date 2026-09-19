@@ -3,6 +3,12 @@ import { test, type Page } from "@playwright/test";
 // Оформление и подтверждение — docs/screens/05-*.png.
 // Корзина: Kebab XL/XXL (XXL + sos de usturoi) × 2 + Coca-Cola, Сороки.
 
+// Человек в Сороках разрешил геолокацию — в карточках точек видно расстояние
+test.use({
+  geolocation: { latitude: 48.16, longitude: 28.305 },
+  permissions: ["geolocation"],
+});
+
 const OPEN = "2026-09-19T09:00:00Z"; // 12:00 в Кишинёве
 const CLOSED = "2026-09-19T20:30:00Z"; // 23:30
 

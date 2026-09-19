@@ -87,7 +87,7 @@ export function PointPicker({
                 )}
               </span>
               <span className="mt-1 block font-body text-meta text-charcoal">
-                {p.address || t.checkout.pointAddressMissing}
+                {p.address}
               </span>
               <span className="mt-1 flex items-center justify-between gap-3">
                 <span className="font-body text-meta text-smoke tabular-nums">

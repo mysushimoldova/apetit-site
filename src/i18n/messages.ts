@@ -78,8 +78,6 @@ export interface Messages {
     back: string;
     /** Блок выбора точки — только если в городе их больше одной */
     point: string;
-    /** Адреса точек в SPEC пока нет */
-    pointAddressMissing: string;
     /** «km» после расстояния «~1,2» */
     km: string;
     name: string;
@@ -90,6 +88,8 @@ export interface Messages {
     /** Подпись под «Adresă»: поле необязательное */
     addressHint: string;
     submit: string;
+    /** Та же кнопка, пока заказ отправляется (неактивна, без крутилки) */
+    sending: string;
     /** Строка под кнопкой отправки */
     callNote: string;
     errors: {
@@ -166,38 +166,36 @@ export const messages: Record<Locale, Messages> = {
       increase: "Mărește cantitatea",
       quantity: "Cantitate",
     },
+    // Тексты оформления и подтверждения утверждены архитектором 19.09.2026
     closed: { banner: "Primim comenzi {open}–{close}" },
     checkout: {
       title: "Comandă",
       back: "Înapoi la meniu",
       point: "Punctul",
-      pointAddressMissing: "[ТЕКСТ: адрес точки]",
       km: "km",
-      // «Nume», «Telefon», «Adresă» — перевод подписей SPEC §3, на утверждение
       name: "Nume",
       phone: "Telefon",
       phonePlaceholder: "0XX XXX XXX",
       address: "Adresă",
       addressHint: "dacă vrei livrare",
       submit: "Trimite comanda",
+      sending: "Se trimite…",
       callNote: "Casierul te va suna pentru confirmare",
       errors: {
-        point: "[ТЕКСТ: ошибка — не выбран пункт]",
-        name: "[ТЕКСТ: ошибка имени — 2–40 букв]",
-        phone: "[ТЕКСТ: ошибка телефона — формат 0XX XXX XXX]",
-        address: "[ТЕКСТ: ошибка адреса — до 120 символов]",
-        network:
-          "[ТЕКСТ: не отправилось — проверьте интернет и нажмите ещё раз]",
-        unavailable: "[ТЕКСТ: части блюд нет в этом пункте — уберите их]",
-        unavailableLine: "[ТЕКСТ: нет в этом пункте]",
-        pointPaused: "[ТЕКСТ: пункт временно не принимает заказы]",
-        rateLimited:
-          "[ТЕКСТ: слишком много заказов с этого номера — позвоните]",
-        rejected: "[ТЕКСТ: заказ не принят — попробуйте ещё раз]",
+        point: "Alege punctul",
+        name: "Scrie numele (2–40 de litere)",
+        phone: "Număr în format 0XX XXX XXX",
+        address: "Adresa e prea lungă (max. 120 de caractere)",
+        network: "Nu s-a trimis. Verifică internetul și încearcă din nou.",
+        unavailable:
+          "Unele produse nu sunt disponibile în acest punct. Scoate-le din coș.",
+        unavailableLine: "nu este în acest punct",
+        pointPaused: "Acest punct nu primește comenzi momentan.",
+        rateLimited: "Prea multe comenzi de pe acest număr. Sună la local.",
+        rejected: "Comanda nu a fost primită. Încearcă din nou.",
       },
     },
     confirmation: {
-      // «Nr. {n}» — моё, на утверждение
       number: "Nr. {n}",
       callSoon: "Te sunăm în câteva minute",
       call: "Sună la local",
@@ -249,13 +247,12 @@ export const messages: Record<Locale, Messages> = {
       increase: "Увеличить количество",
       quantity: "Количество",
     },
-    // TODO ru: проверить — все строки ниже, кроме данных архитектором
+    // Тексты оформления и подтверждения утверждены архитектором 19.09.2026
     closed: { banner: "Принимаем заказы {open}–{close}" },
     checkout: {
       title: "Заказ",
       back: "Вернуться в меню",
       point: "Пункт",
-      pointAddressMissing: "[ТЕКСТ: адрес точки]",
       km: "км",
       name: "Имя",
       phone: "Телефон",
@@ -263,20 +260,21 @@ export const messages: Record<Locale, Messages> = {
       address: "Адрес",
       addressHint: "если нужна доставка",
       submit: "Отправить заказ",
+      sending: "Отправляем…",
       callNote: "Кассир перезвонит для подтверждения",
       errors: {
-        point: "[ТЕКСТ: ошибка — не выбран пункт]",
-        name: "[ТЕКСТ: ошибка имени — 2–40 букв]",
-        phone: "[ТЕКСТ: ошибка телефона — формат 0XX XXX XXX]",
-        address: "[ТЕКСТ: ошибка адреса — до 120 символов]",
-        network:
-          "[ТЕКСТ: не отправилось — проверьте интернет и нажмите ещё раз]",
-        unavailable: "[ТЕКСТ: части блюд нет в этом пункте — уберите их]",
-        unavailableLine: "[ТЕКСТ: нет в этом пункте]",
-        pointPaused: "[ТЕКСТ: пункт временно не принимает заказы]",
+        point: "Выберите пункт",
+        name: "Введите имя (2–40 букв)",
+        phone: "Номер в формате 0XX XXX XXX",
+        address: "Адрес слишком длинный (до 120 символов)",
+        network: "Не отправилось. Проверьте интернет и попробуйте ещё раз.",
+        unavailable:
+          "Некоторые блюда недоступны в этом пункте. Уберите их из корзины.",
+        unavailableLine: "нет в этом пункте",
+        pointPaused: "Этот пункт временно не принимает заказы.",
         rateLimited:
-          "[ТЕКСТ: слишком много заказов с этого номера — позвоните]",
-        rejected: "[ТЕКСТ: заказ не принят — попробуйте ещё раз]",
+          "Слишком много заказов с этого номера. Позвоните в заведение.",
+        rejected: "Заказ не принят. Попробуйте ещё раз.",
       },
     },
     confirmation: {
