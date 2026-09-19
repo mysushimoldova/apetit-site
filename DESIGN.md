@@ -2,7 +2,7 @@
 > Витрина фастфуда на тёплой кремовой бумаге. Еда стоит на фоне одна, без рамок. Над ней — огромное слово категории, как вывеска. Один жёлтый — цена и кнопка. Тонкие чёрные линии, рисованные штрихи вместо иконок, продукт живёт при скролле.
 
 **Тема:** светлая · **Главный экран:** телефон 390 px, десктоп — та же система шире
-**Версия:** 2.1 · 19.09.2026 · утверждено по макетам docs/mock-*.png · собрана по референсам Амяна (см. ниже) + бренд Apetit из PSD меню
+**Версия:** 2.2 · 19.09.2026 · утверждено по макетам docs/mock-*.png · собрана по референсам Амяна (см. ниже) + бренд Apetit из PSD меню
 
 Apetit — фастфуд, и еда должна выглядеть так, чтобы хотелось есть. Поэтому фото
 блюд — единственный декор. Всё остальное отступает: тёплый кремовый фон вместо
@@ -49,7 +49,7 @@ Apetit — фастфуд, и еда должна выглядеть так, ч�
 
 ### Oswald — вывески: слово категории, города на входе, номер заказа. Всегда ЗАГЛАВНЫМИ · `--font-display`
 - **Weights:** 600
-- **Sizes:** billboard `clamp(72px, 22vw, 180px)` (слово категории во всю ширину), 44px (города), 22px (заголовок листа)
+- **Sizes:** billboard — подгоняется под ширину контента (fit-to-width: слово всегда в одну строку на всю ширину; потолок 180px), 44px (города), 22px (заголовок листа)
 - **Line height:** 0.9 для billboard, 1.0 для остального
 - **Letter spacing:** −0.01em billboard, +0.02em при 44px и меньше
 - **Роль:** только вывески. Никогда текст, кнопки, цены.
@@ -78,7 +78,7 @@ Apetit — фастфуд, и еда должна выглядеть так, ч�
 | total | 20px | 1.2 | Manrope 800 | `--text-total` |
 | sheet-title | 22px | 1.0 | Oswald 600 caps | `--text-sheet-title` |
 | city | 44px | 1.0 | Oswald 600 caps | `--text-city` |
-| billboard | clamp(72px, 22vw, 180px) | 0.9 | Oswald 600 caps | `--text-billboard` |
+| billboard | fit-to-width, max 180px | 0.9 | Oswald 600 caps | `--text-billboard` |
 
 Шрифты в проекте (`/public/fonts`, woff2, latin + latin-ext для ș ț ă â î + cyrillic). Не с CDN.
 
@@ -363,7 +363,7 @@ Ink; никаких перекрасок в жёлтый.
 - glass: header, cart bar, city overlay only
 
 **Example Component Prompts**
-1. Category section: dotted rule `1px dotted rgba(26,23,20,.45)`, 48px gap, then the word "KEBAB" in Oswald 600 uppercase at `clamp(72px,22vw,180px)`, line-height .9, transparent fill with 2px #1A1714 text-stroke, left-aligned full width. Below it a 2-column grid (16px/32px gaps) whose first row overlaps the word by −0.22em; tiles have no background.
+1. Category section: dotted rule `1px dotted rgba(26,23,20,.45)`, 48px gap, then the word "KEBAB" in Oswald 600 uppercase, sized to fit the content width on one line (max 180px), line-height .9, transparent fill with 2px #1A1714 text-stroke, left-aligned full width. Below it a 2-column grid (16px/32px gaps) whose first row overlaps the word by −0.22em; tiles have no background.
 2. Product tile: no surface. Food cutout 150px tall centered with a radial puddle shadow beneath (`radial-gradient(ellipse, rgba(26,23,20,.13), transparent 70%)`, 64% width × 10px). Title Manrope 700 17px #1A1714 max 2 lines. Ingredients Montserrat 12px #3D3733, 2 lines clamp. Meta "290 g" Montserrat 13px #7A716A. Row: price pill (#FFBC0D fill, #1A1714 text, Manrope 700 15px, 28px tall, 9999px) left; 32px #FFBC0D circle with "+" right.
 3. City screen: canvas #FAF7F2, no header/footer. Six tiles stacked, 12px gap, 16px side padding: transparent fill, 1px solid #1A1714 border, 16px radius, 88px tall, city name Oswald 600 44px uppercase #1A1714 centered. Pressed: #1A1714 fill, #FAF7F2 text. Tiles enter from y 24→0 with 60ms stagger.
 4. Category chip: 32px tall pill, transparent, 1px solid #1A1714, hand-drawn 16px single-line icon + label Manrope 600 13px, padding 0 12px 0 9px, 8px gap. Active: #1A1714 fill, #FAF7F2 icon and text. Row sticky under the 56px glass header.
