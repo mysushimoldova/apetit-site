@@ -16,13 +16,11 @@ export function CityGrid() {
   const reduceMotion = usePrefersReducedMotion();
 
   return (
-    // translate="no": названия городов — как в меню, авто-перевод их не трогает
-    <ul
-      translate="no"
-      className="flex w-full flex-col gap-3 lg:flex-row lg:flex-wrap lg:justify-center"
-    >
+    // translate="no": названия городов — как в меню, авто-перевод их не трогает.
+    // Телефон — столбик; десктоп — 3 колонки по 1fr (ряд 3 + ряд 2), DESIGN 2.1.
+    <ul translate="no" className="grid w-full grid-cols-1 gap-3 lg:grid-cols-3">
       {CITIES.map((city, index) => (
-        <li key={city.slug} className="lg:w-[200px]">
+        <li key={city.slug}>
           {reduceMotion ? (
             // «Уменьшить движение» — без анимации вообще, обычная ссылка
             <Link href={`/${city.slug}`} className="city-tile">

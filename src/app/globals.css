@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Apetit — дизайн-токены. Источник правды: DESIGN.md.
+   Apetit — дизайн-токены. Источник правды: DESIGN.md (версия 2.1).
    Всё, что здесь, — значения из DESIGN.md, переписанные в CSS.
    Менять цифры только вместе с DESIGN.md.
    ============================================================ */
@@ -13,22 +13,39 @@
 
   /* Длительности анимаций (DESIGN.md → Motion) */
   --dur-fast: 150ms; /* нажатия, переключатели */
-  --dur-base: 240ms; /* появление карточек, чипы, лист */
+  --dur-base: 240ms; /* появление плиток, чипы, лист */
   --dur-slow: 420ms; /* экран городов, переход в меню */
 
-  /* Стекло (ровно три места: шапка, корзина, оверлей города) */
-  --glass-bg: rgba(252, 250, 246, 0.72);
-  --glass-bg-fallback: rgba(252, 250, 246, 0.96);
-  --glass-border: rgba(255, 255, 255, 0.6);
-  --glass-blur: blur(18px) saturate(140%);
+  /* Линии — вместо теней (DESIGN.md → Lines) */
+  --rule: 1px solid var(--color-ink); /* рамки, граница шапки, активный чип */
+  --rule-dotted: 1px dotted rgba(26, 23, 20, 0.45); /* разделители категорий, строк корзины */
+  --hairline: 1px solid var(--color-sand); /* внутри форм, между полями */
 
-  /* Размытые пятна на фоне (Background Glow) */
-  --glow-yellow-opacity: 0.22;
-  --glow-peach-opacity: 0.3;
-  --glow-blur: 120px;
+  /* «Лужица» под фото блюда — единственная тень еды (DESIGN.md → Food Image) */
+  --puddle: radial-gradient(ellipse, rgba(26, 23, 20, 0.13), transparent 70%);
+
+  /* Стекло (ровно три места: шапка, корзина снизу, оверлей смены города) */
+  --glass-bg: rgba(250, 247, 242, 0.78);
+  --glass-bg-fallback: rgba(250, 247, 242, 0.96);
+  --glass-blur: blur(16px) saturate(130%);
 
   /* Затемнение фона под листом блюда */
   --scrim: rgba(26, 23, 20, 0.35);
+
+  /* Размеры компонентов (DESIGN.md → Components) */
+  --size-header: 56px;
+  --size-chips-row: 46px;
+  --size-chip: 32px; /* чип категории */
+  --size-chip-icon: 16px; /* рисованная иконка в чипе */
+  --size-price-pill: 28px; /* ценник в плитке */
+  --size-price-pill-lg: 32px; /* ценник в листе и корзине */
+  --size-add: 32px; /* круглая кнопка «+» */
+  --size-primary: 52px;
+  --size-secondary: 48px;
+  --size-input: 52px;
+  --size-cart-bar: 72px;
+  --size-food-tile: 150px; /* фото в плитке */
+  --size-food-sheet: 280px; /* фото в листе */
 }
 
 @media (min-width: 1024px) {
@@ -51,38 +68,28 @@
   /* Цвета: только палитра Apetit. Стандартные цвета Tailwind (white, gray,
      purple…) отключены — по DESIGN.md чистый белый и серый запрещены. */
   --color-*: initial;
-  --color-cream: #f6f1e9; /* фон страницы */
-  --color-milk: #fcfaf6; /* карточки, панели, инпуты */
-  --color-sand: #eae2d5; /* линии, рамки, выключенные элементы */
+  --color-cream: #faf7f2; /* фон всего сайта, всех секций */
+  --color-milk: #fffdfa; /* только поверхности над страницей: лист, инпуты, карточка точки */
+  --color-sand: #eae2d5; /* выключенные элементы, плитка-заглушка без фото */
   --color-yellow: #ffbc0d; /* единственный акцент — только заливка, не текст */
   --color-yellow-deep: #e9a800; /* нажатый жёлтый */
-  --color-ink: #1a1714; /* основной текст */
-  --color-charcoal: #3d3733; /* второстепенный текст */
+  --color-ink: #1a1714; /* текст, линии, активный чип, рисованные иконки */
+  --color-charcoal: #3d3733; /* второстепенный текст, состав */
   --color-smoke: #7a716a; /* граммы, подписи, плейсхолдеры */
-  --color-ash: #a79e95; /* подвал, мелкий шрифт */
+  --color-ash: #a79e95; /* подвал, самый тихий текст */
   --color-open: #2f8f5b; /* только индикатор «открыто» */
   --color-closed: #c9473a; /* только «закрыто» и ошибки формы */
-  --color-peach-glow: #ffd9a8; /* только размытое пятно на фоне */
 
-  /* Радиусы */
+  /* Радиусов ровно четыре (DESIGN.md → Border Radius) */
   --radius-*: initial;
-  --radius-badge: 8px;
-  --radius-input: 14px;
-  --radius-image: 16px;
-  --radius-card: 20px;
-  --radius-tile: 24px;
-  --radius-sheet: 28px;
-  --radius-pill: 9999px;
+  --radius-pill: 9999px; /* кнопки, чипы, ценник */
+  --radius-input: 12px; /* инпуты, атмосферные фото, баннер «закрыто» */
+  --radius-tile: 16px; /* плитка города, карточка точки, промо */
+  --radius-sheet: 24px; /* лист блюда (верх), модалка */
 
-  /* Тени — тёплые, на основе Ink */
+  /* Тени: только lift (открытый лист / модалка). Остальное — линии. */
   --shadow-*: initial;
-  --shadow-card:
-    0 1px 2px rgba(26, 23, 20, 0.04), 0 8px 24px rgba(26, 23, 20, 0.06);
   --shadow-lift: 0 12px 32px rgba(26, 23, 20, 0.1);
-  --shadow-glass: 0 8px 24px rgba(26, 23, 20, 0.06);
-
-  /* Линии */
-  --border-width-hair: 1px;
 
   /* Максимальная ширина контента: max-w-page */
   --container-page: 1200px;
@@ -91,14 +98,19 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Шкала размеров текста (DESIGN.md → Type Scale) */
-  --text-caption: 12px;
+  --text-caption: 12px; /* подпись ЗАГЛАВНЫМИ */
   --text-caption--line-height: 1.4;
   --text-caption--font-weight: 500;
+  --text-caption--letter-spacing: 0.08em;
   --text-meta: 13px;
   --text-meta--line-height: 1.5;
   --text-body: 15px;
   --text-body--line-height: 1.5;
-  --text-label: 15px;
+  --text-chip: 13px; /* название категории в чипе, Manrope 600 */
+  --text-chip--line-height: 1.25;
+  --text-chip--font-weight: 600;
+  --text-chip--letter-spacing: -0.01em;
+  --text-label: 15px; /* кнопки, Manrope 600/700 */
   --text-label--line-height: 1.25;
   --text-label--font-weight: 600;
   --text-label--letter-spacing: -0.01em;
@@ -106,7 +118,11 @@
   --text-title--line-height: 1.25;
   --text-title--font-weight: 700;
   --text-title--letter-spacing: -0.01em;
-  --text-price: 18px;
+  --text-price-tile: 15px; /* ценник в плитке, Manrope 700 */
+  --text-price-tile--line-height: 1.2;
+  --text-price-tile--font-weight: 700;
+  --text-price-tile--letter-spacing: -0.01em;
+  --text-price: 18px; /* ценник в листе и корзине, Manrope 800 */
   --text-price--line-height: 1.2;
   --text-price--font-weight: 800;
   --text-price--letter-spacing: -0.01em;
@@ -115,17 +131,17 @@
   --text-total--font-weight: 800;
   --text-total--letter-spacing: -0.01em;
   --text-sheet-title: 22px;
-  --text-sheet-title--line-height: 1.05;
+  --text-sheet-title--line-height: 1;
   --text-sheet-title--font-weight: 600;
   --text-sheet-title--letter-spacing: 0.02em;
-  --text-category: 28px;
-  --text-category--line-height: 1.05;
-  --text-category--font-weight: 600;
-  --text-category--letter-spacing: 0.02em;
   --text-city: 44px;
   --text-city--line-height: 1;
   --text-city--font-weight: 600;
   --text-city--letter-spacing: 0.02em;
+  --text-billboard: clamp(72px, 22vw, 180px); /* слово-вывеска категории */
+  --text-billboard--line-height: 0.9;
+  --text-billboard--font-weight: 600;
+  --text-billboard--letter-spacing: -0.01em;
 }
 
 /* Значения, которые ссылаются на переменные из :root или next/font,
@@ -175,11 +191,10 @@
   padding-inline: var(--gutter);
 }
 
-/* Стекло — только шапка, нижняя панель корзины, оверлей города */
+/* Стекло — только шапка, нижняя панель корзины, оверлей города.
+   Граница (rule сверху/снизу) задаётся в компоненте — линия, не тень. */
 @utility glass {
   background: var(--glass-bg-fallback);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-glass);
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     background: var(--glass-bg);
@@ -188,16 +203,16 @@
   }
 }
 
-/* Плитка города (экран входа): без заливки, рамка Ink, 88px, Oswald 44px.
-   Нажатие — заливка Ink, текст Cream, --dur-fast. Значения — из задачи
-   архитектора (обновлённый раздел City Screen); токен --radius-tile пока 24px. */
+/* Плитка города (DESIGN.md → City Screen): без заливки, рамка rule, 16px,
+   88px на телефоне / 200px на десктопе, Oswald 44px заглавными.
+   Нажатие — заливка Ink, текст Cream, --dur-fast. */
 @utility city-tile {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 88px;
-  border: 1px solid var(--color-ink);
-  border-radius: 16px;
+  border: var(--rule);
+  border-radius: var(--radius-tile);
   color: var(--color-ink);
   font-family: var(--font-display);
   font-size: var(--text-city);
@@ -211,6 +226,10 @@
   transition:
     background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
+
+  @media (min-width: 1024px) {
+    height: 200px;
+  }
 
   /* Hover только для мыши: на тачскрине тап даёт ложный hover */
   @media (hover: hover) and (pointer: fine) {
