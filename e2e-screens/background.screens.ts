@@ -1,14 +1,13 @@
 import { test } from "@playwright/test";
 
-// Фоновые линии в меню с разной силой (--bg-lines-opacity):
-// A — 0.5, B — 0.8 (выбран), C — 1.0. На 1280 — только B.
-const VARIANTS = [
-  { name: "A", opacity: "0.5" },
-  { name: "B", opacity: "0.8" },
-  { name: "C", opacity: "1" },
-];
+// Фоновые линии в меню (сила A, --bg-lines-opacity 0.5) с разной толщиной.
+// Толщина зашита в картинку, поэтому вариант — отдельная сборка:
+//   py -3 scripts/bg-lines.py build docs/bg-frames/kadr-08s.png            # A1, ~1px
+//   py -3 scripts/bg-lines.py build docs/bg-frames/kadr-08s.png --line 0.6 # A2, ~0.6px
+// и затем BG_VARIANT=A1|A2 npm run screens -- background --project=390
+const variant = process.env.BG_VARIANT ?? "A1";
 
-test("скриншоты фона меню", async ({ page }, testInfo) => {
+test("скриншот фона меню", async ({ page }, testInfo) => {
   const width = testInfo.project.name;
   await page.goto("/soroca");
   await page.locator("main img").first().waitFor();
@@ -25,18 +24,9 @@ test("скриншоты фона меню", async ({ page }, testInfo) => {
   });
   // Значок «N» dev-режима Next — не часть сайта
   await page.addStyleTag({ content: "nextjs-portal { display: none }" });
-
-  for (const v of VARIANTS) {
-    if (width === "1280" && v.name !== "B") continue;
-    await page.evaluate(
-      (o) =>
-        document.documentElement.style.setProperty("--bg-lines-opacity", o),
-      v.opacity,
-    );
-    // Дать анимации появления плиток закончиться
-    await page.waitForTimeout(600);
-    await page.screenshot({
-      path: `docs/screens/07-fundal-${v.name}-${width}.png`,
-    });
-  }
+  // Дать анимации появления плиток закончиться
+  await page.waitForTimeout(600);
+  await page.screenshot({
+    path: `docs/screens/07-fundal-${variant}-${width}.png`,
+  });
 });

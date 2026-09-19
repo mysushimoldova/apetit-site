@@ -4,7 +4,7 @@
 линии на белом. Скрипт в два шага:
 
     py -3 scripts/bg-lines.py frames                 # 8 кадров → docs/bg-frames/
-    py -3 scripts/bg-lines.py build docs/bg-frames/kadr-08s.png
+    py -3 scripts/bg-lines.py build docs/bg-frames/kadr-08s.png [--line 1.0]
 
 frames — кадры с 1, 4, 8, … 28-й секунды (PNG в полном размере), чтобы
 выбрать тот, где линии чище. build — из выбранного кадра делает картинку
@@ -12,7 +12,15 @@ frames — кадры с 1, 4, 8, … 28-й секунды (PNG в полном 
 потерь, 8 уровней прозрачности), ширина 1600px, вес ≤150 КБ →
 public/img/bg/linii.webp.
 
+--line — толщина линий в px экрана телефона 390×844 (там картинка стоит
+cover по высоте). По умолчанию 1.0 (вариант A1), 0.6 — «волосок» (A2).
+Линии не «растворяются» прозрачностью, а рисуются заново: у каждой линии
+кадра находится осевая линия, и вокруг неё рисуется линия нужной толщины
+со сглаживанием; яркость линии берётся из кадра.
+
 Нужен ffmpeg (для frames): в PATH или путь в переменной FFMPEG.
+Нужны numpy, pillow, scipy, scikit-image — ставятся вместе с
+scripts/requirements.txt (scipy и scikit-image приходят с rembg).
 """
 
 from __future__ import annotations
@@ -27,6 +35,8 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+from scipy import ndimage
+from skimage.morphology import skeletonize
 
 ROOT = Path(__file__).resolve().parent.parent
 VIDEO = ROOT / "assets" / "brand" / "linii-fundal.mp4"
@@ -39,10 +49,17 @@ WIDTH = 1600
 MAX_BYTES = 150 * 1024
 # Альфа ниже этого порога — шум сжатия видео, а не линия: обнуляем
 NOISE_FLOOR = 0.06
+# Пиксель кадра считается линией, если альфа выше: по этой маске ищется
+# осевая линия (на кадре 8 с — 65 линий, мелкого мусора нет)
+LINE_MASK = 0.35
 # Уровней прозрачности: 8 на глаз не отличить от 256 (линии тонкие, Ash,
 # на фоне с opacity), а WebP без потерь выходит почти вдвое легче —
 # картинка грузится вместе с первым экраном и влияет на Lighthouse
 ALPHA_LEVELS = 8
+# Экран, по которому считается --line: телефон 390×844, картинка cover —
+# по высоте экрана (lvh), поэтому 1 px экрана = высота картинки / 844 px её
+PHONE_HEIGHT = 844
+DEFAULT_LINE = 1.0  # A1
 
 
 def find_ffmpeg() -> str:
@@ -83,6 +100,25 @@ def lines_alpha(gray: np.ndarray) -> np.ndarray:
     return alpha
 
 
+def redraw_lines(alpha: np.ndarray, width_px: float) -> np.ndarray:
+    """Линии кадра → те же линии толщиной width_px (в пикселях кадра).
+
+    Осевая линия — скелет маски линий; каждый пиксель получает покрытие
+    по расстоянию до оси (край сглажен на 1 px) и яркость ближайшей точки
+    оси. Края кадра дополняются зеркально — как соседний повтор слоя
+    (картинка, зеркальная копия, картинка): стыков нет.
+    """
+    pad = int(np.ceil(width_px)) + 4
+    a = np.pad(alpha, pad, mode="symmetric")
+    axis = skeletonize(a > LINE_MASK)
+    # Яркость линии — максимум альфы кадра рядом с осью
+    peak = ndimage.maximum_filter(a, size=3)
+    dist, (iy, ix) = ndimage.distance_transform_edt(~axis, return_indices=True)
+    cover = np.clip(width_px / 2 + 0.5 - dist, 0.0, 1.0)
+    out = cover * peak[iy, ix]
+    return out[pad:-pad, pad:-pad]
+
+
 def encode(alpha: np.ndarray) -> bytes:
     """Альфа → WebP без потерь: цвет Ash везде, прозрачность ступенями."""
     h, w = alpha.shape
@@ -97,12 +133,20 @@ def encode(alpha: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
-def build(frame: Path) -> None:
-    src = Image.open(frame).convert("L")
-    height = round(src.height * WIDTH / src.width)
-    # Сначала уменьшаем, потом считаем альфу: сглаживание линий сохраняется
-    small = np.asarray(src.resize((WIDTH, height), Image.Resampling.LANCZOS))
-    alpha = lines_alpha(small)
+def build(frame: Path, line: float) -> None:
+    src = np.asarray(Image.open(frame).convert("L"))
+    scale = src.shape[1] / WIDTH  # пикселей кадра в пикселе картинки
+    height = round(src.shape[0] / scale)
+    # Толщина: px экрана телефона → px картинки → px кадра
+    width_px = line * height / PHONE_HEIGHT * scale
+    # Линии рисуются в полном размере кадра, потом уменьшаются усреднением
+    # (BOX): толщина и сглаживание сохраняются, без ореолов
+    big = redraw_lines(lines_alpha(src), width_px)
+    small = Image.fromarray(np.round(big * 255).astype(np.uint8), "L").resize(
+        (WIDTH, height), Image.Resampling.BOX
+    )
+    alpha = np.asarray(small, dtype=np.float32) / 255
+    alpha[alpha < NOISE_FLOOR] = 0.0
     data = encode(alpha)
     if len(data) > MAX_BYTES:
         sys.exit(
@@ -111,7 +155,17 @@ def build(frame: Path) -> None:
         )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_bytes(data)
-    print(f"{OUT.relative_to(ROOT)}: {WIDTH}×{height}, {len(data) // 1024} КБ")
+    print(
+        f"{OUT.relative_to(ROOT)}: {WIDTH}×{height}, линии {line} px на "
+        f"телефоне ({width_px / scale:.2f} px картинки), {len(data) // 1024} КБ"
+    )
+
+
+def positive(value: str) -> float:
+    number = float(value)
+    if not 0 < number <= 4:
+        raise argparse.ArgumentTypeError("толщина — от 0 до 4 px")
+    return number
 
 
 def main() -> None:
@@ -123,11 +177,16 @@ def main() -> None:
     sub.add_parser("frames", help="вытащить кадры из видео в docs/bg-frames/")
     b = sub.add_parser("build", help="сделать public/img/bg/linii.webp из кадра")
     b.add_argument("frame", type=Path)
+    b.add_argument(
+        "--line", type=positive, default=DEFAULT_LINE,
+        help="толщина линий в px экрана телефона 390×844 "
+        f"(по умолчанию {DEFAULT_LINE} — A1; 0.6 — A2)",
+    )
     args = parser.parse_args()
     if args.cmd == "frames":
         extract_frames()
     else:
-        build(args.frame)
+        build(args.frame, args.line)
 
 
 if __name__ == "__main__":

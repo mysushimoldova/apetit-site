@@ -4,6 +4,8 @@
 // оборот иконки чипа, 250ms, --ease-out (при reduced-motion — только цвет);
 // активный чип меняется при скролле через IntersectionObserver: активна та
 // секция, через которую проходит линия сразу под липкой шапкой и лентой.
+// Пока страница сама едет к выбранной категории, активным остаётся её чип:
+// промежуточные категории по дороге не загораются.
 import {
   useEffect,
   useRef,
@@ -12,6 +14,7 @@ import {
   type MouseEvent,
 } from "react";
 import { CategoryIcon } from "@/components/icons/category-icon";
+import { watchProgrammaticScroll } from "@/lib/programmatic-scroll";
 
 export interface ChipItem {
   slug: string;
@@ -26,6 +29,15 @@ function stickyOffset(): number {
     parseFloat(root.getPropertyValue("--size-header")) +
     parseFloat(root.getPropertyValue("--size-chips-row"))
   );
+}
+
+/** Секция, через которую проходит линия активности (как у observer). */
+function sectionAtLine(items: ChipItem[]): string | undefined {
+  const line = stickyOffset() + 2;
+  return items.find((item) => {
+    const rect = document.getElementById(item.slug)?.getBoundingClientRect();
+    return rect && rect.top <= line && rect.bottom > line;
+  })?.slug;
 }
 
 function prefersReducedMotion(): boolean {
@@ -60,6 +72,9 @@ export function CategoryChips({
 }) {
   const [active, setActive] = useState<string>(items[0]?.slug ?? "");
   const navRef = useRef<HTMLElement>(null);
+  // Идёт программная прокрутка к чипу: observer не трогает активный чип.
+  // Хранит отмену ожидания конца прокрутки.
+  const scrollLockRef = useRef<(() => void) | null>(null);
 
   // Активная секция — та, что пересекает линию под шапкой
   useEffect(() => {
@@ -72,6 +87,7 @@ export function CategoryChips({
       const bottom = Math.max(0, window.innerHeight - top - 2);
       observer = new IntersectionObserver(
         (entries) => {
+          if (scrollLockRef.current) return;
           const hit = entries.find((e) => e.isIntersecting);
           if (hit) setActive(hit.target.id);
         },
@@ -87,6 +103,8 @@ export function CategoryChips({
     return () => {
       window.removeEventListener("resize", observe);
       observer?.disconnect();
+      scrollLockRef.current?.();
+      scrollLockRef.current = null;
     };
   }, [items]);
 
@@ -114,6 +132,16 @@ export function CategoryChips({
     // Адрес отражает категорию, но без новой записи в истории на каждый клик
     history.replaceState(null, "", `#${slug}`);
     setActive(slug);
+    // Фиксируем выбранный чип до конца прокрутки. Если человек прервал её
+    // сам — активна та секция, где страница остановилась; иначе — выбранная
+    // (даже если последняя секция не доехала до шапки: ниже листать некуда)
+    scrollLockRef.current?.();
+    scrollLockRef.current = watchProgrammaticScroll(window, (interrupted) => {
+      scrollLockRef.current = null;
+      if (!interrupted) return;
+      const current = sectionAtLine(items);
+      if (current) setActive(current);
+    });
   };
 
   // Enter у ссылки и так вызывает click; Space по умолчанию листает

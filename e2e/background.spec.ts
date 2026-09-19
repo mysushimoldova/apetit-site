@@ -32,7 +32,7 @@ for (const path of ["/", "/soroca", "/soroca/comanda"]) {
       position: "fixed",
       zIndex: "-1",
       pointerEvents: "none",
-      opacity: "0.8",
+      opacity: "0.5",
     });
     // Картинка линий загрузилась
     await expect

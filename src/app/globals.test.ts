@@ -72,8 +72,8 @@ describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
     expect(css).toContain("--text-price: 18px");
   });
 
-  it("фон — линии: слой под контентом, клики сквозь, сила B = 0.8", () => {
-    expect(css).toContain("--bg-lines-opacity: 0.8");
+  it("фон — линии: слой под контентом, клики сквозь, сила A = 0.5", () => {
+    expect(css).toContain("--bg-lines-opacity: 0.5");
     const layer = css.slice(css.indexOf(".brand-bg {"));
     const rule = layer.slice(0, layer.indexOf("}"));
     expect(rule).toContain("position: fixed");
