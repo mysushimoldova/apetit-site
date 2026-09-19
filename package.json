@@ -11,7 +11,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "screens": "playwright test -c playwright.screenshots.config.ts"
+    "screens": "playwright test -c playwright.screenshots.config.ts",
+    "images": "py -3 scripts/prepare-images.py",
+    "test:py": "py -3 -m unittest scripts/test_prepare_images.py"
   },
   "dependencies": {
     "lucide-react": "^1.47.0",

@@ -1,6 +1,7 @@
 # Исходники (фото, PSD, логотип) — не в git
 assets/foto-originale/
 assets/meniu-psd/
+assets/brand/
 
 # Зависимости
 /node_modules
@@ -27,3 +28,9 @@ next-env.d.ts
 *.pem
 npm-debug.log*
 .vercel
+
+# Мастер-копии вырезок (PNG в исходном размере) — не в git, только WebP
+public/img/products/*.png
+
+# Python (скрипты подготовки фото)
+__pycache__/

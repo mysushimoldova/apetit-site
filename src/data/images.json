@@ -1,0 +1,744 @@
+{
+  "generatedBy": "scripts/prepare-images.py",
+  "pipeline": 2,
+  "products": {
+    "apa-gazata": {
+      "slug": "apa-gazata",
+      "source": "apa-gazata.png",
+      "sourceHash": "5c56383a34857fb933a6543451e97fb21d229097",
+      "method": "alpha",
+      "model": null,
+      "width": 793,
+      "height": 2696,
+      "sizes": [
+        400
+      ],
+      "flags": []
+    },
+    "apa-plata": {
+      "slug": "apa-plata",
+      "source": "apa-plata.png",
+      "sourceHash": "1a16d3e33a4cd1191b7cd0c386f3c79dde7b3195",
+      "method": "alpha",
+      "model": null,
+      "width": 800,
+      "height": 2694,
+      "sizes": [
+        400,
+        800
+      ],
+      "flags": []
+    },
+    "aripioare": {
+      "slug": "aripioare",
+      "source": "aripioare.jpg",
+      "sourceHash": "7f5bcf570aa27a6e518e730d45f2a94c48e9dd2d",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3100,
+      "height": 2058,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "brinzoaice": {
+      "slug": "brinzoaice",
+      "source": "brinzoaice.jpg",
+      "sourceHash": "86130adeb8e7445fdbc2882a8fe78d64ed57ab46",
+      "method": "rembg",
+      "model": "birefnet-general-lite",
+      "width": 2625,
+      "height": 1736,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "burger-menu": {
+      "slug": "burger-menu",
+      "source": "burger-menu.png",
+      "sourceHash": "8d57b29adb3d3228872190048f406fdb95897f8b",
+      "method": "alpha",
+      "model": null,
+      "width": 2100,
+      "height": 1874,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cartofi-pai": {
+      "slug": "cartofi-pai",
+      "source": "cartofi-pai.jpg",
+      "sourceHash": "3caf6491037da95fa7598b2a86a0d2d5e3bdcf6e",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3211,
+      "height": 1869,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cheeseburger-crispy": {
+      "slug": "cheeseburger-crispy",
+      "source": "cheeseburger-crispy.jpg",
+      "sourceHash": "555da3d8b4d9434ca9db6335bb5d64156d97cc21",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2311,
+      "height": 2163,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cheeseburger-dublu-pui": {
+      "slug": "cheeseburger-dublu-pui",
+      "source": "cheeseburger-dublu-pui.jpg",
+      "sourceHash": "b43eeaa5a21f73d1e302f24513ee5c81117d320f",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2340,
+      "height": 2347,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cheeseburger-dublu-vita": {
+      "slug": "cheeseburger-dublu-vita",
+      "source": "cheeseburger-dublu-vita.jpg",
+      "sourceHash": "63e447d84894f176e61289d643a74455764c77f5",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 1903,
+      "height": 2025,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cheeseburger-pui": {
+      "slug": "cheeseburger-pui",
+      "source": "cheeseburger-pui.jpg",
+      "sourceHash": "418a45eb0579bcff084c7275c66f76fd4c6bce55",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2476,
+      "height": 2105,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cheeseburger-vita": {
+      "slug": "cheeseburger-vita",
+      "source": "cheeseburger-vita.jpg",
+      "sourceHash": "935d95466c4ec4219250415ef99bb8afe39e2287",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2365,
+      "height": 2065,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "cola": {
+      "slug": "cola",
+      "source": "cola.png",
+      "sourceHash": "5968730e81d188f4d98d0bf0f0880a028843d7c9",
+      "method": "alpha",
+      "model": null,
+      "width": 768,
+      "height": 2690,
+      "sizes": [
+        400
+      ],
+      "flags": []
+    },
+    "crispy-filets": {
+      "slug": "crispy-filets",
+      "source": "crispy-filets.jpg",
+      "sourceHash": "7b831af26259fd27aae576f2905ae3701b6c3353",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3379,
+      "height": 1798,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "fanta": {
+      "slug": "fanta",
+      "source": "fanta.png",
+      "sourceHash": "c888dcc60374935bb44b85d1f7b13acdb90cf75a",
+      "method": "alpha",
+      "model": null,
+      "width": 764,
+      "height": 2690,
+      "sizes": [
+        400
+      ],
+      "flags": []
+    },
+    "gozleme-carne": {
+      "slug": "gozleme-carne",
+      "source": "gozleme-carne.jpg",
+      "sourceHash": "163ccc9b34bfc42f8b7281d01cc8db73cacfb63a",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3236,
+      "height": 1653,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "gozleme-mozzarella": {
+      "slug": "gozleme-mozzarella",
+      "source": "gozleme-mozzarella.jpg",
+      "sourceHash": "d8fa106922445e4c98a4ac6d30d33ca0b1c2a9f7",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3494,
+      "height": 1772,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "hamburger-dublu-vita": {
+      "slug": "hamburger-dublu-vita",
+      "source": "hamburger-dublu-vita.jpg",
+      "sourceHash": "8c9d8c0e5e01bc4edc8fcb07cfbfbec1ba4eccfe",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2047,
+      "height": 2026,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "hamburger-vita": {
+      "slug": "hamburger-vita",
+      "source": "hamburger-vita.jpg",
+      "sourceHash": "c41424d9c22887f31276648fa3a46e282b7b2bdf",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2358,
+      "height": 2144,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "hot-dog-cheese": {
+      "slug": "hot-dog-cheese",
+      "source": "hot-dog-cheese.png",
+      "sourceHash": "f2671c6f787a32e2f538ccfd6cce6cd2f8dbdda4",
+      "method": "alpha",
+      "model": null,
+      "width": 1766,
+      "height": 1615,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "hot-dog-classic": {
+      "slug": "hot-dog-classic",
+      "source": "hot-dog-classic.png",
+      "sourceHash": "f3bfac6ef4b16865df5f55a05831fcdfe1584c52",
+      "method": "alpha",
+      "model": null,
+      "width": 1931,
+      "height": 1902,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "kebab-cheese": {
+      "slug": "kebab-cheese",
+      "source": "kebab-cheese.jpg",
+      "sourceHash": "e6e8ed63338bf01f720256843af5351353f319cc",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2773,
+      "height": 2401,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "kebab-crispy": {
+      "slug": "kebab-crispy",
+      "source": "kebab-crispy.jpg",
+      "sourceHash": "3e185a801bdaca4e26d0ef28e6fc32c76d987345",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2708,
+      "height": 2173,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "kebab-menu": {
+      "slug": "kebab-menu",
+      "source": "kebab-menu.png",
+      "sourceHash": "c9b9acadff8b81247b37ccc2a6515a597b557c12",
+      "method": "alpha",
+      "model": null,
+      "width": 2027,
+      "height": 1943,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "kebab-philly-beef": {
+      "slug": "kebab-philly-beef",
+      "source": "kebab-philly-beef.jpg",
+      "sourceHash": "f7e9296923b9c08a99b3fa2871761eab11eea2b2",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3018,
+      "height": 2287,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "kebab-xl-xxl": {
+      "slug": "kebab-xl-xxl",
+      "source": "kebab-xl-xxl.jpg",
+      "sourceHash": "b139f5f8a443cede7e1175e81618c5a4d1207eee",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2759,
+      "height": 2452,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "le-coq-margarita": {
+      "slug": "le-coq-margarita",
+      "source": "le-coq-margarita.png",
+      "sourceHash": "eabb42bb216b47a22dcc396dd62abcee362cac68",
+      "method": "alpha",
+      "model": null,
+      "width": 1171,
+      "height": 2084,
+      "sizes": [
+        400,
+        800
+      ],
+      "flags": []
+    },
+    "le-coq-mojito": {
+      "slug": "le-coq-mojito",
+      "source": "le-coq-mojito.png",
+      "sourceHash": "ae70c9765025ca8eaa31abcca22e31e6619d452d",
+      "method": "alpha",
+      "model": null,
+      "width": 650,
+      "height": 2540,
+      "sizes": [
+        400
+      ],
+      "flags": []
+    },
+    "mozza-crispy": {
+      "slug": "mozza-crispy",
+      "source": "mozza-crispy.jpg",
+      "sourceHash": "35e8dae5a5753f69fa3cc7e72a3c4a9aa3e067f0",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2640,
+      "height": 2105,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-4-carnuri": {
+      "slug": "pizza-4-carnuri",
+      "source": "pizza-4-carnuri.png",
+      "sourceHash": "c3a491edaf6317a59725a43522ba016f0ba69629",
+      "method": "alpha",
+      "model": null,
+      "width": 2167,
+      "height": 1534,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-carbonara": {
+      "slug": "pizza-carbonara",
+      "source": "pizza-carbonara.png",
+      "sourceHash": "0d5b427c41e1ca28ebc87b99b10b2c0ec4d9da91",
+      "method": "alpha",
+      "model": null,
+      "width": 2029,
+      "height": 1495,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-margarita": {
+      "slug": "pizza-margarita",
+      "source": "pizza-margarita.png",
+      "sourceHash": "5b80ecc3431b8bf819fb7847f433964fed90131e",
+      "method": "alpha",
+      "model": null,
+      "width": 2148,
+      "height": 1608,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-pepperoni": {
+      "slug": "pizza-pepperoni",
+      "source": "pizza-pepperoni.png",
+      "sourceHash": "f874bdd9a9161dac86b033e21fbd6c373c13ab63",
+      "method": "alpha",
+      "model": null,
+      "width": 2198,
+      "height": 1602,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-quattro-formaggi": {
+      "slug": "pizza-quattro-formaggi",
+      "source": "pizza-quattro-formaggi.png",
+      "sourceHash": "e222cf557b0985880dccbe91a080b7fe202b8067",
+      "method": "alpha",
+      "model": null,
+      "width": 2286,
+      "height": 1636,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-quattro-formaggi-cu-para": {
+      "slug": "pizza-quattro-formaggi-cu-para",
+      "source": "pizza-quattro-formaggi-cu-para.png",
+      "sourceHash": "e33db98adc02f812178eb7e6ed910b0b1720f2f2",
+      "method": "alpha",
+      "model": null,
+      "width": 2112,
+      "height": 1506,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "pizza-sunca-si-legume": {
+      "slug": "pizza-sunca-si-legume",
+      "source": "pizza-sunca-si-legume.png",
+      "sourceHash": "4f85b6bd2974ddd0590aa99b7cfaadada4f1293c",
+      "method": "alpha",
+      "model": null,
+      "width": 2049,
+      "height": 1608,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "salata-cezar": {
+      "slug": "salata-cezar",
+      "source": "salata-cezar.jpg",
+      "sourceHash": "ed06a81b93377bcfa808a2dea4b10b7817352c70",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2302,
+      "height": 2293,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "salata-greceasca": {
+      "slug": "salata-greceasca",
+      "source": "salata-greceasca.jpg",
+      "sourceHash": "5d96b0d415d1cd41682bfc24613df89b8efc7540",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2364,
+      "height": 2356,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sandwich-salam": {
+      "slug": "sandwich-salam",
+      "source": "sandwich-salam.jpg",
+      "sourceHash": "08326aebb9c494a55ba4335864fb4f4c2b810e2b",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3520,
+      "height": 2197,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sandwich-sunca": {
+      "slug": "sandwich-sunca",
+      "source": "sandwich-sunca.jpg",
+      "sourceHash": "8587d485fe5db10e3d1cdcf0fa0b5c950144f445",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 3541,
+      "height": 2299,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-apetit": {
+      "slug": "sos-apetit",
+      "source": "sos-apetit.png",
+      "sourceHash": "f5f1ba8043ef87652e28e2f2e517c886aaeb04de",
+      "method": "alpha",
+      "model": null,
+      "width": 2309,
+      "height": 1514,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-cascaval": {
+      "slug": "sos-cascaval",
+      "source": "sos-cascaval.png",
+      "sourceHash": "0cab54411a685d654677b75dd24917ff8397aef4",
+      "method": "alpha",
+      "model": null,
+      "width": 2661,
+      "height": 1892,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-ketchup": {
+      "slug": "sos-ketchup",
+      "source": "sos-ketchup.jpg",
+      "sourceHash": "f5b750f48844113637b9c77df2651e99487b740c",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2766,
+      "height": 1807,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-maioneza": {
+      "slug": "sos-maioneza",
+      "source": "sos-maioneza.jpg",
+      "sourceHash": "521db352d57a63300a9b298d0e7daf2ccc56a97f",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2643,
+      "height": 1758,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-mustar-miere": {
+      "slug": "sos-mustar-miere",
+      "source": "sos-mustar-miere.jpg",
+      "sourceHash": "10e6ac46f8daf96c4dc3a2d664fee30d404bcbee",
+      "method": "rembg",
+      "model": "birefnet-general-lite",
+      "width": 2679,
+      "height": 1780,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-sweet-chilli": {
+      "slug": "sos-sweet-chilli",
+      "source": "sos-sweet-chilli.png",
+      "sourceHash": "0ff15f54210ad7a4728c5923f41d6bdd1d509274",
+      "method": "alpha",
+      "model": null,
+      "width": 2012,
+      "height": 1431,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sos-usturoi": {
+      "slug": "sos-usturoi",
+      "source": "sos-usturoi.jpg",
+      "sourceHash": "62cc602608379ff9978b5cc5e0dc22e2a37c36c2",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2705,
+      "height": 1777,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "sprite": {
+      "slug": "sprite",
+      "source": "sprite.png",
+      "sourceHash": "ce888d44aae6d974529a3695f02d2d752b70155f",
+      "method": "alpha",
+      "model": null,
+      "width": 774,
+      "height": 2690,
+      "sizes": [
+        400
+      ],
+      "flags": []
+    },
+    "supa-bostan": {
+      "slug": "supa-bostan",
+      "source": "supa-bostan.jpg",
+      "sourceHash": "7aa3decdd10f379111c6579f52695f5195724a2c",
+      "method": "rembg",
+      "model": "birefnet-general-lite",
+      "width": 2196,
+      "height": 2187,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "supa-ciuperci": {
+      "slug": "supa-ciuperci",
+      "source": "supa-ciuperci.jpg",
+      "sourceHash": "22b4311faf018028ffccfa45abec717b7b02be01",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2219,
+      "height": 2216,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    },
+    "supa-spanac": {
+      "slug": "supa-spanac",
+      "source": "supa-spanac.jpg",
+      "sourceHash": "17d3c6f893c630534ea5e1b77523e25384a0e628",
+      "method": "rembg",
+      "model": "isnet-general-use",
+      "width": 2237,
+      "height": 2234,
+      "sizes": [
+        400,
+        800,
+        1600
+      ],
+      "flags": []
+    }
+  }
+}
