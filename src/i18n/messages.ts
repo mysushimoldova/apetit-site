@@ -5,10 +5,16 @@ import type { Locale } from "@/data/points";
 
 export const DEFAULT_LOCALE: Locale = "ro";
 
-export const messages = {
+export interface Messages {
+  cityScreen: {
+    /** Невидимый заголовок экрана городов — только для скринридеров */
+    title: string;
+  };
+}
+
+export const messages: Record<Locale, Messages> = {
   ro: {
     cityScreen: {
-      /** Невидимый заголовок экрана городов — только для скринридеров */
       title: "Alege orașul",
     },
   },
@@ -17,9 +23,7 @@ export const messages = {
       title: "Выберите город",
     },
   },
-} as const satisfies Record<Locale, unknown>;
-
-export type Messages = (typeof messages)[typeof DEFAULT_LOCALE];
+};
 
 export function getMessages(locale: Locale): Messages {
   return messages[locale];
