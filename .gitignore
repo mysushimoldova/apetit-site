@@ -1,2 +1,29 @@
+# Исходники (фото, PSD, логотип) — не в git
 assets/foto-originale/
 assets/meniu-psd/
+
+# Зависимости
+/node_modules
+
+# Сборка Next.js
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# Секреты — только в .env.local, никогда в git
+.env*
+
+# Тесты
+/coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Разное
+.DS_Store
+*.pem
+npm-debug.log*
+.vercel

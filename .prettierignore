@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+test-results
+playwright-report
+package-lock.json
+assets
+.claude
+
+# Документы проекта форматируем вручную
+*.md
+docs
