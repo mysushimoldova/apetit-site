@@ -1,32 +1,35 @@
 import { test } from "@playwright/test";
 
-// Фоновые линии в меню (сила A, --bg-lines-opacity 0.5) с разной толщиной.
-// Толщина зашита в картинку, поэтому вариант — отдельная сборка:
-//   py -3 scripts/bg-lines.py build docs/bg-frames/kadr-08s.png            # A1, ~1px
-//   py -3 scripts/bg-lines.py build docs/bg-frames/kadr-08s.png --line 0.6 # A2, ~0.6px
-// и затем BG_VARIANT=A1|A2 npm run screens -- background --project=390
-const variant = process.env.BG_VARIANT ?? "A1";
+// Фоновые линии в меню с разным отдалением (--bg-frame-w — ширина кадра на
+// экране): 1 — 1600px, 2 — 1200px (выбран), 3 — 900px. Только телефон 390px.
+// Запуск: npm run screens -- background --project=390
+const VARIANTS = [
+  { name: "1", frame: "1600px" },
+  { name: "2", frame: "1200px" },
+  { name: "3", frame: "900px" },
+];
 
-test("скриншот фона меню", async ({ page }, testInfo) => {
-  const width = testInfo.project.name;
+test("скриншоты отдаления фона меню", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "390", "только телефон");
   await page.goto("/soroca");
   await page.locator("main img").first().waitFor();
-  // Фото первого экрана и картинка линий загружены
+  // Фото первого экрана загружены, фон проявился
   await page.waitForFunction(() =>
     Array.from(document.images)
       .filter((img) => img.getBoundingClientRect().top < window.innerHeight)
       .every((img) => img.complete && img.naturalWidth > 0),
   );
-  await page.evaluate(async () => {
-    const img = new Image();
-    img.src = "/img/bg/linii.webp";
-    await img.decode();
-  });
+  await page.locator("[data-brand-bg][data-ready]").waitFor({ state: "attached" });
   // Значок «N» dev-режима Next — не часть сайта
   await page.addStyleTag({ content: "nextjs-portal { display: none }" });
-  // Дать анимации появления плиток закончиться
-  await page.waitForTimeout(600);
-  await page.screenshot({
-    path: `docs/screens/07-fundal-${variant}-${width}.png`,
-  });
+
+  for (const v of VARIANTS) {
+    await page.evaluate(
+      (w) => document.documentElement.style.setProperty("--bg-frame-w", w),
+      v.frame,
+    );
+    // Дать закончиться проявлению фона и появлению плиток
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `docs/screens/07-zoom-${v.name}-390.png` });
+  }
 });

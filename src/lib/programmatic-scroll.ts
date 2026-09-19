@@ -6,6 +6,11 @@
 /** Пауза без scroll, после которой прокрутка считается законченной. */
 export const SCROLL_IDLE_MS = 150;
 
+/** Сколько ждать первого scroll: если секция уже на месте, его не будет.
+ *  Дольше паузы — первый scroll может запоздать, пока браузер занят
+ *  (например, расшифровывает картинку фона), и фиксация снялась бы раньше. */
+export const SCROLL_START_MS = 1000;
+
 const INTERRUPT_EVENTS = ["wheel", "touchstart", "pointerdown", "keydown"];
 
 /**
@@ -16,11 +21,10 @@ export function watchProgrammaticScroll(
   target: EventTarget,
   onEnd: (interrupted: boolean) => void,
   idleMs: number = SCROLL_IDLE_MS,
+  startMs: number = SCROLL_START_MS,
 ): () => void {
   let done = false;
-  // Таймер паузы запускается сразу: если секция уже на месте, событий
-  // scroll не будет вовсе
-  let idle = setTimeout(() => finish(false), idleMs);
+  let idle = setTimeout(() => finish(false), startMs);
 
   const onScroll = () => {
     clearTimeout(idle);

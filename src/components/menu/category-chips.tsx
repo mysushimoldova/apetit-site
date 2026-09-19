@@ -100,11 +100,13 @@ export function CategoryChips({
     };
     observe();
     window.addEventListener("resize", observe);
+    // Фиксацию чипа здесь не снимаем: клик мог прийти раньше, чем React
+    // запустил эффекты (он повторяет такой клик после «оживления» страницы),
+    // и уборка при повторном запуске эффекта сняла бы свежую фиксацию.
+    // Ожидание конца прокрутки само заканчивается не позже SCROLL_START_MS.
     return () => {
       window.removeEventListener("resize", observe);
       observer?.disconnect();
-      scrollLockRef.current?.();
-      scrollLockRef.current = null;
     };
   }, [items]);
 

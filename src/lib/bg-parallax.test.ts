@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { BG_PARALLAX, bgOffset } from "./bg-parallax";
+import { BG_PARALLAX, bgOffset, bgTileHeight } from "./bg-parallax";
 
 describe("сдвиг фоновых линий при прокрутке", () => {
-  const period = 1688; // два экрана по 844px
+  const period = bgTileHeight(1200); // плитка при кадре 1200px
+
+  it("высота плитки — 1.125 ширины кадра (два кадра 16:9)", () => {
+    expect(period).toBe(1350);
+    expect(bgTileHeight(1600)).toBe(1800);
+    expect(bgTileHeight(0)).toBe(0);
+    expect(bgTileHeight(Number.NaN)).toBe(0);
+  });
 
   it("0.35 от прокрутки, вверх", () => {
     expect(BG_PARALLAX).toBe(0.35);
@@ -15,7 +22,7 @@ describe("сдвиг фоновых линий при прокрутке", () =>
     expect(Object.is(bgOffset(0, period), -0)).toBe(false);
   });
 
-  it("через два экрана начинает заново (слой не кончается на длинном меню)", () => {
+  it("через высоту плитки начинает заново (слой не кончается на длинном меню)", () => {
     const y = period / BG_PARALLAX; // прокрутка, на которой слой проехал период
     expect(bgOffset(y, period)).toBeCloseTo(0);
     expect(bgOffset(y + 1000, period)).toBeCloseTo(-350);

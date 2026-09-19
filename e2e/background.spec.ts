@@ -15,35 +15,70 @@ for (const path of ["/", "/soroca", "/soroca/comanda"]) {
   test(`${path}: слой линий под контентом, клики проходят сквозь`, async ({
     page,
   }) => {
+    // Оформление с пустой корзиной уводит в меню — кладём одну позицию
+    if (path.endsWith("/comanda")) {
+      await page.addInitScript(() =>
+        window.localStorage.setItem(
+          "apetit.cart",
+          JSON.stringify({
+            state: {
+              city: "soroca",
+              lines: [
+                {
+                  productSlug: "cola",
+                  variantId: null,
+                  addonIds: [],
+                  removedIds: [],
+                  qty: 1,
+                },
+              ],
+            },
+            version: 1,
+          }),
+        ),
+      );
+    }
     await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`${path}$`));
     const layer = page.locator("[data-brand-bg]");
     await expect(layer).toHaveCount(1);
     await expect(layer).toHaveAttribute("aria-hidden", "true");
+    // Картинка загружена после страницы — слой проявился
+    await expect(layer).toHaveAttribute("data-ready", "");
     const style = await layer.evaluate((el) => {
       const s = getComputedStyle(el);
+      const track = getComputedStyle(el.firstElementChild!);
       return {
         position: s.position,
         zIndex: s.zIndex,
         pointerEvents: s.pointerEvents,
-        opacity: s.opacity,
+        image: track.backgroundImage.includes("/img/bg/linii.webp"),
+        repeat: track.backgroundRepeat,
+        size: track.backgroundSize,
       };
     });
     expect(style).toEqual({
       position: "fixed",
       zIndex: "-1",
       pointerEvents: "none",
-      opacity: "0.5",
+      image: true,
+      repeat: "repeat",
+      size: "2400px auto", // кадр 1200px, плитка — два кадра
     });
-    // Картинка линий загрузилась
     await expect
-      .poll(() =>
-        page.evaluate(() =>
-          performance
-            .getEntriesByType("resource")
-            .some((r) => r.name.endsWith("/img/bg/linii.webp")),
-        ),
-      )
-      .toBe(true);
+      .poll(() => layer.evaluate((el) => getComputedStyle(el).opacity))
+      .toBe("0.5");
+    // Картинка запрошена только после загрузки страницы (не мешает контенту)
+    const timing = await page.evaluate(() => {
+      const nav = performance.getEntriesByType(
+        "navigation",
+      )[0] as PerformanceNavigationTiming;
+      const bg = performance
+        .getEntriesByType("resource")
+        .find((r) => r.name.endsWith("/img/bg/linii.webp"));
+      return { load: nav.loadEventEnd, bg: bg?.startTime ?? -1 };
+    });
+    expect(timing.bg).toBeGreaterThanOrEqual(timing.load);
     // В центре экрана верхний элемент — контент или фон страницы, не слой
     const hitsLayer = await page.evaluate(() => {
       const el = document.elementFromPoint(
@@ -61,6 +96,20 @@ test("при прокрутке слой едет вверх на 0.35 от пр
   expect(await layerShift(page)).toBe(0);
   await page.evaluate(() => window.scrollTo(0, 1000));
   await expect.poll(() => layerShift(page)).toBeCloseTo(-350, 0);
+  // Через высоту плитки (1350px при кадре 1200px) — по кругу
+  await page.evaluate(() => window.scrollTo(0, 5000));
+  await expect.poll(() => layerShift(page)).toBeCloseTo(-(1750 % 1350), 0);
+});
+
+test("слой перекрывает экран при любом сдвиге (лента = экран + плитка)", async ({
+  page,
+}) => {
+  await page.goto("/soroca");
+  const heights = await page.evaluate(() => {
+    const track = document.querySelector<HTMLElement>(".brand-bg-track")!;
+    return { track: track.offsetHeight, screen: window.innerHeight };
+  });
+  expect(heights.track).toBeGreaterThanOrEqual(heights.screen + 1350);
 });
 
 test("при «уменьшить движение» слой неподвижен", async ({ page }) => {

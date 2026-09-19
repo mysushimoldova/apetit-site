@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SCROLL_IDLE_MS,
+  SCROLL_START_MS,
   watchProgrammaticScroll,
 } from "./programmatic-scroll";
 
@@ -37,9 +38,22 @@ describe("watchProgrammaticScroll", () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
-  it("если прокрутки не было (секция уже на месте) — конец по паузе", () => {
+  it("если прокрутки не было (секция уже на месте) — конец через SCROLL_START_MS", () => {
     watchProgrammaticScroll(target, onEnd);
-    vi.advanceTimersByTime(SCROLL_IDLE_MS);
+    vi.advanceTimersByTime(SCROLL_START_MS - 1);
+    expect(onEnd).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onEnd).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it("первый scroll запоздал (браузер занят) — фиксация не снимается раньше", () => {
+    watchProgrammaticScroll(target, onEnd);
+    vi.advanceTimersByTime(SCROLL_IDLE_MS * 3);
+    expect(onEnd).not.toHaveBeenCalled();
+    fire("scroll");
+    vi.advanceTimersByTime(SCROLL_IDLE_MS - 1);
+    expect(onEnd).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
     expect(onEnd).toHaveBeenCalledExactlyOnceWith(false);
   });
 

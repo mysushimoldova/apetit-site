@@ -2,22 +2,34 @@
 // размер, добавки, убранные ингредиенты — и количество. Никаких цен и названий:
 // цену всегда пересчитывает сервер по актуальным данным точки.
 // Одинаковые конфигурации складываются в одну позицию.
-import { z } from "@/lib/zod";
+// Схема — на лёгком zod/mini: она нужна и в браузере (корзина в меню).
+import {
+  array,
+  gte,
+  int,
+  lte,
+  maxLength,
+  nullable,
+  object,
+  regex,
+  string,
+  type output,
+} from "@/lib/zod-mini";
 import { isCitySlug, type CitySlug } from "@/data/points";
 
 /** Потолок штук в одной позиции — защита от «99999» из localStorage. */
 export const MAX_QTY = 99;
 
-const id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+const id = string().check(regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/));
 
-export const CartLineSchema = z.object({
+export const CartLineSchema = object({
   productSlug: id,
-  variantId: id.nullable(),
-  addonIds: z.array(id).max(30),
-  removedIds: z.array(id).max(30),
-  qty: z.number().int().min(1).max(MAX_QTY),
+  variantId: nullable(id),
+  addonIds: array(id).check(maxLength(30)),
+  removedIds: array(id).check(maxLength(30)),
+  qty: int().check(gte(1), lte(MAX_QTY)),
 });
-export type CartLine = z.infer<typeof CartLineSchema>;
+export type CartLine = output<typeof CartLineSchema>;
 
 /** Конфигурация блюда без количества — то, что делает позицию уникальной. */
 export type LineConfig = Omit<CartLine, "qty">;
