@@ -158,6 +158,19 @@ describe("блюда (SPEC приложение А)", () => {
     }
   });
 
+  it("убрать можно состав без основы; у комбо — ничего (это части набора)", () => {
+    const removable = (slug: string) =>
+      bySlug(slug)?.removable.map((r) => r.id);
+    expect(removable("kebab-cheese")).toContain("rosii");
+    expect(removable("kebab-cheese")).not.toContain("lipie");
+    expect(removable("kebab-menu")).toEqual([]);
+    expect(removable("burger-menu")).toEqual([]);
+    for (const p of PRODUCTS) {
+      const ids = p.removable.map((r) => r.id);
+      expect(new Set(ids).size, p.slug).toBe(ids.length);
+    }
+  });
+
   it("контрольные цены из SPEC", () => {
     expect(bySlug("kebab-cheese")).toMatchObject({ price: 105, grams: 440 });
     expect(bySlug("cheeseburger-dublu-pui")).toMatchObject({

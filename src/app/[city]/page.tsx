@@ -1,9 +1,11 @@
-// Страница меню города (SPEC §3 шаг 2, DESIGN.md 2.1 → Layout).
+// Страница меню города (SPEC §3 шаги 2–4, DESIGN.md 2.2 → Layout).
 // Шапка → лента чипов → для каждой категории: точечная линия, слово-вывеска,
-// сетка плиток. Только просмотр: корзина и лист блюда — следующие задачи.
-// В Сороках меню берётся по первой точке (выбор точки — в корзине).
+// сетка плиток. Поверх — корзина (CartProvider): лист блюда, Cart Bar,
+// лист корзины. В Сороках меню берётся по первой точке (выбор точки — при
+// оформлении заказа).
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CartProvider } from "@/components/cart/cart-provider";
 import { RememberCity } from "@/components/city/remember-city";
 import { CategoryChips } from "@/components/menu/category-chips";
 import { ProductTile } from "@/components/menu/product-tile";
@@ -13,6 +15,7 @@ import { getMenuForCity } from "@/data/menu";
 import { CITIES, getCity, isCitySlug } from "@/data/points";
 import { fill, getMessages } from "@/i18n/messages";
 import { billboardWidthEm } from "@/lib/billboard-fit";
+import { buildCatalog } from "@/lib/cart/catalog";
 
 type Props = { params: Promise<{ city: string }> };
 
@@ -43,6 +46,8 @@ export default async function CityPage({ params }: Props) {
   const locale = city.locale;
   const t = getMessages(locale);
   const menu = getMenuForCity(city.slug);
+  // Блюда города с ценами точки и разрешёнными добавками — для листа и корзины
+  const catalog = buildCatalog(city.slug);
 
   const chips = menu.map(({ category }) => ({
     slug: category.slug,
@@ -55,44 +60,46 @@ export default async function CityPage({ params }: Props) {
   return (
     <div lang={locale}>
       <RememberCity slug={city.slug} />
-      <SiteHeader city={city} locale={locale} t={t} />
-      <CategoryChips items={chips} label={t.header.categories} />
+      <CartProvider city={city.slug} locale={locale} t={t} catalog={catalog}>
+        <SiteHeader city={city} locale={locale} t={t} />
+        <CategoryChips items={chips} label={t.header.categories} />
 
-      <main className="page pt-4">
-        {/* Заголовок страницы для скринридеров: бренд + город, без нового текста */}
-        <h1 className="sr-only" translate="no">
-          Apetit {city.name}
-        </h1>
-        {menu.map(({ category, products }) => (
-          <section
-            key={category.slug}
-            id={category.slug}
-            aria-labelledby={`${category.slug}-title`}
-            className="menu-section"
-            // Ширина слова-вывески в em — CSS подгоняет размер под ширину
-            style={
-              {
-                "--billboard-em": billboardWidthEm(category.name[locale]),
-              } as React.CSSProperties
-            }
-          >
-            <h2 id={`${category.slug}-title`} className="billboard">
-              {category.name[locale]}
-            </h2>
-            <RevealGrid className="tiles grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-12">
-              {products.map((product) => (
-                <ProductTile
-                  key={product.slug}
-                  product={product}
-                  locale={locale}
-                  t={t}
-                  eager={tileIndex++ < EAGER_TILES}
-                />
-              ))}
-            </RevealGrid>
-          </section>
-        ))}
-      </main>
+        <main className="page pt-4">
+          {/* Заголовок страницы для скринридеров: бренд + город, без нового текста */}
+          <h1 className="sr-only" translate="no">
+            Apetit {city.name}
+          </h1>
+          {menu.map(({ category, products }) => (
+            <section
+              key={category.slug}
+              id={category.slug}
+              aria-labelledby={`${category.slug}-title`}
+              className="menu-section"
+              // Ширина слова-вывески в em — CSS подгоняет размер под ширину
+              style={
+                {
+                  "--billboard-em": billboardWidthEm(category.name[locale]),
+                } as React.CSSProperties
+              }
+            >
+              <h2 id={`${category.slug}-title`} className="billboard">
+                {category.name[locale]}
+              </h2>
+              <RevealGrid className="tiles grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-12">
+                {products.map((product) => (
+                  <ProductTile
+                    key={product.slug}
+                    product={product}
+                    locale={locale}
+                    t={t}
+                    eager={tileIndex++ < EAGER_TILES}
+                  />
+                ))}
+              </RevealGrid>
+            </section>
+          ))}
+        </main>
+      </CartProvider>
     </div>
   );
 }

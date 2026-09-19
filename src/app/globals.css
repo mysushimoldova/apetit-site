@@ -366,13 +366,14 @@
   margin-top: calc(var(--billboard-size, var(--text-billboard)) * -0.22);
 }
 
-/* Фото блюда: 150px в плитке, под ним «лужица» — единственная тень еды */
+/* Фото блюда: 150px в плитке (280px в листе, 56px в корзине — через --food-h),
+   под ним «лужица» — единственная тень еды */
 @utility food {
   position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  height: var(--size-food-tile);
+  height: var(--food-h, var(--size-food-tile));
 
   &::before {
     content: "";
@@ -452,4 +453,585 @@
   transition:
     opacity var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out);
+}
+
+/* ---------- Лист блюда и корзина (DESIGN.md 2.2 → Components) ---------- */
+
+/* Primary: Yellow, Ink Manrope 700 15px, 52px, pill. Нажатие — Yellow Deep.
+   Disabled — Sand и Smoke. Единственная жёлтая кнопка на экране. */
+@utility btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--size-primary);
+  padding: 0 24px;
+  border-radius: var(--radius-pill);
+  background: var(--color-yellow);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: var(--color-yellow-deep);
+    }
+  }
+  &:active:not(:disabled) {
+    background: var(--color-yellow-deep);
+    transform: scale(0.97);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  &:disabled {
+    background: var(--color-sand);
+    color: var(--color-smoke);
+    cursor: not-allowed;
+  }
+}
+
+/* Secondary: без заливки, рамка rule, Manrope 600 15px, 48px, pill.
+   Hover/нажатие — Ink, текст Cream. */
+@utility btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--size-secondary);
+  padding: 0 24px;
+  border: var(--rule);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--color-ink);
+      color: var(--color-cream);
+    }
+  }
+  &:active {
+    background: var(--color-ink);
+    color: var(--color-cream);
+    transform: scale(0.97);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
+/* Ценник в листе и корзине — крупнее: Manrope 800 18px, 32px */
+@utility price-pill-lg {
+  display: inline-flex;
+  align-items: center;
+  height: var(--size-price-pill-lg);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-yellow);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-price);
+  font-weight: var(--text-price--font-weight);
+  letter-spacing: var(--text-price--letter-spacing);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Кнопка на плитке: «+» (Yellow) → после добавления Ink-пилюля «− N +».
+   Кнопка «+» остаётся тем же элементом — фокус не теряется.
+   Утилита (а не components), чтобы перекрывать стили add-button. */
+@utility tile-cart {
+  position: relative;
+  z-index: 1; /* над растянутой кнопкой-названием */
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--size-add);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--dur-fast) var(--ease-out);
+
+  &[data-active] {
+    background: var(--color-ink);
+    color: var(--color-cream);
+  }
+  &[data-active] .add-button {
+    width: 30px;
+    background: transparent;
+    color: var(--color-cream);
+  }
+  /* Блюдо с размерами: Ink-круг с числом, без ± */
+  &[data-active] .add-button[data-count] {
+    width: var(--size-add);
+  }
+  /* Кольцо фокуса на Ink-пилюле — светлое и внутри */
+  &[data-active] .add-button:focus-visible,
+  & .tile-cart-minus:focus-visible {
+    outline: 2px solid var(--color-cream);
+    outline-offset: -4px;
+  }
+  /* Минус и число появляются мягко (где браузер умеет @starting-style) */
+  & > .tile-cart-extra {
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+    @starting-style {
+      opacity: 0;
+      transform: translateX(6px);
+    }
+  }
+}
+
+/* Подпись блока ЗАГЛАВНЫМИ (MĂRIME, FĂRĂ, EXTRA) */
+@utility caption-caps {
+  font-family: var(--font-body);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  font-weight: var(--text-caption--font-weight);
+  letter-spacing: var(--text-caption--letter-spacing);
+  text-transform: uppercase;
+}
+
+@layer components {
+  /* Лист (bottom sheet / модалка): нативный <dialog> на весь экран.
+     Состояние открытия — data-state на <dialog> (ставит sheet.tsx):
+     панель едет снизу 240ms, фон темнеет до --scrim; закрытие быстрее — 150ms. */
+  .sheet {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink);
+    overflow: hidden;
+
+    &::backdrop {
+      background: transparent;
+    }
+  }
+
+  .sheet-scrim {
+    position: absolute;
+    inset: 0;
+    background: var(--scrim);
+    opacity: 0;
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+
+  .sheet-panel {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    /* Сверху остаётся полоска затемнённой страницы — по ней можно тапнуть */
+    max-height: calc(100dvh - 40px);
+    background: var(--color-milk);
+    border-top: var(--rule);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: var(--shadow-lift);
+    transform: translate3d(0, 100%, 0);
+    transition: transform var(--dur-base) var(--ease-out);
+    will-change: transform;
+  }
+
+  .sheet[data-state="open"] .sheet-scrim {
+    opacity: 1;
+  }
+  .sheet[data-state="open"] .sheet-panel {
+    transform: translate3d(0, 0, 0);
+  }
+  /* Закрытие быстрее открытия */
+  .sheet[data-state="closed"] .sheet-scrim,
+  .sheet[data-state="closed"] .sheet-panel {
+    transition-duration: var(--dur-fast);
+  }
+
+  /* Десктоп: модалка 520px по центру, рамка rule целиком; появление —
+     чуть снизу + прозрачность (модалка не «выезжает» с края экрана) */
+  @media (min-width: 1024px) {
+    .sheet-panel {
+      inset: 50% auto auto 50%;
+      width: 520px;
+      max-height: min(88dvh, 880px);
+      border: var(--rule);
+      border-radius: var(--radius-sheet);
+      opacity: 0;
+      transform: translate3d(-50%, calc(-50% + 16px), 0);
+      transition:
+        transform var(--dur-base) var(--ease-out),
+        opacity var(--dur-base) var(--ease-out);
+    }
+    .sheet[data-state="open"] .sheet-panel {
+      opacity: 1;
+      transform: translate3d(-50%, -50%, 0);
+    }
+  }
+
+  /* Верх листа: ручка 36×4 Sand + крестик. За эту полосу (и за всё
+     содержимое, когда оно прокручено до верха) лист тянется вниз. */
+  .sheet-top {
+    position: relative;
+    flex: none;
+    height: 44px;
+    touch-action: none;
+  }
+  .sheet-handle {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: var(--radius-pill);
+    background: var(--color-sand);
+  }
+  @media (min-width: 1024px) {
+    .sheet-handle {
+      display: none;
+    }
+  }
+
+  .sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 var(--gutter) 24px;
+  }
+  @media (min-width: 1024px) {
+    .sheet-body {
+      padding-inline: 24px;
+    }
+  }
+
+  /* Низ листа: всегда виден (не прокручивается вместе с содержимым) */
+  .sheet-footer {
+    flex: none;
+    padding: 12px var(--gutter) max(12px, env(safe-area-inset-bottom));
+    border-top: var(--hairline);
+    background: var(--color-milk);
+  }
+  @media (min-width: 1024px) {
+    .sheet-footer {
+      padding: 16px 24px;
+      border-radius: 0 0 var(--radius-sheet) var(--radius-sheet);
+    }
+  }
+
+  /* Лист без низа (подтверждение) — отступ от полоски «домой» на iPhone */
+  .sheet-body:last-child {
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+
+  /* Строки корзины разделены точечной линией (DESIGN.md → Lines) */
+  .cart-line + .cart-line {
+    border-top: var(--rule-dotted);
+  }
+
+  /* Блоки листа (Mărime / Fără / Extra) разделены hairline */
+  .sheet-block {
+    border-top: var(--hairline);
+    padding-block: 16px;
+  }
+
+  /* Круглая кнопка-значок 44px (крестик, ± в счётчике): на экране — значок,
+     зона нажатия — 44px */
+  .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-pill);
+    color: var(--color-ink);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled) {
+        background: var(--color-sand);
+      }
+    }
+    &:active:not(:disabled) {
+      transform: scale(0.92);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: -2px;
+    }
+    &:disabled {
+      color: var(--color-ash);
+      cursor: not-allowed;
+    }
+  }
+
+  /* Сегменты размера: pill, рамка rule; выбранный — Yellow */
+  /* position: relative — скрытый input остаётся внутри подписи
+     (иначе при фокусе прокрутка листа прыгает к нему) */
+  .segment {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    height: 44px;
+    padding: 0 18px;
+    border: var(--rule);
+    border-radius: var(--radius-pill);
+    font-family: var(--font-ui);
+    font-size: var(--text-label);
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:has(input:checked)) {
+        background: var(--color-sand);
+      }
+    }
+    &:has(input:checked) {
+      background: var(--color-yellow);
+    }
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 2px;
+    }
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+
+  /* Строка с галочкой (Fără / Extra): вся строка — зона нажатия 44px */
+  .check-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.3;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .check-row:hover:not(:has(input:checked)) .check-box {
+      background: var(--color-sand);
+    }
+  }
+  /* Квадрат галочки: тонкая линия rule, отмечено — Ink с Cream-галочкой.
+     Без радиуса: радиусов на сайте ровно четыре. */
+  .check-box {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: var(--rule);
+    color: var(--color-cream);
+    transition: background-color var(--dur-fast) var(--ease-out);
+
+    & > svg {
+      opacity: 0;
+      transition: opacity var(--dur-fast) var(--ease-out);
+    }
+  }
+  .check-row:has(input:checked) .check-box {
+    background: var(--color-ink);
+    & > svg {
+      opacity: 1;
+    }
+  }
+  .check-row:has(input:focus-visible) .check-box {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  /* «Fără»: отмеченный ингредиент зачёркнут — сразу видно, что его не будет */
+  .check-row[data-kind="without"]:has(input:checked) .check-label {
+    text-decoration: line-through;
+    color: var(--color-smoke);
+  }
+
+  /* Счётчик ± в листе и корзине: рамка rule, pill */
+  .stepper {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    border: var(--rule);
+    border-radius: var(--radius-pill);
+    font-family: var(--font-ui);
+    font-size: var(--text-label);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+
+    & > output {
+      min-width: 24px;
+      text-align: center;
+    }
+  }
+
+  .tile-cart-minus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: var(--size-add);
+    border-radius: var(--radius-pill);
+    color: var(--color-cream);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--dur-fast) var(--ease-out);
+
+    &:active {
+      transform: scale(0.92);
+    }
+  }
+  .tile-cart-count {
+    min-width: 16px;
+    text-align: center;
+  }
+
+  /* Название плитки — кнопка, её невидимая область растянута на всю плитку:
+     нажатие на фото или название открывает лист */
+  .tile-open {
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border-radius: var(--radius-input);
+    }
+    &:focus-visible {
+      outline: none;
+    }
+    &:focus-visible::after {
+      outline: 2px solid var(--color-ink);
+    }
+  }
+
+  /* Cart Bar: fixed снизу, стекло, сверху rule, 72px. Появляется снизу,
+     когда в корзине ≥ 1 позиции. Только телефон — на десктопе кнопка в шапке. */
+  .cart-bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    border-top: var(--rule);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translate3d(0, 100%, 0);
+    visibility: hidden;
+    transition:
+      transform var(--dur-fast) var(--ease-out),
+      visibility 0s linear var(--dur-fast);
+
+    &[data-visible] {
+      transform: translate3d(0, 0, 0);
+      visibility: visible;
+      transition:
+        transform var(--dur-base) var(--ease-out),
+        visibility 0s;
+    }
+    @media (min-width: 1024px) {
+      display: none;
+    }
+  }
+  .cart-bar-button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: var(--size-cart-bar);
+    padding: 12px var(--gutter);
+    text-align: left;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: -4px;
+    }
+  }
+
+  /* Бейдж на значке корзины: Ink-круг, Cream-цифра */
+  .cart-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    background: var(--color-ink);
+    color: var(--color-cream);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Кнопка корзины в шапке появляется мягко (не из ничего: чуть меньше + прозрачность) */
+  .header-cart {
+    transition:
+      opacity var(--dur-base) var(--ease-out),
+      transform var(--dur-base) var(--ease-out);
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+
+  /* Пока лист открыт, страница под ним не прокручивается */
+  html[data-scroll-lock] {
+    overflow: hidden;
+  }
+
+  /* Бар корзины не должен закрывать элемент в фокусе внизу страницы */
+  @media (max-width: 1023.98px) {
+    html:has(.cart-bar[data-visible]) {
+      scroll-padding-bottom: calc(var(--size-cart-bar) + 16px);
+    }
+  }
 }

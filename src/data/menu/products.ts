@@ -8,7 +8,8 @@
 // - названия сэндвичей и салатов дополнены словом категории;
 // - цены соусов отдельно — по печатному меню (ketchup 10, maioneză 15);
 // - removable (что можно убрать) = состав без основы (lipie, chiflă, tortilla,
-//   ciabatta).
+//   ciabatta). У комбо (категория menu) убрать нечего: в «составе» там части
+//   набора (kebab mic, limonadă…), а не ингредиенты — вопрос в PROGRESS.md.
 import type { LocalizedList, Product, Removable, Variant } from "./schema";
 
 /** Основа блюда — её убрать нельзя, остальной состав можно (бесплатно). */
@@ -54,7 +55,7 @@ function product(input: ProductInput): Product {
     grams: input.grams ?? null,
     price: input.price,
     variants: input.variants ?? null,
-    removable: removableFrom(ingredients),
+    removable: input.category === "menu" ? [] : removableFrom(ingredients),
     photo: input.photo === undefined ? input.slug : input.photo,
     active: true,
   };

@@ -1,11 +1,13 @@
 // Плитка блюда (DESIGN.md → Product Tile): без поверхности, рамки и тени.
 // Фото → название (2 строки) → состав (2 строки, «…») → граммы → ценник и «+».
-// Нажатие на фото/название откроет лист блюда — следующая задача.
-import { Plus } from "lucide-react";
+// Нажатие на фото/название открывает лист блюда; «+» — корзина.
+// Сама плитка серверная, интерактивны два островка: название и «+».
 import type { Locale } from "@/data/points";
 import { priceLabel, type MenuProduct } from "@/data/menu";
 import type { Messages } from "@/i18n/messages";
 import { FoodImage } from "./food-image";
+import { TileCartControl } from "./tile-cart-control";
+import { TileOpenButton } from "./tile-open-button";
 
 /** «440 g», «340 / 430 g» при вариантах; null — граммов нет. */
 function gramsLabel(product: MenuProduct, unit: string): string | null {
@@ -35,9 +37,11 @@ export function ProductTile({
   const { from, price } = priceLabel(product);
 
   return (
-    <article data-reveal className="flex min-w-0 flex-col">
+    <article data-reveal className="relative flex min-w-0 flex-col">
       <FoodImage photo={product.photo} alt={name} eager={eager} />
-      <h3 className="mt-4 line-clamp-2 font-ui text-title text-ink">{name}</h3>
+      <h3 className="mt-4 font-ui text-title text-ink">
+        <TileOpenButton slug={product.slug} name={name} />
+      </h3>
       {ingredients && (
         <p className="mt-1 line-clamp-2 font-body text-caption font-normal tracking-normal text-charcoal">
           {ingredients}
@@ -48,7 +52,8 @@ export function ProductTile({
           {grams}
         </p>
       )}
-      <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+      {/* flex-wrap: на узких экранах (360px) счётчик уходит на строку ниже */}
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3">
         <span className="price-pill tabular-nums">
           {from && (
             <span className="text-[12px] font-semibold">{t.menu.from}</span>
@@ -61,14 +66,11 @@ export function ProductTile({
             {t.menu.currency}
           </span>
         </span>
-        {/* Пока без действия: корзина — следующая задача */}
-        <button
-          type="button"
-          aria-label={`${t.product.add}: ${name}`}
-          className="add-button shrink-0"
-        >
-          <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
-        </button>
+        <TileCartControl
+          slug={product.slug}
+          name={name}
+          hasVariants={product.variants !== null}
+        />
       </div>
     </article>
   );
