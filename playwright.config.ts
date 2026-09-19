@@ -32,6 +32,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: BASE_URL,
+    // Тестовое время для «вне часов» (заголовок x-apetit-test-now) — только
+    // в этом dev-сервере, см. src/app/[city]/comanda/actions.ts
+    env: { APETIT_E2E: "1" },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

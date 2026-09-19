@@ -34,7 +34,10 @@ export interface Messages {
     add: string;
     size: string;
     without: string;
+    /** Добавки в блюдо: ингредиенты и соусы внутрь */
     extra: string;
+    /** Соусы в стаканчике, отдельно от блюда (ответ архитектора) */
+    sauceCup: string;
     /** Пометка у блока «Fără»: убрать — бесплатно */
     free: string;
   };
@@ -46,6 +49,9 @@ export interface Messages {
     total: string;
     remove: string;
     order: string;
+    /** Очистить корзину: первое нажатие — clear, второе — clearConfirm */
+    clear: string;
+    clearConfirm: string;
   };
   /** Подтверждение: корзина другого города */
   citySwitch: {
@@ -60,9 +66,60 @@ export interface Messages {
     increase: string;
     quantity: string;
   };
+  /** Вне рабочих часов (SPEC §3): баннер на оформлении и в корзине */
+  closed: {
+    /** «Primim comenzi {open}–{close}» — часы точки */
+    banner: string;
+  };
+  /** Оформление заказа (SPEC §3 шаг 5) */
+  checkout: {
+    title: string;
+    /** Ссылка назад в меню */
+    back: string;
+    /** Блок выбора точки — только если в городе их больше одной */
+    point: string;
+    /** Адреса точек в SPEC пока нет */
+    pointAddressMissing: string;
+    /** «km» после расстояния «~1,2» */
+    km: string;
+    name: string;
+    phone: string;
+    /** Формат номера в пустом поле (SPEC §3 шаг 5) */
+    phonePlaceholder: string;
+    address: string;
+    /** Подпись под «Adresă»: поле необязательное */
+    addressHint: string;
+    submit: string;
+    /** Строка под кнопкой отправки */
+    callNote: string;
+    errors: {
+      point: string;
+      name: string;
+      phone: string;
+      address: string;
+      network: string;
+      unavailable: string;
+      /** Пометка у позиции, которой нет в выбранной точке */
+      unavailableLine: string;
+      pointPaused: string;
+      rateLimited: string;
+      rejected: string;
+    };
+  };
+  /** Экран подтверждения (SPEC §3 шаг 6, DESIGN → Order Confirmation) */
+  confirmation: {
+    /** Номер заказа крупно; {n} → номер */
+    number: string;
+    callSoon: string;
+    /** Secondary с телефоном точки (DESIGN: «Sună la local») */
+    call: string;
+    back: string;
+  };
   meta: {
     /** title страницы города; {city} → название города */
     cityTitle: string;
+    /** title оформления и подтверждения; {city} → название города */
+    checkoutTitle: string;
   };
 }
 
@@ -77,6 +134,7 @@ export const messages: Record<Locale, Messages> = {
       size: "Mărime",
       without: "Fără",
       extra: "Extra",
+      sauceCup: "Sos aparte",
       free: "gratuit",
     },
     cart: {
@@ -93,6 +151,8 @@ export const messages: Record<Locale, Messages> = {
       total: "Total",
       remove: "Șterge",
       order: "Comandă",
+      clear: "Golește coșul",
+      clearConfirm: "Da, golește",
     },
     citySwitch: {
       title: "Ai schimbat orașul — coșul va fi golit",
@@ -106,7 +166,47 @@ export const messages: Record<Locale, Messages> = {
       increase: "Mărește cantitatea",
       quantity: "Cantitate",
     },
-    meta: { cityTitle: "Apetit {city} — kebab, burgeri, comandă online" },
+    closed: { banner: "Primim comenzi {open}–{close}" },
+    checkout: {
+      title: "Comandă",
+      back: "Înapoi la meniu",
+      point: "Punctul",
+      pointAddressMissing: "[ТЕКСТ: адрес точки]",
+      km: "km",
+      // «Nume», «Telefon», «Adresă» — перевод подписей SPEC §3, на утверждение
+      name: "Nume",
+      phone: "Telefon",
+      phonePlaceholder: "0XX XXX XXX",
+      address: "Adresă",
+      addressHint: "dacă vrei livrare",
+      submit: "Trimite comanda",
+      callNote: "Casierul te va suna pentru confirmare",
+      errors: {
+        point: "[ТЕКСТ: ошибка — не выбран пункт]",
+        name: "[ТЕКСТ: ошибка имени — 2–40 букв]",
+        phone: "[ТЕКСТ: ошибка телефона — формат 0XX XXX XXX]",
+        address: "[ТЕКСТ: ошибка адреса — до 120 символов]",
+        network:
+          "[ТЕКСТ: не отправилось — проверьте интернет и нажмите ещё раз]",
+        unavailable: "[ТЕКСТ: части блюд нет в этом пункте — уберите их]",
+        unavailableLine: "[ТЕКСТ: нет в этом пункте]",
+        pointPaused: "[ТЕКСТ: пункт временно не принимает заказы]",
+        rateLimited:
+          "[ТЕКСТ: слишком много заказов с этого номера — позвоните]",
+        rejected: "[ТЕКСТ: заказ не принят — попробуйте ещё раз]",
+      },
+    },
+    confirmation: {
+      // «Nr. {n}» — моё, на утверждение
+      number: "Nr. {n}",
+      callSoon: "Te sunăm în câteva minute",
+      call: "Sună la local",
+      back: "Înapoi la meniu",
+    },
+    meta: {
+      cityTitle: "Apetit {city} — kebab, burgeri, comandă online",
+      checkoutTitle: "Comandă — Apetit {city}",
+    },
   },
   ru: {
     cityScreen: { title: "Выберите город" },
@@ -118,6 +218,7 @@ export const messages: Record<Locale, Messages> = {
       size: "Размер",
       without: "Без",
       extra: "Добавки",
+      sauceCup: "Соус отдельно",
       free: "бесплатно",
     },
     cart: {
@@ -134,6 +235,8 @@ export const messages: Record<Locale, Messages> = {
       total: "Итого",
       remove: "Удалить",
       order: "Заказать",
+      clear: "Очистить корзину",
+      clearConfirm: "Да, очистить",
     },
     citySwitch: {
       title: "Вы сменили город — корзина будет очищена",
@@ -146,7 +249,46 @@ export const messages: Record<Locale, Messages> = {
       increase: "Увеличить количество",
       quantity: "Количество",
     },
-    meta: { cityTitle: "Apetit {city} — кебаб, бургеры, заказ онлайн" },
+    // TODO ru: проверить — все строки ниже, кроме данных архитектором
+    closed: { banner: "Принимаем заказы {open}–{close}" },
+    checkout: {
+      title: "Заказ",
+      back: "Вернуться в меню",
+      point: "Пункт",
+      pointAddressMissing: "[ТЕКСТ: адрес точки]",
+      km: "км",
+      name: "Имя",
+      phone: "Телефон",
+      phonePlaceholder: "0XX XXX XXX",
+      address: "Адрес",
+      addressHint: "если нужна доставка",
+      submit: "Отправить заказ",
+      callNote: "Кассир перезвонит для подтверждения",
+      errors: {
+        point: "[ТЕКСТ: ошибка — не выбран пункт]",
+        name: "[ТЕКСТ: ошибка имени — 2–40 букв]",
+        phone: "[ТЕКСТ: ошибка телефона — формат 0XX XXX XXX]",
+        address: "[ТЕКСТ: ошибка адреса — до 120 символов]",
+        network:
+          "[ТЕКСТ: не отправилось — проверьте интернет и нажмите ещё раз]",
+        unavailable: "[ТЕКСТ: части блюд нет в этом пункте — уберите их]",
+        unavailableLine: "[ТЕКСТ: нет в этом пункте]",
+        pointPaused: "[ТЕКСТ: пункт временно не принимает заказы]",
+        rateLimited:
+          "[ТЕКСТ: слишком много заказов с этого номера — позвоните]",
+        rejected: "[ТЕКСТ: заказ не принят — попробуйте ещё раз]",
+      },
+    },
+    confirmation: {
+      number: "№ {n}",
+      callSoon: "Перезвоним через несколько минут",
+      call: "Позвонить в заведение",
+      back: "Вернуться в меню",
+    },
+    meta: {
+      cityTitle: "Apetit {city} — кебаб, бургеры, заказ онлайн",
+      checkoutTitle: "Заказ — Apetit {city}",
+    },
   },
 };
 

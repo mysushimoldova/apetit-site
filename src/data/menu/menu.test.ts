@@ -163,6 +163,23 @@ describe("блюда (SPEC приложение А)", () => {
       bySlug(slug)?.removable.map((r) => r.id);
     expect(removable("kebab-cheese")).toContain("rosii");
     expect(removable("kebab-cheese")).not.toContain("lipie");
+    // База = хлеб + главный ингредиент из названия (ответ архитектора)
+    expect(removable("kebab-cheese")).not.toContain("cascaval");
+    expect(removable("kebab-crispy")).not.toContain("crispy");
+    expect(removable("kebab-philly-beef")).not.toContain("vita");
+    expect(removable("kebab-philly-beef")).toContain("cascaval");
+    expect(removable("cheeseburger-pui")).not.toContain("carne-de-pui");
+    expect(removable("cheeseburger-pui")).not.toContain("cascaval");
+    expect(removable("cheeseburger-pui")).toContain("rosii");
+    expect(removable("hamburger-vita")).not.toContain("vita-porc");
+    expect(removable("gozleme-carne")).not.toContain("carne-de-pui");
+    expect(removable("gozleme-carne")).toContain("mozzarella");
+    expect(removable("gozleme-mozzarella")).not.toContain("mozzarella");
+    expect(removable("hot-dog-classic")).not.toContain("crenvusca");
+    expect(removable("hot-dog-classic")).toContain("varza");
+    expect(removable("sandwich-salam")).not.toContain("salam");
+    expect(removable("sandwich-sunca")).not.toContain("sunca");
+    expect(removable("pizza-pepperoni")).not.toContain("salam-crud-afumat");
     expect(removable("kebab-menu")).toEqual([]);
     expect(removable("burger-menu")).toEqual([]);
     for (const p of PRODUCTS) {

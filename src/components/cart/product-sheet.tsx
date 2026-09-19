@@ -1,10 +1,12 @@
 "use client";
 // Лист блюда (SPEC §3 шаг 3, DESIGN.md → Product Sheet): фото 280px, название
 // Oswald 22px, состав, граммы; блоки Mărime (сегменты), Fără (галочки,
-// бесплатно), Extra (добавки категории с ценой); внизу ± и «Adaugă · N lei».
+// бесплатно), Extra (добавки в блюдо) и Sos aparte (соусники отдельно) —
+// с ценой; внизу ± и «Adaugă · N lei».
 // Цена пересчитывается на лету той же функцией, что потом проверит сервер.
 import { Check } from "lucide-react";
 import { useId, useState } from "react";
+import type { Addon } from "@/data/menu/schema";
 import { FoodPicture } from "@/components/menu/food-picture";
 import { Sheet } from "@/components/sheet/sheet";
 import { formatPrice } from "@/i18n/messages";
@@ -53,6 +55,21 @@ export function ProductSheet({
   const addons = product.addonIds
     .map((id) => catalog.addons[id])
     .filter((a) => a !== undefined);
+  // Два блока: что добавить в блюдо и соус в стаканчике отдельно
+  const inDish = addons.filter((a) => a.kind === "ingredient");
+  const cups = addons.filter((a) => a.kind === "sauce-cup");
+  const addonGroup = (id: string, title: string, list: Addon[]) =>
+    list.length > 0 && (
+      <AddonGroup
+        id={id}
+        title={title}
+        addons={list}
+        selected={addonIds}
+        onToggle={(addonId) => setAddonIds((l) => toggle(l, addonId))}
+        price={(value) => formatPrice(locale, t, value)}
+        name={(a) => a.name[locale]}
+      />
+    );
 
   function addToCart() {
     if (cartStore.getState().add(city, config, qty)) onDismiss();
@@ -162,39 +179,54 @@ export function ProductSheet({
           </div>
         )}
 
-        {addons.length > 0 && (
-          <div
-            role="group"
-            aria-labelledby={`${ids}-extra`}
-            className="sheet-block"
-          >
-            <h3 id={`${ids}-extra`} className="caption-caps">
-              {t.sheet.extra}
-            </h3>
-            <div className="mt-1">
-              {addons.map((a) => (
-                <label key={a.id} className="check-row">
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={addonIds.includes(a.id)}
-                    onChange={() => setAddonIds((l) => toggle(l, a.id))}
-                  />
-                  <span className="check-box" aria-hidden="true">
-                    <Check size={14} strokeWidth={2.5} />
-                  </span>
-                  <span className="check-label min-w-0 flex-1">
-                    {a.name[locale]}
-                  </span>
-                  <span className="flex-none font-ui text-label font-semibold tabular-nums">
-                    +{formatPrice(locale, t, a.price)}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
+        {addonGroup(`${ids}-extra`, t.sheet.extra, inDish)}
+        {addonGroup(`${ids}-cups`, t.sheet.sauceCup, cups)}
       </div>
     </Sheet>
+  );
+}
+
+function AddonGroup({
+  id,
+  title,
+  addons,
+  selected,
+  onToggle,
+  price,
+  name,
+}: {
+  id: string;
+  title: string;
+  addons: Addon[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  price: (value: number) => string;
+  name: (addon: Addon) => string;
+}) {
+  return (
+    <div role="group" aria-labelledby={id} className="sheet-block">
+      <h3 id={id} className="caption-caps">
+        {title}
+      </h3>
+      <div className="mt-1">
+        {addons.map((a) => (
+          <label key={a.id} className="check-row">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={selected.includes(a.id)}
+              onChange={() => onToggle(a.id)}
+            />
+            <span className="check-box" aria-hidden="true">
+              <Check size={14} strokeWidth={2.5} />
+            </span>
+            <span className="check-label min-w-0 flex-1">{name(a)}</span>
+            <span className="flex-none font-ui text-label font-semibold tabular-nums">
+              +{price(a.price)}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }

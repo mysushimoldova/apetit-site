@@ -117,6 +117,18 @@ describe("действия с позициями", () => {
     expect(store.getState().lines).toEqual([]);
   });
 
+  it("clear: все позиции убраны, город остаётся, сохранено", () => {
+    const store = hydratedStore();
+    store.getState().add("soroca", cola);
+    store.getState().add("soroca", kebab, 2);
+    store.getState().clear();
+    expect(store.getState()).toMatchObject({ city: "soroca", lines: [] });
+    expect(JSON.parse(storage.data.get(CART_STORAGE_KEY)!).state).toEqual({
+      city: "soroca",
+      lines: [],
+    });
+  });
+
   it("bump растёт на каждое добавление и не сохраняется", () => {
     const store = hydratedStore();
     store.getState().add("soroca", cola);

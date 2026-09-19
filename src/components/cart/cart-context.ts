@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { CitySlug, Locale } from "@/data/points";
 import type { Messages } from "@/i18n/messages";
+import type { Hours } from "@/lib/order/hours";
 import type { CartLine } from "@/lib/cart/lines";
 import { cartTotal, type Catalog } from "@/lib/cart/pricing";
 import { useCart } from "@/lib/cart/store";
@@ -21,6 +22,8 @@ export interface CartContextValue {
   locale: Locale;
   t: Messages;
   catalog: Catalog;
+  /** Часы приёма заказов (баннер «закрыто» в корзине) */
+  hours: Hours;
   openProduct: (slug: string) => void;
   openCart: () => void;
 }

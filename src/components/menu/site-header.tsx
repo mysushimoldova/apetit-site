@@ -2,7 +2,8 @@
 // (пока текстом Oswald — SVG-логотипа ещё нет), справа город + RO/RU.
 // Переключатель языка пока статический: маршрут /ru/[city] (SPEC §7) —
 // следующая задача.
-// Десктоп: справа ещё кнопка корзины (DESIGN.md → Layout).
+// Десктоп: справа ещё кнопка корзины (DESIGN.md → Layout); на оформлении
+// заказа её нет (cart={false}) — корзина уже на экране.
 import { HeaderCartButton } from "@/components/cart/header-cart-button";
 import type { City, Locale } from "@/data/points";
 import type { Messages } from "@/i18n/messages";
@@ -14,10 +15,12 @@ export function SiteHeader({
   city,
   locale,
   t,
+  cart = true,
 }: {
   city: City;
   locale: Locale;
   t: Messages;
+  cart?: boolean;
 }) {
   return (
     <header className="site-header glass">
@@ -40,7 +43,7 @@ export function SiteHeader({
               </span>
             ))}
           </span>
-          <HeaderCartButton />
+          {cart && <HeaderCartButton />}
         </div>
       </div>
     </header>

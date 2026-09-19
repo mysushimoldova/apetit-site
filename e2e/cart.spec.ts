@@ -23,6 +23,8 @@ async function openProduct(page: Page, name: string) {
 }
 
 test.beforeEach(async ({ page }) => {
+  // Рабочее время (12:00 в Кишинёве): «Comandă» активна
+  await page.clock.setFixedTime(new Date("2026-09-19T09:00:00Z"));
   await page.goto("/soroca");
   // Корзина подставляется после загрузки — дождаться, пока «+» оживёт
   await page.waitForFunction(() => document.readyState === "complete");
@@ -64,7 +66,10 @@ test("сценарий задачи: Kebab XL/XXL → XXL + sos usturoi × 2 →
   await expect(cart).toContainText("Kebab XL / XXL");
   await expect(cart).toContainText("XXL · Extra: Sos de usturoi");
   await expect(cart).toContainText("Total");
-  await expect(cart.getByRole("button", { name: "Comandă" })).toBeDisabled();
+  await expect(cart.getByRole("link", { name: "Comandă" })).toHaveAttribute(
+    "href",
+    "/soroca/comanda",
+  );
 
   await cart.getByRole("button", { name: "Șterge: Kebab XL / XXL" }).click();
   await expect(cart).toBeHidden();
@@ -273,4 +278,39 @@ test.describe("десктоп", () => {
     await headerCart.click();
     await expect(page.getByRole("dialog", { name: "Coș" })).toBeVisible();
   });
+});
+
+test("«Extra» и «Sos aparte» — два блока: в блюдо и соусники отдельно", async ({
+  page,
+}) => {
+  const sheet = await openProduct(page, "Kebab Cheese");
+  const extra = sheet.getByRole("group", { name: "Extra" });
+  const cups = sheet.getByRole("group", { name: "Sos aparte" });
+  await expect(extra.getByRole("checkbox", { name: /Becon/ })).toHaveCount(1);
+  await expect(extra.getByRole("checkbox", { name: /Sosieră/ })).toHaveCount(0);
+  await expect(cups.getByRole("checkbox", { name: /Sosieră/ })).toHaveCount(7);
+  // База (lipie + cașcaval) не убирается
+  const without = sheet.getByRole("group", { name: "Fără" });
+  await expect(without.getByRole("checkbox", { name: "cașcaval" })).toHaveCount(
+    0,
+  );
+  await expect(without.getByRole("checkbox", { name: "roșii" })).toHaveCount(1);
+});
+
+test("«Golește coșul»: первое нажатие — «Da, golește», второе — пусто", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Adaugă: Kebab Cheese" }).click();
+  await page.getByRole("button", { name: "Adaugă: Coca-Cola" }).click();
+  await cartBar(page).getByRole("button").click();
+  const cart = page.getByRole("dialog", { name: "Coș" });
+
+  await cart.getByRole("button", { name: "Golește coșul" }).click();
+  const confirm = cart.getByRole("button", { name: "Da, golește" });
+  await expect(confirm).toBeVisible();
+  await expect(cart).toContainText("Kebab Cheese"); // ещё ничего не удалено
+
+  await confirm.click();
+  await expect(cart).toBeHidden();
+  await expect(cartBar(page)).toBeHidden();
 });

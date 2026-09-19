@@ -7,12 +7,13 @@
 //   (как в утверждённом макете): cașcaval, crispy, vită, carne de pui…
 // - названия сэндвичей и салатов дополнены словом категории;
 // - цены соусов отдельно — по печатному меню (ketchup 10, maioneză 15);
-// - removable (что можно убрать) = состав без основы (lipie, chiflă, tortilla,
-//   ciabatta). У комбо (категория menu) убрать нечего: в «составе» там части
-//   набора (kebab mic, limonadă…), а не ингредиенты — вопрос в PROGRESS.md.
+// - removable (что можно убрать) = состав без базы. База (ответ архитектора):
+//   хлеб (lipie, chiflă, tortilla, ciabatta) + главный ингредиент — то, что
+//   стоит в названии блюда (поле main). У комбо (категория menu) блока «Fără»
+//   нет: в «составе» там части набора (kebab mic, limonadă…).
 import type { LocalizedList, Product, Removable, Variant } from "./schema";
 
-/** Основа блюда — её убрать нельзя, остальной состав можно (бесплатно). */
+/** Хлеб — часть базы любого блюда: убрать нельзя. */
 const BASE_INGREDIENTS = new Set(["lipie", "chiflă", "tortilla", "ciabatta"]);
 
 function slugify(text: string): string {
@@ -27,10 +28,15 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function removableFrom(ingredients: LocalizedList): Removable[] {
+/** Всё, кроме базы (хлеб + main), можно убрать бесплатно. */
+function removableFrom(
+  ingredients: LocalizedList,
+  main: readonly string[],
+): Removable[] {
+  const base = new Set([...BASE_INGREDIENTS, ...main]);
   return ingredients.ro
     .map((ro, i) => ({ id: slugify(ro), name: { ro, ru: ingredients.ru[i] } }))
-    .filter((r) => !BASE_INGREDIENTS.has(r.name.ro));
+    .filter((r) => !base.has(r.name.ro));
 }
 
 type ProductInput = {
@@ -42,11 +48,20 @@ type ProductInput = {
   ingredients?: LocalizedList;
   variants?: Variant[] | null;
   photo?: string | null;
+  /** Главный ингредиент из названия (ro, как в составе) — часть базы. */
+  main?: string[];
 };
 
 /** Блюдо с фото (photo = slug), без вариантов, если не сказано иначе. */
 function product(input: ProductInput): Product {
   const ingredients = input.ingredients ?? { ro: [], ru: [] };
+  const main = input.main ?? [];
+  // Опечатка в main тихо сделала бы главный ингредиент убираемым
+  for (const m of main) {
+    if (!ingredients.ro.includes(m)) {
+      throw new Error(`${input.slug}: main «${m}» нет в составе`);
+    }
+  }
   return {
     slug: input.slug,
     category: input.category,
@@ -55,7 +70,8 @@ function product(input: ProductInput): Product {
     grams: input.grams ?? null,
     price: input.price,
     variants: input.variants ?? null,
-    removable: input.category === "menu" ? [] : removableFrom(ingredients),
+    removable:
+      input.category === "menu" ? [] : removableFrom(ingredients, main),
     photo: input.photo === undefined ? input.slug : input.photo,
     active: true,
   };
@@ -93,6 +109,7 @@ const kebab = (extraRo: string[], extraRu: string[]) =>
 const KEBAB: Product[] = [
   product({
     slug: "kebab-philly-beef",
+    main: ["vită"],
     category: "kebab",
     name: { ro: "Kebab Philly Beef", ru: "Кебаб Филли Биф" },
     price: 94,
@@ -101,6 +118,7 @@ const KEBAB: Product[] = [
   }),
   product({
     slug: "kebab-cheese",
+    main: ["cașcaval"],
     category: "kebab",
     name: { ro: "Kebab Cheese", ru: "Кебаб Чиз" },
     price: 105,
@@ -109,6 +127,7 @@ const KEBAB: Product[] = [
   }),
   product({
     slug: "kebab-crispy",
+    main: ["crispy"],
     category: "kebab",
     name: { ro: "Kebab Crispy", ru: "Кебаб Криспи" },
     price: 90,
@@ -237,6 +256,7 @@ const burger = (extraRo: string[], extraRu: string[]) =>
 const BURGERS: Product[] = [
   product({
     slug: "cheeseburger-dublu-pui",
+    main: ["carne de pui", "cașcaval"],
     category: "burgers",
     name: { ro: "Cheeseburger Dublu Pui", ru: "Двойной чизбургер с курицей" },
     price: 115,
@@ -245,6 +265,7 @@ const BURGERS: Product[] = [
   }),
   product({
     slug: "cheeseburger-pui",
+    main: ["carne de pui", "cașcaval"],
     category: "burgers",
     name: { ro: "Cheeseburger Pui", ru: "Чизбургер с курицей" },
     price: 85,
@@ -253,6 +274,7 @@ const BURGERS: Product[] = [
   }),
   product({
     slug: "cheeseburger-dublu-vita",
+    main: ["vită-porc", "cașcaval"],
     category: "burgers",
     name: {
       ro: "Cheeseburger Dublu Vită-Porc",
@@ -264,6 +286,7 @@ const BURGERS: Product[] = [
   }),
   product({
     slug: "cheeseburger-vita",
+    main: ["vită-porc", "cașcaval"],
     category: "burgers",
     name: { ro: "Cheeseburger Vită-Porc", ru: "Чизбургер говядина-свинина" },
     price: 85,
@@ -272,6 +295,7 @@ const BURGERS: Product[] = [
   }),
   product({
     slug: "hamburger-dublu-vita",
+    main: ["vită-porc"],
     category: "burgers",
     name: {
       ro: "Hamburger Dublu Vită-Porc",
@@ -283,6 +307,7 @@ const BURGERS: Product[] = [
   }),
   product({
     slug: "hamburger-vita",
+    main: ["vită-porc"],
     category: "burgers",
     name: { ro: "Hamburger Vită-Porc", ru: "Гамбургер говядина-свинина" },
     price: 80,
@@ -291,6 +316,7 @@ const BURGERS: Product[] = [
   }),
   product({
     slug: "cheeseburger-crispy",
+    main: ["crispy", "cașcaval"],
     category: "burgers",
     name: { ro: "Cheeseburger Crispy", ru: "Чизбургер Криспи" },
     price: 85,
@@ -303,6 +329,7 @@ const BURGERS: Product[] = [
 const GOZLEME: Product[] = [
   product({
     slug: "gozleme-mozzarella",
+    main: ["mozzarella"],
     category: "gozleme",
     name: { ro: "Gözleme Mozzarella", ru: "Гёзлеме с моцареллой" },
     price: 45,
@@ -314,6 +341,7 @@ const GOZLEME: Product[] = [
   }),
   product({
     slug: "gozleme-carne",
+    main: ["carne de pui"],
     category: "gozleme",
     name: { ro: "Gözleme Carne de Pui", ru: "Гёзлеме с курицей" },
     price: 55,
@@ -380,6 +408,7 @@ const CRISPY: Product[] = [
 const HOT_DOG: Product[] = [
   product({
     slug: "hot-dog-classic",
+    main: ["crenvușcă"],
     category: "hot-dog",
     name: { ro: "Hot Dog Classic", ru: "Хот-дог Классик" },
     price: 45,
@@ -391,6 +420,7 @@ const HOT_DOG: Product[] = [
   }),
   product({
     slug: "hot-dog-cheese",
+    main: ["crenvușcă", "cașcaval"],
     category: "hot-dog",
     name: { ro: "Hot Dog Cheese", ru: "Хот-дог Чиз" },
     price: 55,
@@ -406,6 +436,7 @@ const HOT_DOG: Product[] = [
 const SANDWICH: Product[] = [
   product({
     slug: "sandwich-salam",
+    main: ["salam"],
     category: "sandwich",
     name: {
       ro: "Sandwich cu salam fiert-afumat",
@@ -420,6 +451,7 @@ const SANDWICH: Product[] = [
   }),
   product({
     slug: "sandwich-sunca",
+    main: ["șuncă"],
     category: "sandwich",
     name: {
       ro: "Sandwich cu șuncă de găină",
@@ -494,6 +526,7 @@ const PIZZA: Product[] = [
   }),
   product({
     slug: "pizza-quattro-formaggi",
+    main: ["mozzarella", "gouda", "brânză mucegai", "parmezan"],
     category: "pizza",
     name: { ro: "Quattro Formaggi", ru: "Кватро Формаджи" },
     price: 125,
@@ -505,6 +538,7 @@ const PIZZA: Product[] = [
   }),
   product({
     slug: "pizza-quattro-formaggi-cu-para",
+    main: ["mozzarella", "gouda", "brânză mucegai", "parmezan", "pere"],
     category: "pizza",
     name: { ro: "Quattro Formaggi cu Pară", ru: "Кватро Формаджи с грушей" },
     price: 135,
@@ -523,6 +557,7 @@ const PIZZA: Product[] = [
   }),
   product({
     slug: "pizza-pepperoni",
+    main: ["salam crud-afumat"],
     category: "pizza",
     name: { ro: "Pepperoni", ru: "Пепперони" },
     price: 145,
@@ -573,6 +608,7 @@ const PIZZA: Product[] = [
   }),
   product({
     slug: "pizza-4-carnuri",
+    main: ["piept de pui sous-vide", "șuncă de pui", "salam", "bacon"],
     category: "pizza",
     name: { ro: "4 Cărnuri", ru: "4 вида мяса" },
     price: 155,
@@ -598,6 +634,7 @@ const PIZZA: Product[] = [
   }),
   product({
     slug: "pizza-sunca-si-legume",
+    main: ["șuncă de pui"],
     category: "pizza",
     name: { ro: "Șuncă și Legume", ru: "Ветчина и овощи" },
     price: 125,

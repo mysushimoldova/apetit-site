@@ -80,9 +80,12 @@ Claude в чате claude.ai; он пишет промпты, Амян вста�
   `differential-review`; найденное — исправить, не откладывать.
 - Каждый новый npm-пакет → `supply-chain-risk-auditor` до установки;
   сомнительный — не ставить, спросить архитектора.
-- Любые настройки (next.config, заголовки, Supabase, cookies, CORS) →
-  `insecure-defaults`. Это плагин, а не папка в `.claude/skills/`: команда
-  `/insecure-defaults:audit <файл или папка>` (подключён в `.claude/settings.json`).
+- `insecure-defaults` — перед релизом и при крупных изменениях настроек
+  (next.config, wrangler, Supabase, переменные окружения), не при каждой
+  правке. Обычный цикл — `owasp-security` + `differential-review` перед
+  коммитом серверного кода. Это плагин, а не папка в `.claude/skills/`:
+  команда `/insecure-defaults:audit <файл или папка>` (подключён в
+  `.claude/settings.json`).
 - Перед каждым релизом и перед запуском → полный прогон `semgrep`, отчёт в
   PROGRESS.md. Отчёты сканирования — вне репозитория (временная папка).
   На Windows `jq` запускать с флагом `-b`, иначе скрипт скилла падает на `\r`.

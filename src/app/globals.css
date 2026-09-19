@@ -10,6 +10,11 @@
 :root {
   /* Боковой отступ: 16px на телефоне, 40px на десктопе */
   --gutter: 16px;
+  /* Вырезы экрана (viewport-fit=cover): «чёлка» сверху, полоска «домой»
+     снизу, скругления и камера по бокам в горизонтальном положении */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --gutter-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  --gutter-right: max(var(--gutter), env(safe-area-inset-right, 0px));
 
   /* Длительности анимаций (DESIGN.md → Motion) */
   --dur-fast: 150ms; /* нажатия, переключатели */
@@ -188,7 +193,8 @@
   width: 100%;
   max-width: var(--container-page);
   margin-inline: auto;
-  padding-inline: var(--gutter);
+  padding-left: var(--gutter-left);
+  padding-right: var(--gutter-right);
 }
 
 /* Стекло — только шапка, нижняя панель корзины, оверлей города.
@@ -256,14 +262,16 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  height: var(--size-header);
+  /* Под «чёлкой» — продолжение стекла, содержимое шапки ниже неё */
+  height: calc(var(--size-header) + var(--safe-top));
+  padding-top: var(--safe-top);
   border-bottom: var(--rule);
 }
 
 /* Лента чипов: 46px, стекло, прилипает под шапкой; полоса прокрутки скрыта */
 @utility chips-row {
   position: sticky;
-  top: var(--size-header);
+  top: calc(var(--size-header) + var(--safe-top));
   z-index: 20;
   height: var(--size-chips-row);
   overflow-x: auto;
@@ -277,8 +285,12 @@
   /* Первый чип стоит на одной линии с контентом (контейнер 1200px по центру),
      а при прокрутке ленты на телефоне последний не прилипает к краю */
   & > ul {
-    padding-inline: max(
-      var(--gutter),
+    padding-left: max(
+      var(--gutter-left),
+      calc((100% - var(--container-page)) / 2 + var(--gutter))
+    );
+    padding-right: max(
+      var(--gutter-right),
       calc((100% - var(--container-page)) / 2 + var(--gutter))
     );
   }
@@ -333,7 +345,9 @@
   border-top: var(--rule-dotted);
   padding-top: 48px;
   padding-bottom: 64px;
-  scroll-margin-top: calc(var(--size-header) + var(--size-chips-row));
+  scroll-margin-top: calc(
+    var(--size-header) + var(--size-chips-row) + var(--safe-top)
+  );
   /* Размер слова-вывески — от ширины секции (cqw), чтобы слово легло
      «во всю ширину» (макет, вариант A). --billboard-em — ширина слова в em
      из src/lib/billboard-fit.ts, задаётся на секции. Потолок 180px —
@@ -453,6 +467,19 @@
   transition:
     opacity var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out);
+}
+
+@keyframes confirm-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes confirm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 /* ---------- Лист блюда и корзина (DESIGN.md 2.2 → Components) ---------- */
@@ -654,7 +681,7 @@
     display: flex;
     flex-direction: column;
     /* Сверху остаётся полоска затемнённой страницы — по ней можно тапнуть */
-    max-height: calc(100dvh - 40px);
+    max-height: calc(100dvh - 40px - var(--safe-top));
     background: var(--color-milk);
     border-top: var(--rule);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
@@ -726,7 +753,7 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 0 var(--gutter) 24px;
+    padding: 0 var(--gutter-right) 24px var(--gutter-left);
   }
   @media (min-width: 1024px) {
     .sheet-body {
@@ -737,7 +764,8 @@
   /* Низ листа: всегда виден (не прокручивается вместе с содержимым) */
   .sheet-footer {
     flex: none;
-    padding: 12px var(--gutter) max(12px, env(safe-area-inset-bottom));
+    padding: 12px var(--gutter-right) max(12px, env(safe-area-inset-bottom))
+      var(--gutter-left);
     border-top: var(--hairline);
     background: var(--color-milk);
   }
@@ -756,6 +784,13 @@
   /* Строки корзины разделены точечной линией (DESIGN.md → Lines) */
   .cart-line + .cart-line {
     border-top: var(--rule-dotted);
+  }
+
+  /* «Golește coșul» — Secondary; взведена (ждёт второго нажатия) — Ink,
+     как нажатая Secondary, чтобы смена состояния была заметна */
+  .btn-secondary[data-armed] {
+    background: var(--color-ink);
+    color: var(--color-cream);
   }
 
   /* Блоки листа (Mărime / Fără / Extra) разделены hairline */
@@ -982,7 +1017,7 @@
     gap: 12px;
     width: 100%;
     height: var(--size-cart-bar);
-    padding: 12px var(--gutter);
+    padding: 12px var(--gutter-right) 12px var(--gutter-left);
     text-align: left;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -1021,6 +1056,179 @@
       opacity: 0;
       transform: scale(0.96);
     }
+  }
+
+  /* ---------- Оформление заказа (DESIGN.md 2.2 → Input, Point Card,
+     Closed Banner, Order Confirmation) ---------- */
+
+  /* Input: Milk, рамка hairline, 12px, 52px, Montserrat Ink.
+     Фокус — рамка rule. Ошибка — рамка Closed. */
+  .input {
+    display: block;
+    width: 100%;
+    height: var(--size-input);
+    padding: 0 16px;
+    border: var(--hairline);
+    border-radius: var(--radius-input);
+    background: var(--color-milk);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    /* 15px по DESIGN, но iOS увеличивает страницу при фокусе на поле < 16px */
+    font-size: 16px;
+    transition: border-color var(--dur-fast) var(--ease-out);
+
+    &::placeholder {
+      color: var(--color-smoke);
+    }
+    &:focus {
+      outline: none;
+      border: var(--rule);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 2px;
+    }
+    &[aria-invalid="true"] {
+      border-color: var(--color-closed);
+    }
+  }
+
+  /* Фокус на поле с ошибкой прокручивает к нему — не под липкую шапку */
+  .input,
+  .point-card {
+    scroll-margin-top: calc(var(--size-header) + var(--safe-top) + 48px);
+  }
+
+  /* Подпись ошибки: 12px Closed, под полем */
+  .field-error {
+    margin-top: 6px;
+    color: var(--color-closed);
+    font-family: var(--font-body);
+    font-size: var(--text-caption);
+    line-height: 1.4;
+  }
+
+  /* Ссылка «назад в меню» над заголовком — зона нажатия 44px */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding-right: 8px;
+    font-family: var(--font-ui);
+    font-size: var(--text-label);
+    font-weight: 600;
+    text-underline-offset: 4px;
+    -webkit-tap-highlight-color: transparent;
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+    &:focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 2px;
+    }
+  }
+
+  /* Closed Banner: без заливки, рамка rule, 12px, Montserrat 15px Ink,
+     точка Closed */
+  .closed-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: var(--rule);
+    border-radius: var(--radius-input);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.4;
+  }
+  .closed-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-closed);
+  }
+
+  /* Point Card: Milk, рамка rule, 16px, padding 16px. Выбранная — рамка 2px
+     Yellow (padding на 1px меньше — карточка не прыгает) и галочка Ink */
+  .point-card {
+    display: block;
+    padding: 16px;
+    border: var(--rule);
+    border-radius: var(--radius-tile);
+    background: var(--color-milk);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+
+    &:has(input:checked) {
+      padding: 15px;
+      border: 2px solid var(--color-yellow);
+    }
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 2px;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:has(input:checked)) {
+        background: var(--color-cream);
+      }
+    }
+  }
+  .point-check {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-pill);
+    background: var(--color-ink);
+    color: var(--color-cream);
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+  .point-card:has(input:checked) .point-check {
+    opacity: 1;
+  }
+  fieldset[aria-invalid="true"] .point-card:not(:has(input:checked)) {
+    border-color: var(--color-closed);
+  }
+
+  /* Итог заказа: строки через rule-dotted, итого — под линией rule */
+  .summary-line + .summary-line {
+    border-top: var(--rule-dotted);
+  }
+  .summary-line[data-unavailable] p:first-child {
+    color: var(--color-smoke);
+    text-decoration: line-through;
+  }
+  .summary-total {
+    border-top: var(--rule);
+  }
+
+  /* Подтверждение: круг 96px Yellow с галочкой Ink. Появление — один раз:
+     круг — scale .94→1 + прозрачность, остальное — снизу 8px + прозрачность,
+     лесенкой по --step × 60ms (= --dur-base / 4; при reduced-motion — 0).
+     CSS-анимация идёт вне главного потока, пока страница догружается. */
+  .confirm-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px;
+    height: 96px;
+    border-radius: var(--radius-pill);
+    background: var(--color-yellow);
+    color: var(--color-ink);
+    animation: confirm-pop var(--dur-base) var(--ease-out) both;
+  }
+  .confirm-step {
+    animation: confirm-rise var(--dur-base) var(--ease-out) both;
+    animation-delay: calc(var(--dur-base) / 4 * var(--step, 1));
   }
 
   /* Пока лист открыт, страница под ним не прокручивается */

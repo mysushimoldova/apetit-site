@@ -33,6 +33,8 @@ export interface CartState extends CartSnapshot {
   remove: (key: string) => void;
   /** «−» на плитке */
   decrementProduct: (productSlug: string) => void;
+  /** «Golește coșul» и успешный заказ: все позиции убраны, город тот же. */
+  clear: () => void;
   /** Смена города: корзина очищается и привязывается к новому городу. */
   switchCity: (city: CitySlug) => void;
   /** Убрать позиции, которые точка не продаёт. */
@@ -123,6 +125,9 @@ export function createCartStore(getStorage: () => SyncStorage) {
         },
         decrementProduct(productSlug) {
           set({ lines: decrementProduct(get().lines, productSlug) });
+        },
+        clear() {
+          set({ lines: [] });
         },
         switchCity(city) {
           set({ city, lines: [] });

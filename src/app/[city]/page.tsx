@@ -12,7 +12,7 @@ import { ProductTile } from "@/components/menu/product-tile";
 import { RevealGrid } from "@/components/menu/reveal-grid";
 import { SiteHeader } from "@/components/menu/site-header";
 import { getMenuForCity } from "@/data/menu";
-import { CITIES, getCity, isCitySlug } from "@/data/points";
+import { CITIES, getCity, isCitySlug, pointsOfCity } from "@/data/points";
 import { fill, getMessages } from "@/i18n/messages";
 import { billboardWidthEm } from "@/lib/billboard-fit";
 import { buildCatalog } from "@/lib/cart/catalog";
@@ -48,6 +48,8 @@ export default async function CityPage({ params }: Props) {
   const menu = getMenuForCity(city.slug);
   // Блюда города с ценами точки и разрешёнными добавками — для листа и корзины
   const catalog = buildCatalog(city.slug);
+  // Часы — первой точки города (у всех 08:30–23:00; сервер проверит точку)
+  const hours = pointsOfCity(city.slug)[0].hours;
 
   const chips = menu.map(({ category }) => ({
     slug: category.slug,
@@ -60,7 +62,13 @@ export default async function CityPage({ params }: Props) {
   return (
     <div lang={locale}>
       <RememberCity slug={city.slug} />
-      <CartProvider city={city.slug} locale={locale} t={t} catalog={catalog}>
+      <CartProvider
+        city={city.slug}
+        locale={locale}
+        t={t}
+        catalog={catalog}
+        hours={hours}
+      >
         <SiteHeader city={city} locale={locale} t={t} />
         <CategoryChips items={chips} label={t.header.categories} />
 

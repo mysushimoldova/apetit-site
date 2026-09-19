@@ -2,8 +2,8 @@
 // (импортирует images.json — в клиентский бандл этот файл не должен попасть)
 // и один раз передаётся в CartProvider.
 import images from "@/data/images.json";
-import { ADDONS, addonsFor, getMenuForCity } from "@/data/menu";
-import type { CitySlug } from "@/data/points";
+import { ADDONS, addonsFor, getMenuForPoint } from "@/data/menu";
+import { pointsOfCity, type CitySlug } from "@/data/points";
 import type { Catalog, CatalogProduct, PhotoInfo } from "./pricing";
 
 type ImageInfo = { width: number; height: number; sizes: number[] };
@@ -20,9 +20,16 @@ function photoInfo(photo: string | null): PhotoInfo | null {
   };
 }
 
-export function buildCatalog(citySlug: CitySlug): Catalog {
+/**
+ * Каталог точки: включённые блюда по ценам этой точки. photos: false — без
+ * размеров фото (сервер заказа и итог на странице оформления).
+ */
+export function buildPointCatalog(
+  pointId: string,
+  { photos = true }: { photos?: boolean } = {},
+): Catalog {
   const products: Record<string, CatalogProduct> = {};
-  for (const section of getMenuForCity(citySlug)) {
+  for (const section of getMenuForPoint(pointId)) {
     for (const p of section.products) {
       products[p.slug] = {
         slug: p.slug,
@@ -34,7 +41,7 @@ export function buildCatalog(citySlug: CitySlug): Catalog {
         variants: p.variants,
         removable: p.removable,
         addonIds: addonsFor(p).map((a) => a.id),
-        photo: photoInfo(p.photo),
+        photo: photos ? photoInfo(p.photo) : null,
       };
     }
   }
@@ -42,4 +49,11 @@ export function buildCatalog(citySlug: CitySlug): Catalog {
     products,
     addons: Object.fromEntries(ADDONS.map((a) => [a.id, a])),
   };
+}
+
+/** Каталог города для меню — по первой точке (как getMenuForCity). */
+export function buildCatalog(citySlug: CitySlug): Catalog {
+  const [first] = pointsOfCity(citySlug);
+  if (!first) throw new Error(`No points for city ${citySlug}`);
+  return buildPointCatalog(first.id);
 }

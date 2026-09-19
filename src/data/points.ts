@@ -23,6 +23,10 @@ export interface Point {
   locale: Locale;
   hours: { open: string; close: string };
   address: string;
+  /** Переключатель «временно не принимает заказы» (SPEC §1.1, на случай ЧП). */
+  acceptingOrders: boolean;
+  /** Координаты — для «~1,2 km» при оформлении; null — расстояние не показываем. */
+  coords: { lat: number; lng: number } | null;
 }
 
 const HOURS = { open: "08:30", close: "23:00" } as const;
@@ -36,7 +40,7 @@ export const CITIES: readonly City[] = [
   { slug: "briceni", name: "Briceni", locale: "ro" },
 ];
 
-// TODO: адреса точек — УТОЧНИТЬ у Амяна (SPEC §1.1)
+// TODO: адреса и координаты точек — УТОЧНИТЬ у Амяна (SPEC §1.1)
 export const POINTS: readonly Point[] = [
   {
     id: "soroca-centru",
@@ -47,6 +51,8 @@ export const POINTS: readonly Point[] = [
     locale: "ro",
     hours: HOURS,
     address: "",
+    acceptingOrders: true,
+    coords: null,
   },
   {
     id: "soroca-noua",
@@ -57,6 +63,8 @@ export const POINTS: readonly Point[] = [
     locale: "ro",
     hours: HOURS,
     address: "",
+    acceptingOrders: true,
+    coords: null,
   },
   {
     id: "sculeni",
@@ -67,6 +75,8 @@ export const POINTS: readonly Point[] = [
     locale: "ro",
     hours: HOURS,
     address: "",
+    acceptingOrders: true,
+    coords: null,
   },
   {
     id: "floresti",
@@ -77,6 +87,8 @@ export const POINTS: readonly Point[] = [
     locale: "ro",
     hours: HOURS,
     address: "",
+    acceptingOrders: true,
+    coords: null,
   },
   {
     id: "otaci",
@@ -87,6 +99,8 @@ export const POINTS: readonly Point[] = [
     locale: "ru",
     hours: HOURS,
     address: "",
+    acceptingOrders: true,
+    coords: null,
   },
   {
     id: "briceni",
@@ -97,6 +111,8 @@ export const POINTS: readonly Point[] = [
     locale: "ro",
     hours: HOURS,
     address: "",
+    acceptingOrders: true,
+    coords: null,
   },
 ];
 
@@ -110,4 +126,12 @@ export function getCity(slug: CitySlug): City {
   const city = CITIES.find((c) => c.slug === slug);
   if (!city) throw new Error(`Unknown city slug: ${slug}`);
   return city;
+}
+
+export function getPoint(id: string): Point | undefined {
+  return POINTS.find((p) => p.id === id);
+}
+
+export function pointsOfCity(slug: CitySlug): Point[] {
+  return POINTS.filter((p) => p.citySlug === slug);
 }

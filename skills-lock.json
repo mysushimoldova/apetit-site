@@ -127,12 +127,6 @@
       "skillPath": "skills/review-animations/SKILL.md",
       "computedHash": "8c2befeb28bb484bf2de7b2fc228774857e266d32a65d76895e78651a536d8cf"
     },
-    "secure-workflow-guide": {
-      "source": "trailofbits/skills",
-      "sourceType": "github",
-      "skillPath": "plugins/building-secure-contracts/skills/secure-workflow-guide/SKILL.md",
-      "computedHash": "b833e68c734f4c2152a69470ddbb936ecf93a50c91de277141a15d65fb4cd5bc"
-    },
     "semgrep": {
       "source": "trailofbits/skills",
       "sourceType": "github",

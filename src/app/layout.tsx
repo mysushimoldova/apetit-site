@@ -11,6 +11,9 @@ export const viewport: Viewport = {
   themeColor: "#FAF7F2",
   width: "device-width",
   initialScale: 1,
+  // Страница заходит под «чёлку» и полоску «домой» iPhone; отступы от них —
+  // env(safe-area-inset-*) в globals.css (шапка, лист, панель корзины)
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

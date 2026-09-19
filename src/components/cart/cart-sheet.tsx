@@ -1,43 +1,22 @@
 "use client";
 // Лист корзины (SPEC §3 шаг 4): позиции с размером/добавками/«без»,
-// количество ±, «Șterge», итог. «Comandă» пока неактивна — оформление
-// заказа следующей задачей.
+// количество ±, «Șterge», «Golește coșul», итог, «Comandă» → оформление.
+// Вне рабочих часов — Closed Banner сверху и «Comandă» неактивна (только
+// показ: решает сервер).
+import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { FoodPicture } from "@/components/menu/food-picture";
+import { ClosedBanner } from "@/components/order/closed-banner";
 import { Sheet } from "@/components/sheet/sheet";
-import type { Locale } from "@/data/points";
-import { formatPrice, type Messages } from "@/i18n/messages";
+import { formatPrice } from "@/i18n/messages";
+import { describeParts, lineParts } from "@/lib/cart/describe";
 import { lineKey, type CartLine } from "@/lib/cart/lines";
-import {
-  priceLine,
-  type Catalog,
-  type CatalogProduct,
-} from "@/lib/cart/pricing";
+import { priceLine } from "@/lib/cart/pricing";
 import { cartStore } from "@/lib/cart/store";
+import { useIsOpen } from "@/lib/order/use-is-open";
 import { useCartContext, useCartSummary } from "./cart-context";
+import { ClearCartButton } from "./clear-cart-button";
 import { QuantityStepper } from "./quantity-stepper";
-
-/** «XXL · Extra: Sos de usturoi · Fără: roșii» */
-function describeLine(
-  line: CartLine,
-  product: CatalogProduct,
-  catalog: Catalog,
-  locale: Locale,
-  t: Messages,
-): string {
-  const parts: string[] = [];
-  const variant = product.variants?.find((v) => v.id === line.variantId);
-  if (variant) parts.push(variant.name[locale]);
-  const addons = line.addonIds
-    .map((id) => catalog.addons[id]?.name[locale])
-    .filter(Boolean);
-  if (addons.length) parts.push(`${t.sheet.extra}: ${addons.join(", ")}`);
-  const removed = line.removedIds
-    .map((id) => product.removable.find((r) => r.id === id)?.name[locale])
-    .filter(Boolean);
-  if (removed.length) parts.push(`${t.sheet.without}: ${removed.join(", ")}`);
-  return parts.join(" · ");
-}
 
 export function CartSheet({
   open,
@@ -46,8 +25,9 @@ export function CartSheet({
   open: boolean;
   onDismiss: () => void;
 }) {
-  const { t, locale } = useCartContext();
+  const { t, locale, city, hours } = useCartContext();
   const summary = useCartSummary();
+  const closed = useIsOpen(hours) === false;
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -64,10 +44,15 @@ export function CartSheet({
           {formatPrice(locale, t, total)}
         </span>
       </div>
-      {/* Оформление заказа — следующая задача */}
-      <button type="button" className="btn-primary mt-3 w-full" disabled>
-        {t.cart.order}
-      </button>
+      {closed ? (
+        <button type="button" className="btn-primary mt-3 w-full" disabled>
+          {t.cart.order}
+        </button>
+      ) : (
+        <Link href={`/${city}/comanda`} className="btn-primary mt-3 w-full">
+          {t.cart.order}
+        </Link>
+      )}
     </>
   );
 
@@ -87,6 +72,11 @@ export function CartSheet({
       >
         {t.cart.title}
       </h2>
+      {closed && (
+        <div className="mt-3">
+          <ClosedBanner hours={hours} t={t} />
+        </div>
+      )}
       <ul className="mt-2">
         {lines.map((line) => (
           <CartLineRow
@@ -97,6 +87,9 @@ export function CartSheet({
           />
         ))}
       </ul>
+      <div className="mt-2">
+        <ClearCartButton />
+      </div>
     </Sheet>
   );
 }
@@ -115,7 +108,8 @@ function CartLineRow({
 
   const key = lineKey(line);
   const name = product.name[locale];
-  const details = describeLine(line, product, catalog, locale, t);
+  const parts = lineParts(line, catalog);
+  const details = parts ? describeParts(parts, locale, t) : "";
 
   return (
     <li className="cart-line flex gap-3 py-4">

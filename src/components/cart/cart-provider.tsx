@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { CitySlug, Locale } from "@/data/points";
 import { formatPrice, plural, type Messages } from "@/i18n/messages";
+import type { Hours } from "@/lib/order/hours";
 import type { Catalog } from "@/lib/cart/pricing";
 import {
   CART_STORAGE_KEY,
@@ -35,12 +36,14 @@ export function CartProvider({
   locale,
   t,
   catalog,
+  hours,
   children,
 }: {
   city: CitySlug;
   locale: Locale;
   t: Messages;
   catalog: Catalog;
+  hours: Hours;
   children: ReactNode;
 }) {
   const [sheet, setSheet] = useState<{ slug: string; open: boolean } | null>(
@@ -54,8 +57,8 @@ export function CartProvider({
   );
   const openCart = useCallback(() => setCartOpen(true), []);
   const value = useMemo<CartContextValue>(
-    () => ({ city, locale, t, catalog, openProduct, openCart }),
-    [city, locale, t, catalog, openProduct, openCart],
+    () => ({ city, locale, t, catalog, hours, openProduct, openCart }),
+    [city, locale, t, catalog, hours, openProduct, openCart],
   );
 
   // Сохранённая корзина — после монтирования (HTML сервера = пустая корзина);
