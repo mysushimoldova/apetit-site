@@ -12,7 +12,8 @@
 - JPG и PNG без прозрачности → rembg с alpha matting на копии не длиннее
   2048px (isnet-general-use; при флагах качества — повтор через
   birefnet-general-lite), маска поднимается до исходного размера;
-- мастер <slug>.png в исходном размере (не в git), WebP quality 82;
+- мастер <slug>.png в исходном размере (не в git), WebP quality 82
+  (версия 400px — 80: она идёт на плитки меню, вес первого экрана важнее);
 - повторный запуск ничего не пересчитывает, если исходник не менялся
   (sha1 исходника хранится в манифесте).
 """
@@ -30,7 +31,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from prepare_images_lib import (  # noqa: E402
-    QUALITY,
+    quality_for,
     WORK_LONG_SIDE,
     has_real_alpha,
     iter_sources,
@@ -156,7 +157,7 @@ def process_one(src: Path) -> dict:
     for w in sizes:
         h = round(cut.height * w / cut.width)
         cut.resize((w, h), Image.LANCZOS).save(
-            OUT_DIR / f"{slug}-{w}.webp", quality=QUALITY, method=6
+            OUT_DIR / f"{slug}-{w}.webp", quality=quality_for(w), method=6
         )
 
     return {

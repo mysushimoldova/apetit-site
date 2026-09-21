@@ -42,12 +42,14 @@ test("панель показывает меню Сорок и управляе�
   const frame = await preview(page);
   await expect.poll(async () => (await frameStats(frame))?.running).toBe(true);
 
-  // Режим «Не двигается»: фон берёт паузу себе, цикл кадров стоит
+  // Режим «Не двигается»: стоит только время линий — движок продолжает
+  // идти, чтобы фон по-прежнему ехал при прокрутке
   await page.getByRole("button", { name: "Не двигается" }).click();
-  await expect
-    .poll(async () => (await frameStats(frame))!.paused)
-    .toContain("background-static");
-  expect((await frameStats(frame))!.running).toBe(false);
+  await expect(
+    page.getByRole("button", { name: "Не двигается" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await frameStats(frame))!.running).toBe(true);
+  expect((await frameStats(frame))!.paused).toEqual([]);
 
   await page.getByRole("button", { name: "Живые линии" }).click();
   await expect.poll(async () => (await frameStats(frame))!.running).toBe(true);

@@ -41,10 +41,10 @@ describe("юниформы слоя фона", () => {
     expect(u.offY).toBe(-1200);
   });
 
-  it("«не двигается» — время и сдвиг нулевые", () => {
+  it("«не двигается» — стоит время линий, сдвиг при прокрутке работает", () => {
     const u = contoursUniforms({ ...settings, mode: "static" }, frame);
     expect(u.t).toBe(0);
-    expect(u.offY).toBe(0);
+    expect(u.offY).toBe(-1200);
     expect(u.scale).toBe(1800);
   });
 

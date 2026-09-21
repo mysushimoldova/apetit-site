@@ -68,7 +68,8 @@ describe("защитные заголовки (SPEC §9.4)", () => {
 
   it("next.config отдаёт их на все адреса", async () => {
     const rules = await nextConfig.headers!();
-    expect(rules).toHaveLength(1);
+    // Первое правило — защитные заголовки на все адреса; дальше идут
+    // правила кэша (src/lib/cache-headers.ts)
     expect(rules[0].source).toBe("/:path*");
     const keys = rules[0].headers.map((h) => h.key);
     expect(keys).toEqual(securityHeaders(false).map((h) => h.key));

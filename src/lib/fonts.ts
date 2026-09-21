@@ -28,11 +28,18 @@ export const manrope = Manrope({
   variable: "--font-manrope",
 });
 
-/** Montserrat 400/500 — состав, описания, формы, подвал. */
+/** Montserrat 400/500 — состав, описания, формы, подвал.
+ *  preload: false — файлы Montserrat самые тяжёлые (104 КБ на два набора
+ *  знаков), а на первом экране им набран только мелкий текст: состав и
+ *  граммы. Если качать их сразу, они отбирают канал у Oswald, которым
+ *  набрано слово-вывеска — а это самый большой элемент экрана (LCP).
+ *  Шрифт всё равно загрузится, просто следующей очередью; подмена
+ *  незаметна (display: swap и подогнанный запасной шрифт — без сдвигов). */
 export const montserrat = Montserrat({
   weight: ["400", "500"],
   subsets: ["latin", "latin-ext"],
   display: "swap",
+  preload: false,
   variable: "--font-montserrat",
 });
 

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { immutableCacheRules } from "./src/lib/cache-headers";
 import { securityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
@@ -12,13 +13,15 @@ const nextConfig: NextConfig = {
   },
   // Не сообщать всем «X-Powered-By: Next.js» — лишняя подсказка атакующему
   poweredByHeader: false,
-  // Защитные заголовки (CSP, HSTS и др.) на все адреса — src/lib/security-headers.ts
+  // Защитные заголовки (CSP, HSTS и др.) на все адреса — src/lib/security-headers.ts,
+  // плюс долгий кэш для неизменяемых файлов (src/lib/cache-headers.ts).
   async headers() {
     return [
       {
         source: "/:path*",
         headers: securityHeaders(process.env.NODE_ENV === "development"),
       },
+      ...immutableCacheRules(),
     ];
   },
 };

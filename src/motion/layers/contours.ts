@@ -74,7 +74,9 @@ void main(){${LINE}
 }`;
 
 /** Юниформы кадра — чистый расчёт, проверяется тестом.
- *  uScale и сдвиг умножаются на dpr: шейдер считает в пикселях холста. */
+ *  uScale и сдвиг умножаются на dpr: шейдер считает в пикселях холста.
+ *  Режим «не двигается» останавливает только время линий (uT = 0);
+ *  сдвиг при прокрутке работает как обычно (решение архитектора). */
 export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
   const still = settings.mode === "static";
   return {
@@ -89,7 +91,7 @@ export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
     /** uSpeed */
     speed: settings.speed,
     /** uOff.y (uOff.x всегда 0) */
-    offY: still ? 0 : -(frame.scroll * settings.parallax * frame.dpr),
+    offY: -(frame.scroll * settings.parallax * frame.dpr),
     /** uC */
     rgb: RGB[settings.color],
   };

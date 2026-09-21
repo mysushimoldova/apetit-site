@@ -37,8 +37,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: fill(t.meta.cityTitle, { city: city.name }) };
 }
 
-/** Сколько первых фото грузить сразу (первый экран: 2 колонки × 2 ряда). */
-const EAGER_TILES = 4;
+/** Сколько первых фото грузить сразу и с высоким приоритетом. На телефоне
+ *  390×844 в первый экран попадает один ряд — две плитки; остальные ждут
+ *  своей очереди и не отбирают канал у шрифта слова-вывески (это LCP). */
+const EAGER_TILES = 2;
 
 export default async function CityPage({ params }: Props) {
   const { city: slug } = await params;
