@@ -1,13 +1,15 @@
-// Точка входа модуля заказов для приложения (Server Action). Память —
-// одна на процесс сервера (см. memory.ts: TODO перенести в Supabase).
+// Точка входа модуля заказов для приложения (Server Action). Хранилище —
+// таблица orders в Supabase (service role, только сервер); в памяти
+// процесса ничего не держим: номера, лимиты и дубли — в базе.
 import "server-only";
-import { createOrderMemory } from "./memory";
+import { getServiceClient } from "@/server/db/client";
+import { createSupabaseOrderStore } from "./store";
 import { submitOrder, type SubmitResult } from "./submit";
 
 export type { OrderReceipt, ReceiptLine } from "@/lib/order/receipt";
 export type { SubmitResult } from "./submit";
 
-const memory = createOrderMemory();
+const store = createSupabaseOrderStore(getServiceClient);
 
 export function placeOrder(
   input: unknown,
@@ -15,7 +17,10 @@ export function placeOrder(
 ): Promise<SubmitResult> {
   return submitOrder(input, {
     ...request,
-    memory,
-    log: (message, data) => console.info(`[orders] ${message}`, data),
+    store,
+    log: (message, data) => {
+      const write = message === "db error" ? console.error : console.info;
+      write(`[orders] ${message}`, data);
+    },
   });
 }

@@ -1,8 +1,49 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPoint, type Point } from "@/data/points";
 import type { CartLine } from "@/lib/cart/lines";
-import { createOrderMemory, type OrderMemory } from "./memory";
+import { StoreError, type NewOrder, type OrderStore } from "./store";
 import { submitOrder, type SubmitContext } from "./submit";
+
+/**
+ * Подмена базы: массив строк и те же четыре запроса, что делает настоящий
+ * store (по dedup_hash, по телефону, по IP, вставка с номером из «sequence»).
+ */
+function createFakeStore(): OrderStore & {
+  rows: (NewOrder & { number: number })[];
+} {
+  const rows: (NewOrder & { number: number })[] = [];
+  let next = 1001;
+  const after = (since: Date) => rows.filter((r) => r.createdAt > since);
+  return {
+    rows,
+    async findRecent(dedupHash, since) {
+      const hit = after(since)
+        .filter((r) => r.dedupHash === dedupHash)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      if (!hit) return null;
+      return {
+        number: hit.number,
+        items: JSON.parse(JSON.stringify(hit.items)),
+        total: hit.total,
+        createdAt: hit.createdAt.toISOString(),
+      };
+    },
+    async countByPhone(phone, since) {
+      return after(since).filter((r) => r.phone === phone).length;
+    },
+    async countByIp(ipHash, since) {
+      return after(since).filter((r) => r.ipHash === ipHash).length;
+    },
+    async insert(order) {
+      const number = next++;
+      rows.push({ ...order, number });
+      return { number, createdAt: order.createdAt.toISOString() };
+    },
+    async anonymizeOldOrders() {
+      return 0;
+    },
+  };
+}
 
 // 12:00 по Кишинёву (летом UTC+3)
 const NOON = new Date("2026-09-19T09:00:00Z");
@@ -33,11 +74,11 @@ const order = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-let memory: OrderMemory;
+let store: ReturnType<typeof createFakeStore>;
 let ctx: SubmitContext;
 beforeEach(() => {
-  memory = createOrderMemory();
-  ctx = { now: NOON, ip: null, memory, log: vi.fn() };
+  store = createFakeStore();
+  ctx = { now: NOON, ip: null, store, log: vi.fn() };
 });
 
 describe("submitOrder — приём заказа", () => {
@@ -62,6 +103,37 @@ describe("submitOrder — приём заказа", () => {
       variant: { ro: "XXL" },
       extra: [{ ro: "Sos de usturoi (în preparat)" }],
     });
+  });
+
+  it("в базу уходит одна строка: точка, город, язык, контакты, снимок, хэши", async () => {
+    await submitOrder(order({ address: "Str. Independenței 1" }), {
+      ...ctx,
+      ip: "203.0.113.7",
+    });
+    expect(store.rows).toHaveLength(1);
+    const row = store.rows[0];
+    expect(row).toMatchObject({
+      number: 1001,
+      pointId: "soroca-centru",
+      city: "soroca",
+      lang: "ro",
+      name: "Ion",
+      phone: "+37367111222",
+      address: "Str. Independenței 1",
+      total: 228,
+      createdAt: NOON,
+    });
+    expect(row.items).toHaveLength(1);
+    expect(row.items[0]).toMatchObject({ qty: 2, unit: 114, total: 228 });
+    // Хэши — 64 hex-символа, самих телефона и IP в них нет
+    expect(row.dedupHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row.ipHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify([row.dedupHash, row.ipHash])).not.toContain("203.0");
+  });
+
+  it("без адреса и без IP — address null, ip_hash null", async () => {
+    await submitOrder(order(), ctx);
+    expect(store.rows[0]).toMatchObject({ address: null, ipHash: null });
   });
 
   it("номера сквозные с 1001", async () => {
@@ -154,9 +226,19 @@ describe("submitOrder — приём заказа", () => {
     const a = await submitOrder(order(), ctx);
     const b = await submitOrder(order(), { ...ctx, now: minutes(1) });
     expect(a.ok && b.ok && b.receipt.number).toBe(1001);
+    // Повтор — из базы: строка одна, время и снимок — первого заказа
+    expect(store.rows).toHaveLength(1);
+    expect(b.ok && b.receipt.createdAt).toBe(NOON.toISOString());
+    expect(b.ok && b.receipt.total).toBe(228);
     expect(ctx.log).toHaveBeenCalledOnce();
     const c = await submitOrder(order(), { ...ctx, now: minutes(2.1) });
     expect(c.ok && c.receipt.number).toBe(1002);
+  });
+
+  it("тот же состав, другой телефон — не дубль, свой номер", async () => {
+    await submitOrder(order(), ctx);
+    const r = await submitOrder(order({ phone: "067111333" }), ctx);
+    expect(r.ok && r.receipt.number).toBe(1002);
   });
 
   it("≤3 заказа с одного номера за 10 минут, потом снова можно", async () => {
@@ -201,5 +283,34 @@ describe("submitOrder — приём заказа", () => {
       ip: "203.0.113.8",
     });
     expect(other.ok).toBe(true);
+  });
+
+  it("база не ответила — db_error, в логе шаг и код, без данных заказа", async () => {
+    store.insert = async () => {
+      throw new StoreError("insert", "57P01", "terminating connection");
+    };
+    const r = await submitOrder(order(), ctx);
+    expect(r).toEqual({ ok: false, code: "db_error" });
+    expect(ctx.log).toHaveBeenCalledWith("db error", {
+      step: "insert",
+      code: "57P01",
+      message: "terminating connection",
+    });
+    const logged = JSON.stringify(vi.mocked(ctx.log).mock.calls);
+    expect(logged).not.toContain("67111222");
+    expect(logged).not.toContain("Ion");
+  });
+
+  it("ошибка на проверке дубля (нет env, сеть) — тоже db_error, заказ не пишется", async () => {
+    store.findRecent = async () => {
+      throw new Error("fetch failed");
+    };
+    const r = await submitOrder(order(), ctx);
+    expect(r).toEqual({ ok: false, code: "db_error" });
+    expect(store.rows).toHaveLength(0);
+    expect(ctx.log).toHaveBeenCalledWith("db error", {
+      step: "unknown",
+      message: "fetch failed",
+    });
   });
 });

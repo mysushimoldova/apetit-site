@@ -1,10 +1,11 @@
 // Приём заказа (SPEC §3 шаг 5, §9.3, §9.4). Одна функция, в которую следующая
-// задача добавит Telegram и Supabase — форма и Server Action не меняются.
+// задача добавит Telegram — форма и Server Action не меняются.
 //
 // Порядок проверок: вход (zod) → ловушка для ботов → точка есть и принимает
 // заказы → рабочие часы точки → каждая позиция продаётся в точке и собрана
-// из разрешённого (размер, добавки, «без») → повтор за 2 минуты (тот же номер)
-// → лимиты номера и IP → номер заказа → снимок → лог.
+// из разрешённого (размер, добавки, «без») → повтор за 2 минуты (тот же номер
+// из базы) → лимиты номера и IP (запросы по индексам) → один INSERT, номер
+// выдаёт sequence базы → снимок → лог.
 // Цена считается здесь, по каталогу точки; сумм от клиента нет и не
 // принимается (OrderInputSchema — strictObject).
 import { getPoint as getRealPoint, type Point } from "@/data/points";
@@ -14,8 +15,20 @@ import { lineKey, type CartLine } from "@/lib/cart/lines";
 import { priceLine, type Catalog } from "@/lib/cart/pricing";
 import { isOpenAt, type Hours } from "@/lib/order/hours";
 import { OrderInputSchema, type OrderField } from "@/lib/order/schema";
-import type { OrderMemory } from "./memory";
-import type { OrderReceipt, ReceiptLine } from "@/lib/order/receipt";
+import {
+  ReceiptLineSchema,
+  type OrderReceipt,
+  type ReceiptLine,
+} from "@/lib/order/receipt";
+import { z } from "@/lib/zod";
+import { sha256Hex } from "./hash";
+import {
+  DEDUP_MS,
+  IP_LIMIT,
+  PHONE_LIMIT,
+  StoreError,
+  type OrderStore,
+} from "./store";
 
 export type SubmitResult =
   | { ok: true; receipt: OrderReceipt }
@@ -24,6 +37,8 @@ export type SubmitResult =
   | { ok: false; code: "point_paused" }
   | { ok: false; code: "unavailable"; lines: number[] }
   | { ok: false; code: "rate_limited" }
+  /** База не ответила — форма показывает «попробуй ещё раз» */
+  | { ok: false; code: "db_error" }
   /** Мусор, неизвестная точка, ловушка — без подробностей */
   | { ok: false; code: "rejected" };
 
@@ -31,7 +46,7 @@ export interface SubmitContext {
   now: Date;
   /** IP клиента — только из надёжного источника (cf-connecting-ip); null — не знаем */
   ip: string | null;
-  memory: OrderMemory;
+  store: OrderStore;
   log: (message: string, data: Record<string, unknown>) => void;
   /** Подмена в тестах (точка на паузе) */
   getPoint?: (id: string) => Point | undefined;
@@ -59,6 +74,18 @@ function maskPhone(phone: string): string {
 function fingerprint(pointId: string, lines: readonly CartLine[]): string {
   const parts = lines.map((l) => `${lineKey(l)}*${l.qty}`).sort();
   return `${pointId}#${parts.join(";")}`;
+}
+
+/** Снимок позиций из базы; битый (не должно быть) — null, возьмём свежий. */
+const StoredLinesSchema = z.array(ReceiptLineSchema).min(1);
+
+/** Что писать в лог об ошибке базы: шаг, код, текст — без данных заказа. */
+function describeDbError(error: unknown): Record<string, unknown> {
+  if (error instanceof StoreError) {
+    return { step: error.step, code: error.code, message: error.message };
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return { step: "unknown", message };
 }
 
 function receiptLine(line: CartLine, catalog: Catalog): ReceiptLine | null {
@@ -120,39 +147,88 @@ export async function submitOrder(
     return { ok: false, code: "unavailable", lines: unavailable };
   }
 
-  const now = ctx.now.getTime();
-  const print = fingerprint(point.id, input.lines);
-  const duplicate = ctx.memory.findDuplicate(input.phone, print, now);
-  if (duplicate) return { ok: true, receipt: duplicate };
-
-  if (!ctx.memory.allows(input.phone, ctx.ip, now)) {
-    return { ok: false, code: "rate_limited" };
-  }
-
-  const receipt = ctx.memory.commit(input.phone, ctx.ip, print, now, (n) => ({
-    number: n,
+  const total = lines.reduce((sum, l) => sum + l.total, 0);
+  const receipt = (
+    number: number,
+    createdAt: string,
+    snapshot: { lines: ReceiptLine[]; total: number },
+  ): OrderReceipt => ({
+    number,
     pointId: point.id,
     pointName: point.name,
     pointPhone: point.phone,
     city: point.citySlug,
-    lines,
-    total: lines.reduce((sum, l) => sum + l.total, 0),
-    createdAt: ctx.now.toISOString(),
-  }));
-
-  // TODO (следующая задача): сообщение в Telegram точке и запись в Supabase.
-  // Здесь же будут имя, телефон и адрес клиента — в лог их не пишем.
-  // Для Telegram (parse_mode HTML) имя и адрес экранировать: < > & — их
-  // схема для адреса не запрещает. Заказ в базе не отдавать по одному номеру
-  // без проверки: номера сквозные, их легко перебрать.
-  ctx.log("order accepted", {
-    number: receipt.number,
-    point: receipt.pointId,
-    total: receipt.total,
-    lines: receipt.lines.length,
-    phone: maskPhone(input.phone),
-    address: input.address !== "",
+    lines: snapshot.lines,
+    total: snapshot.total,
+    createdAt,
   });
 
-  return { ok: true, receipt };
+  const since = (windowMs: number) => new Date(ctx.now.getTime() - windowMs);
+  const dedupHash = await sha256Hex(
+    `${input.phone}|${fingerprint(point.id, input.lines)}`,
+  );
+  const ipHash = ctx.ip === null ? null : await sha256Hex(ctx.ip);
+
+  try {
+    // Тот же телефон и тот же состав за 2 минуты — вернуть записанный заказ
+    const recent = await ctx.store.findRecent(dedupHash, since(DEDUP_MS));
+    if (recent) {
+      const stored = StoredLinesSchema.safeParse(recent.items);
+      return {
+        ok: true,
+        receipt: receipt(
+          recent.number,
+          recent.createdAt,
+          stored.success
+            ? { lines: stored.data, total: recent.total }
+            : { lines, total },
+        ),
+      };
+    }
+
+    const byPhone = await ctx.store.countByPhone(
+      input.phone,
+      since(PHONE_LIMIT.windowMs),
+    );
+    if (byPhone >= PHONE_LIMIT.max) return { ok: false, code: "rate_limited" };
+    if (ipHash !== null) {
+      const byIp = await ctx.store.countByIp(ipHash, since(IP_LIMIT.windowMs));
+      if (byIp >= IP_LIMIT.max) return { ok: false, code: "rate_limited" };
+    }
+
+    const inserted = await ctx.store.insert({
+      pointId: point.id,
+      city: point.citySlug,
+      lang: point.locale,
+      name: input.name,
+      phone: input.phone,
+      address: input.address === "" ? null : input.address,
+      items: lines,
+      total,
+      ipHash,
+      dedupHash,
+      createdAt: ctx.now,
+    });
+
+    // TODO (следующая задача): сообщение в Telegram точке, telegram_message_id
+    // в строку заказа. Имя и адрес экранировать (parse_mode HTML). Заказ из
+    // базы не отдавать по одному номеру без проверки: номера сквозные.
+    ctx.log("order accepted", {
+      number: inserted.number,
+      point: point.id,
+      total,
+      lines: lines.length,
+      phone: maskPhone(input.phone),
+      address: input.address !== "",
+    });
+
+    return {
+      ok: true,
+      receipt: receipt(inserted.number, inserted.createdAt, { lines, total }),
+    };
+  } catch (error) {
+    // Клиенту — «попробуй ещё раз»; в лог — причина, без данных заказа
+    ctx.log("db error", describeDbError(error));
+    return { ok: false, code: "db_error" };
+  }
 }

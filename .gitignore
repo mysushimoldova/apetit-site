@@ -15,6 +15,7 @@ next-env.d.ts
 
 # Секреты — только в .env.local, никогда в git
 .env*
+!.env.example
 
 # Тесты
 /coverage
