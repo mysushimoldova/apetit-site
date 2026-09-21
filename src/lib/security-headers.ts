@@ -31,7 +31,10 @@ export function contentSecurityPolicy(isDev: boolean): string {
     "img-src": ["'self'", "data:"],
     "font-src": ["'self'"],
     "connect-src": ["'self'"],
-    "frame-ancestors": ["'none'"],
+    // Боевой сайт не даёт вставлять себя в рамку. В разработке панель
+    // /dev/motion показывает страницу меню в <iframe> своего же адреса,
+    // поэтому там — 'self' (и X-Frame-Options ниже — SAMEORIGIN).
+    "frame-ancestors": [isDev ? "'self'" : "'none'"],
     "form-action": ["'self'"],
     "base-uri": ["'self'"],
     "object-src": ["'none'"],
@@ -49,7 +52,7 @@ export function securityHeaders(isDev: boolean): Header[] {
     },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-    { key: "X-Frame-Options", value: "DENY" },
+    { key: "X-Frame-Options", value: isDev ? "SAMEORIGIN" : "DENY" },
     {
       key: "Permissions-Policy",
       value: "geolocation=(self), camera=(), microphone=(), payment=()",

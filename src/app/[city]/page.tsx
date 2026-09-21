@@ -5,7 +5,6 @@
 // оформлении заказа).
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BrandBackground } from "@/components/brand/brand-background";
 import { CartProvider } from "@/components/cart/cart-provider";
 import { RememberCity } from "@/components/city/remember-city";
 import { CategoryChips } from "@/components/menu/category-chips";
@@ -13,6 +12,7 @@ import { ProductTile } from "@/components/menu/product-tile";
 import { RevealGrid } from "@/components/menu/reveal-grid";
 import { SiteFooter } from "@/components/menu/site-footer";
 import { SiteHeader } from "@/components/menu/site-header";
+import { MotionStage } from "@/components/motion/motion-stage";
 import { getMenuForCity } from "@/data/menu";
 import { CITIES, getCity, isCitySlug, pointsOfCity } from "@/data/points";
 import { fill, getMessages } from "@/i18n/messages";
@@ -63,7 +63,7 @@ export default async function CityPage({ params }: Props) {
 
   return (
     <div lang={locale}>
-      <BrandBackground />
+      <MotionStage />
       <RememberCity slug={city.slug} />
       <CartProvider
         city={city.slug}

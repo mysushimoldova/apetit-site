@@ -21,6 +21,7 @@ import {
   hydrateCart,
   useCart,
 } from "@/lib/cart/store";
+import { useMotionPause } from "@/motion/use-pause";
 import { CartBar } from "./cart-bar";
 import {
   CartContext,
@@ -50,6 +51,11 @@ export function CartProvider({
     null,
   );
   const [cartOpen, setCartOpen] = useState(false);
+
+  // Движок анимаций стоит, пока открыт лист блюда или корзина: под ними
+  // страница всё равно не видна, а телефону легче (src/motion/engine.ts)
+  useMotionPause("sheet", sheet?.open === true);
+  useMotionPause("cart", cartOpen);
 
   const openProduct = useCallback(
     (slug: string) => setSheet({ slug, open: true }),

@@ -198,12 +198,15 @@ test.describe("защитные заголовки и CSP", () => {
       );
       expect(h["x-content-type-options"]).toBe("nosniff");
       expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
-      expect(h["x-frame-options"]).toBe("DENY");
+      // Здесь dev-сервер: рамка своего адреса разрешена ради панели
+      // /dev/motion. На боевой сборке — DENY и 'none', это проверяет
+      // e2e-prod/dev-routes.spec.ts и src/lib/security-headers.test.ts
+      expect(h["x-frame-options"]).toBe("SAMEORIGIN");
       expect(h["permissions-policy"]).toBe(
         "geolocation=(self), camera=(), microphone=(), payment=()",
       );
       expect(h["content-security-policy"]).toContain("default-src 'self'");
-      expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
+      expect(h["content-security-policy"]).toContain("frame-ancestors 'self'");
       expect(h["x-powered-by"]).toBeUndefined();
     });
   }

@@ -2,6 +2,7 @@
 // версии текста, видна одна — по языку (src/lib/legal-lang.ts).
 // Заголовок Oswald, текст Montserrat 16px, строка до 640px, подзаголовки
 // Manrope 700. Без карточек и иконок. Внизу — «Înapoi la meniu».
+import { MotionStage } from "@/components/motion/motion-stage";
 import { companyValues } from "@/data/company";
 import type { Locale } from "@/data/points";
 import { legalDocs, type LegalSlug } from "@/i18n/legal";
@@ -64,6 +65,7 @@ export function LegalPage({ slug }: { slug: LegalSlug }) {
       {/* Язык по сохранённому городу — до отрисовки, см. legal-lang.ts.
           Текст скрипта — из наших констант, пользовательских данных нет. */}
       <script dangerouslySetInnerHTML={{ __html: buildLegalLangScript() }} />
+      <MotionStage />
       <LegalHeader changeCity={changeCity} />
       <main className="page pt-8 pb-16 lg:pt-12">
         {LOCALES.map((locale) => (

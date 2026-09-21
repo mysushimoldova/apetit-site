@@ -15,6 +15,10 @@ import {
 } from "react";
 import { CategoryIcon } from "@/components/icons/category-icon";
 import { watchProgrammaticScroll } from "@/lib/programmatic-scroll";
+import { pauseMotion, resumeMotion } from "@/motion/pause";
+
+/** Причина паузы движка на время прокрутки к категории. */
+const SCROLL_PAUSE = "scroll";
 
 export interface ChipItem {
   slug: string;
@@ -136,14 +140,25 @@ export function CategoryChips({
     setActive(slug);
     // Фиксируем выбранный чип до конца прокрутки. Если человек прервал её
     // сам — активна та секция, где страница остановилась; иначе — выбранная
-    // (даже если последняя секция не доехала до шапки: ниже листать некуда)
+    // (даже если последняя секция не доехала до шапки: ниже листать некуда).
+    // На время этой прокрутки движок анимаций стоит: пока страница едет,
+    // телефону есть чем заняться и без фона (src/motion/pause.ts). Ожидание
+    // само кончается не позже SCROLL_START_MS, поэтому паузу всегда кто-то
+    // снимет — даже если человек успел уйти со страницы.
     scrollLockRef.current?.();
-    scrollLockRef.current = watchProgrammaticScroll(window, (interrupted) => {
+    pauseMotion(SCROLL_PAUSE);
+    const stopWatch = watchProgrammaticScroll(window, (interrupted) => {
       scrollLockRef.current = null;
+      resumeMotion(SCROLL_PAUSE);
       if (!interrupted) return;
       const current = sectionAtLine(items);
       if (current) setActive(current);
     });
+    scrollLockRef.current = () => {
+      scrollLockRef.current = null;
+      stopWatch();
+      resumeMotion(SCROLL_PAUSE);
+    };
   };
 
   // Enter у ссылки и так вызывает click; Space по умолчанию листает

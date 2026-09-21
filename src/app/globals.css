@@ -34,12 +34,8 @@
   --glass-bg-fallback: rgba(250, 247, 242, 0.96);
   --glass-blur: blur(16px) saturate(130%);
 
-  /* Сила фоновых линий (DESIGN.md → Background): 0.5 / 0.8 / 1.0 — варианты
-     A / B / C, выбран A. Цвет (Ash) и толщина линий — в самой картинке. */
-  --bg-lines-opacity: 0.5;
-  /* Ширина одного кадра линий на экране (отдаление): 1600 / 1200 / 900px —
-     варианты 1 / 2 / 3, выбран 2. Чем меньше — тем больше линий и они тоньше. */
-  --bg-frame-w: 1200px;
+  /* Появление холста движка анимаций (src/motion/engine.ts) */
+  --dur-canvas: 300ms;
 
   /* Затемнение фона под листом блюда */
   --scrim: rgba(26, 23, 20, 0.35);
@@ -194,43 +190,32 @@
   }
 }
 
-/* ---------- Фон: контурные линии бренда (DESIGN.md → Background) ----------
-   Неподвижный слой на весь экран под контентом; клики проходят сквозь.
-   Картинка — плитка 2×2 (кадр и его зеркала, scripts/bg-lines.py),
-   повторяется в обе стороны без стыков; кадр в ней шириной --bg-frame-w.
-   Внутри — «лента» высотой экран + плитка: её сдвигает BrandBackground
-   через transform, через каждую высоту плитки — по кругу, без шва.
-   Картинка декоративная: BrandBackground ставит data-ready после загрузки
-   страницы, и только тогда она запрашивается и мягко проявляется. */
-.brand-bg {
+/* ---------- Холст движка анимаций (DESIGN.md → Motion) ----------
+   Один холст на весь сайт (src/motion/engine.ts): фирменные контурные линии
+   фона, дальше — остальные эффекты. Лежит за контентом, клики проходят
+   сквозь. Рамка с overflow: hidden держит его ровно по экрану.
+   Высота холста — 100lvh, самый высокий экран телефона: когда браузер
+   прячет адресную строку, размер холста не меняется и рисунок не дёргается.
+   Холст проявляется после первого нарисованного кадра, за --dur-canvas
+   (плавность оставлена и при «уменьшить движение»: это прозрачность,
+   а не движение). */
+.motion-stage {
   position: fixed;
   inset: 0;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+}
+.motion-canvas {
+  display: block;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
   opacity: 0;
-  transition: opacity var(--dur-base) var(--ease-out);
+  transition: opacity var(--dur-canvas) var(--ease-out);
 }
-.brand-bg[data-ready] {
-  opacity: var(--bg-lines-opacity);
-}
-.brand-bg-track {
-  /* Высота плитки: два кадра 16:9 → 2 × 9/16 = 1.125 ширины кадра
-     (BG_TILE_HEIGHT_PER_FRAME в src/lib/bg-parallax.ts) */
-  --bg-tile-h: calc(var(--bg-frame-w) * 1.125);
-  /* lvh — высота экрана без учёта панелей браузера: слой не кончается,
-     когда на телефоне прячется адресная строка */
-  height: calc(100vh + var(--bg-tile-h));
-  height: calc(100lvh + var(--bg-tile-h));
-  will-change: transform;
-  /* Сдвиг на полкадра: вертикальные оси зеркал плитки уходят за края
-     экрана телефона — посередине экрана не видно «отражения» */
-  background-position: calc(50% - var(--bg-frame-w) / 2) top;
-  background-size: calc(var(--bg-frame-w) * 2) auto;
-  background-repeat: repeat;
-}
-.brand-bg[data-ready] .brand-bg-track {
-  background-image: url("/img/bg/linii.webp");
+.motion-canvas[data-ready] {
+  opacity: 1;
 }
 
 /* ---------- Утилиты дизайн-системы ---------- */

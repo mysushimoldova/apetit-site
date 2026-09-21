@@ -50,6 +50,18 @@ describe("защитные заголовки (SPEC §9.4)", () => {
     expect(all).not.toMatch(/https?:|\*/);
   });
 
+  it("рамка: боевой сайт — никому, в разработке — только свой адрес", () => {
+    // Панель /dev/motion показывает страницу меню в <iframe> того же адреса
+    expect(asMap(true)["X-Frame-Options"]).toBe("SAMEORIGIN");
+    expect(directives(contentSecurityPolicy(true))["frame-ancestors"]).toEqual([
+      "'self'",
+    ]);
+    expect(asMap(false)["X-Frame-Options"]).toBe("DENY");
+    expect(directives(contentSecurityPolicy(false))["frame-ancestors"]).toEqual(
+      ["'none'"],
+    );
+  });
+
   it("next.config не выдаёт движок сайта (X-Powered-By)", () => {
     expect(nextConfig.poweredByHeader).toBe(false);
   });

@@ -1,0 +1,35 @@
+"use client";
+// Движок анимаций на странице (src/motion/engine.ts). Сам холст создаёт
+// движок; этот компонент только решает, когда его подгружать.
+//
+// Подгружаем после контента: сначала страница показана и нарисован первый
+// кадр, только потом запрашивается код движка (dynamic import, ssr:false).
+// На скорость показа страницы (LCP) он не влияет, холст проявляется за
+// 300 мс (globals.css → .motion-canvas).
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+
+const MotionRuntime = dynamic(() => import("./motion-runtime"), { ssr: false });
+
+/** Страница загружена и один кадр уже нарисован → callback. */
+function afterFirstPaint(callback: () => void): () => void {
+  let raf = 0;
+  const start = () => {
+    // Два requestAnimationFrame: второй срабатывает уже после отрисовки
+    raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(callback);
+    });
+  };
+  if (document.readyState === "complete") start();
+  else window.addEventListener("load", start, { once: true });
+  return () => {
+    window.removeEventListener("load", start);
+    cancelAnimationFrame(raf);
+  };
+}
+
+export function MotionStage() {
+  const [load, setLoad] = useState(false);
+  useEffect(() => afterFirstPaint(() => setLoad(true)), []);
+  return load ? <MotionRuntime /> : null;
+}

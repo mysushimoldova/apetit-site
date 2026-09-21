@@ -72,31 +72,29 @@ describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
     expect(css).toContain("--text-price: 18px");
   });
 
-  it("фон — линии: слой под контентом, клики сквозь, сила A = 0.5", () => {
-    expect(css).toContain("--bg-lines-opacity: 0.5");
-    const layer = css.slice(css.indexOf(".brand-bg {"));
-    const rule = layer.slice(0, layer.indexOf("}"));
-    expect(rule).toContain("position: fixed");
-    expect(rule).toContain("z-index: -1");
-    expect(rule).toContain("pointer-events: none");
-    // Проявляется, когда картинка загружена (после контента)
-    expect(rule).toContain("opacity: 0");
-    expect(css).toMatch(
-      /\.brand-bg\[data-ready\] \{\s*opacity: var\(--bg-lines-opacity\);/,
+  it("холст движка: за контентом, клики сквозь, появляется плавно", () => {
+    expect(css).toContain("--dur-canvas: 300ms");
+    const stage = css.slice(css.indexOf(".motion-stage {"));
+    const stageRule = stage.slice(0, stage.indexOf("}"));
+    expect(stageRule).toContain("position: fixed");
+    expect(stageRule).toContain("z-index: -1");
+    expect(stageRule).toContain("pointer-events: none");
+    expect(stageRule).toContain("overflow: hidden");
+    const canvas = css.slice(css.indexOf(".motion-canvas {"));
+    const canvasRule = canvas.slice(0, canvas.indexOf("}"));
+    // Высота — самый высокий экран телефона: при прятанье адресной строки
+    // холст не меняет размер и рисунок не дёргается
+    expect(canvasRule).toContain("height: 100lvh");
+    expect(canvasRule).toContain("opacity: 0");
+    expect(canvasRule).toContain(
+      "transition: opacity var(--dur-canvas) var(--ease-out)",
     );
+    expect(css).toMatch(/\.motion-canvas\[data-ready\] \{\s*opacity: 1;/);
   });
 
-  it("фон — плитка повторяется в обе стороны, кадр 1200px (вариант 2)", () => {
-    expect(css).toContain("--bg-frame-w: 1200px");
-    const track = css.slice(css.indexOf(".brand-bg-track {"));
-    const rule = track.slice(0, track.indexOf("}"));
-    expect(rule).toContain("background-size: calc(var(--bg-frame-w) * 2) auto");
-    expect(rule).toContain("background-repeat: repeat");
-    expect(rule).toContain("--bg-tile-h: calc(var(--bg-frame-w) * 1.125)");
-    // Картинка запрашивается только после data-ready
-    expect(rule).not.toContain("url(");
-    expect(css).toMatch(
-      /\.brand-bg\[data-ready\] \.brand-bg-track \{\s*background-image: url\("\/img\/bg\/linii\.webp"\);/,
-    );
+  it("старого растрового фона в стилях не осталось", () => {
+    expect(css).not.toContain("brand-bg");
+    expect(css).not.toContain("linii.webp");
+    expect(css).not.toContain("--bg-frame-w");
   });
 });
