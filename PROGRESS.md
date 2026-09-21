@@ -2065,3 +2065,179 @@ Oswald latin 13 КБ, Manrope latin 25 КБ + latin-ext 15 КБ, Montserrat
    нужен сейчас или достаточно Turnstile по SPEC 9.4 при появлении спама?
 4. `lang` заказа беру из точки (`point.locale`); переключатель RO/RU
    посетителя форма на сервер не передаёт (форму не трогал). Так и оставить?
+
+## 2026-09-21 — Этап 5 — Telegram: заказы точкам, «Принят», напоминания, копии владельцам
+
+Коммиты: `chore: normalize line endings` (шаг 0), `feat: telegram orders`.
+План: `docs/superpowers/plans/2026-09-21-telegram-orders.md`. Отчёт
+безопасности: `docs/security/2026-09-21-telegram-review.md`.
+
+### 0. Концы строк
+
+`.gitattributes` закоммичен. `git checkout -- .` файлы не переписал (для git
+они были «не изменены» — содержимое после нормализации совпадало), поэтому
+281 файл переписан в LF скриптом, `git add -u` обновил записи индекса; в
+итоге `git ls-files --eol` — все текстовые `i/lf w/lf`, статус чистый.
+Побочное: `scripts/prepare-images.py` на Windows писал манифест с CRLF и
+тест «повторный запуск без изменений» падал — добавил `newline="\n"`.
+
+### 1. Ответы архитектора — сделано
+
+1. **E2e убирают за собой**: `checkout.spec.ts` запоминает телефоны, которые
+   сам придумал, и в `afterAll` удаляет заказы `name='Ion Popescu'` с этими
+   телефонами через service-role из `.env.local`. Проверено: после прогона
+   в базе 0 строк.
+2. **`ip_hash` = HMAC-SHA256** с `ORDER_HASH_SECRET`. Секрета нет — SHA-256
+   и одно предупреждение в лог на процесс (тест). Имя в `.env.example`.
+3. **Атомарный лимит** — миграция 0002, функция `place_order()`:
+   `pg_advisory_xact_lock` по телефону и по IP, потом дубль → лимит по
+   номеру → лимит по IP → INSERT, всё в одной транзакции. Интеграционный
+   тест: 6 одновременных заказов с одного номера → ровно 3 приняты, 3 —
+   `limited`. Код на сервере стал короче: решения принимает база.
+4. **`lang` заказа** — скрытое поле формы со значением языка страницы
+   (RO/RU), zod `enum(["ro","ru"])`, хранится в `orders.lang`. Текст в
+   Telegram — по-прежнему на языке точки (Otaci — ru), как в задании.
+
+### 2. Telegram — как сделано
+
+**Схема** (`supabase/migrations/0002_telegram.sql`, применена): `telegram_chats`
+(point_id pk, chat_id, title, linked_at), `owner_chats` (chat_id pk, label,
+linked_at), `telegram_codes` (code pk, kind point/owner, point_id, label);
+в `orders` — `reminders_sent`, `last_reminder_at`, `telegram_error`. Функции:
+`place_order`, `claim_due_reminders`, `ping_reminders`, `random_link_code`.
+RLS + права только service_role; функции закрыты от anon.
+
+**Коды привязки — в базе, не в .env.** Их 6 и они «живут» у точек: админка
+(SPEC §5.3) сможет перевыпускать по одному; в `.env` — только секреты
+приложения. Случайность — из `gen_random_uuid()` (без pgcrypto).
+
+| Точка | Код |
+|---|---|
+| Apetit Centru (soroca-centru) | `67QUYX82` — **уже привязан** (чат Амяна, живая проверка) |
+| Apetit Soroca Nouă (soroca-noua) | `73ZREJMD` |
+| Apetit Sculeni (sculeni) | `AJEHJU4Z` |
+| Apetit Otaci (otaci) | `247TH6JB` |
+| Apetit Briceni (briceni) | `3VA4ZGNM` |
+| Владельцы (копии всех заказов) | `PYNFPD2X` |
+
+Код точки **одноразовый**: как только точка привязана, тот же код с другого
+телефона получит отказ «Punctul este deja conectat…» (иначе любой, кто
+увидел код в этом отчёте, мог бы перехватить чат с телефонами клиентов —
+находка ревью). Перепривязать: удалить строку точки в Table Editor →
+`telegram_chats`, затем `/start КОД` заново. Код владельца многоразовый
+(владельцев несколько); когда все подключатся — перевыпустить:
+`update public.telegram_codes set code = public.random_link_code() where kind = 'owner';`
+
+**Отправка** — после успешной записи в базу, через `after()` из
+`next/server`: клиент видит подтверждение сразу, Telegram идёт после ответа
+(на Cloudflare это waitUntil). Текст — HTML: `🔴 COMANDĂ NOUĂ #1042` жирным,
+точка, 👤 имя, 📞 телефон в виде `+373 68 123 456` (Telegram сам делает его
+ссылкой — отдельной кнопки «Позвонить» ботам не дают), 📍 адрес если есть,
+позиции «2 × Kebab Cheese (XXL) — 198 lei» + строка «Extra: … · Sos aparte:
+… · Fără: …», 💰 TOTAL, 🕐 время по Кишинёву. Имя, адрес, названия
+экранируются. Кнопка «✅ Am primit» / «✅ Принят» (`callback_data =
+accept:<uuid заказа>`). Нажатие → `status=accepted`, `accepted_at`, в лог
+«кто принял» (id и имя в Telegram), сообщение переписывается без кнопки с
+«✅ Primit la 19:42». Повторное нажатие — «Deja primit». Нажать может
+только чат той точки, которой заказ адресован. Копия владельцам — тот же
+текст без кнопки. `telegram_message_id` — в заказ.
+
+**Напоминания — pg_cron + pg_net.** Раз в минуту `ping_reminders()` в базе
+читает `settings` → ключ `telegram_reminders` `{url, secret}` и делает POST
+на `/api/telegram/reminders` с заголовком `X-Reminders-Secret`; сайт
+вызывает `claim_due_reminders()` — один UPDATE … RETURNING, который и
+выбирает заказы (`new`, старше 2 мин, `reminders_sent < 5`, прошлое
+напоминание ≥ 2 мин назад), и поднимает счётчик. Поэтому частые или
+параллельные вызовы ничего не дублируют. Почему не Cloudflare Cron:
+одинаково работает и на Cloudflare, и на Vercel (план Б; на Vercel Hobby
+cron — раз в сутки), cron в базе уже есть, и код будильника не зависит от
+хостинга. Минус: на Free-тарифе Supabase проект «засыпает» после недели
+без обращений — но сайт ходит в базу при каждом заказе, так что при живом
+сайте этого не случится.
+
+**Приём событий** — `/api/telegram/webhook`: заголовок
+`X-Telegram-Bot-Api-Secret-Token` = `TELEGRAM_WEBHOOK_SECRET`, сравнение за
+постоянное время; чужой → 401 без обработки (проверено curl-ом); нет
+секрета в env → тоже 401 (закрыто по умолчанию). Мусор → 400, наша ошибка
+→ 500 (Telegram повторит доставку).
+
+**Локально** — `npm run telegram:dev`: опрашивает бота (getUpdates) и отдаёт
+каждое событие в тот же локальный `/api/telegram/webhook` с тем же
+секретом — код обработки один; раз в 60 с дёргает будильник напоминаний.
+Отказывается работать, если у бота стоит боевой webhook (не сломать прод),
+снять можно только `-- --force`. `npm run telegram:setup` ставит webhook на
+`SITE_URL/api/telegram/webhook` — **запустим после публикации**.
+
+**Ошибки.** Telegram недоступен → заказ принят и записан, клиент видит
+успех; 3 попытки (сразу, через 1 с, через 3 с); потом текст ошибки в
+`orders.telegram_error`, `telegram_message_id` пустой. Точка не привязана —
+то же самое (`point not linked: …`), копии владельцам уходят всё равно.
+**Как увидеть такие заказы** (пока — запрос в SQL Editor):
+`select number, point_id, created_at, telegram_error from public.orders where telegram_error is not null order by created_at desc;`
+
+### 3. Живая проверка (с Амяном)
+
+- `/start` без кода (кнопка Start) → сначала 500: подсказка «/start <cod>»
+  содержала `<cod>`, Telegram принял за HTML-тег. Текст заменён на
+  «/start COD», добавлен тест, что в текстах бота нет `<`/`>`.
+- `/start 67QUYX82` → «Punct conectat: Apetit Centru», строка в
+  `telegram_chats`.
+- Заказ 1026 (2 × Kebab XXL + Extra, Coca-Cola, адрес «Str. Test 1
+  <probă>») → сообщение с кнопкой пришло; кнопка → `accepted`, время,
+  `telegram_message_id=4`, сообщение переписано.
+- Заказ 1027 без нажатия → напоминания 18:15:45, 18:17:45, 18:19:45 (ровно
+  каждые 2 минуты, срабатывает на минутной отметке, т.е. задержка до 3 мин);
+  после нажатия в 18:20:29 — остановились. Оба тестовых заказа удалил,
+  база пустая.
+
+### 4. Проверки
+
+- Vitest **311** (было 271): текст сообщения и экранирование — 10; webhook-
+  секрет, `/start`, одноразовый код, кнопка, чужой чат, повтор — 10; retry,
+  `telegram_error`, копии, счётчик напоминаний — 10; `place`/HMAC/схема — 15;
+  **интеграция с базой — 8** (атомарный залп, лимит IP, дубль через
+  `place_order`, анонимизация, коды, привязка, `claim_due_reminders`,
+  «Принят» второй раз — null). Без `.env.local` интеграция пропускается.
+- Playwright `checkout.spec.ts` — **14** ✓ с подменённым отправителем
+  (`APETIT_E2E=1`, не production) и очисткой после прогона.
+- `npm run lint` ✓, `tsc` ✓, `npm run build` ✓ (маршруты
+  `/api/telegram/webhook`, `/api/telegram/reminders` в сборке), `test:py` ✓.
+- Новых npm-пакетов нет: Bot API — обычный `fetch`.
+- `owasp-security` + `differential-review` — отчёт по ссылке выше; находка
+  «код точки как постоянный ключ» исправлена сразу (одноразовый код).
+
+### 5. Что Амяну сделать руками
+
+1. **Секреты в `.env.local`** — сделано сегодня командой (сгенерировала три
+   значения и дописала в файл):
+   `node -e "const c=require('crypto');const r=()=>c.randomBytes(32).toString('hex');require('fs').appendFileSync('.env.local','\nORDER_HASH_SECRET='+r()+'\nTELEGRAM_WEBHOOK_SECRET='+r()+'\nREMINDERS_SECRET='+r()+'\n')"`
+   Имена: `ORDER_HASH_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `REMINDERS_SECRET`
+   (все в `.env.example`). Одно значение отдельно:
+   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+2. **Раздать коды точкам** (таблица выше): на рабочем телефоне точки открыть
+   t.me/apetit_comenzi_bot → Start → отправить `/start КОД`. Владельцы —
+   код владельца, потом перевыпустить его (строка SQL выше).
+3. **Заранее, для боевого сайта** (когда будет домен): `SITE_URL=https://…`
+   в `.env.local` и `npm run telegram:setup`; в SQL Editor —
+   `insert into public.settings (key, value) values ('telegram_reminders', '{"url": "https://ДОМЕН/api/telegram/reminders", "secret": "ЗНАЧЕНИЕ REMINDERS_SECRET"}');`
+   Те же три секрета положить в переменные окружения хостинга.
+4. Убедиться в панели, что `pg_net` включён (Database → Extensions) — без
+   него `ping_reminders()` тихо ничего не делает.
+
+### 6. Отличия от SPEC / вопросы архитектору
+
+1. SPEC §4.2 рисует кнопку «Am preluat» и заголовок `🟢 PRELUAT · 18:45`;
+   в задании — «Am primit» и строка «Primit la 19:42» внизу. Сделал по
+   заданию (тексты в `src/server/telegram/texts.ts`, поменять — одна
+   строка). Какой вариант утверждаем?
+2. SPEC §4.3: «через 10 минут без ответа — сообщение владельцам "Точка X не
+   приняла заказ #1042"». В задании этого пункта нет — не делал. Добавить
+   следующей задачей (после 5-го напоминания — одно сообщение владельцам)?
+3. Настраиваемые интервалы (SPEC §4.3 «в админке») — пока константы
+   `REMINDER_INTERVAL_MS`, `REMINDER_MAX` в `reminders.ts`; в админку — потом.
+4. Тексты бота на утверждение: `НОВЫЙ ЗАКАЗ / ИТОГО / Добавки / Соус
+   отдельно / Без / ✅ Принят / Принят в / Уже принят / ⏰ Заказ N ждёт /
+   Точка подключена: … / Владелец подключён … / Неверный код / Отправьте:
+   /start КОД / Punctul este deja conectat la alt chat…` (и ro-варианты).
+5. Секрет будильника лежит в `settings` открытым текстом (таблица закрыта
+   RLS и правами). Переносить в Supabase Vault?
