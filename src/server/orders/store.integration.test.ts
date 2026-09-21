@@ -60,9 +60,9 @@ describe.skipIf(!ready)("orders в настоящей Supabase (.env.local)", ()
     store = createSupabaseOrderStore(() => db);
   });
   const created: number[] = [];
-  const insert = async (order: NewOrder) => {
-    const r = await store.insert(order);
-    created.push(r.number);
+  const place = async (order: NewOrder) => {
+    const r = await store.place(order);
+    if (r.outcome === "created") created.push(r.order.number);
     return r;
   };
 
@@ -81,7 +81,7 @@ describe.skipIf(!ready)("orders в настоящей Supabase (.env.local)", ()
     }
   });
 
-  it("anon-ключ: отказ на чтение, запись и функцию (RLS, без прав)", async () => {
+  it("anon-ключ: отказ на чтение, запись и функции (RLS, без прав)", async () => {
     const anon = createClient(URL ?? "", ANON_KEY ?? "", {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -100,75 +100,170 @@ describe.skipIf(!ready)("orders в настоящей Supabase (.env.local)", ()
       dedup_hash: "x",
     });
     expect(write.error).not.toBeNull();
-    const fn = await anon.rpc("anonymize_old_orders");
-    expect(fn.error).not.toBeNull();
+    expect((await anon.rpc("anonymize_old_orders")).error).not.toBeNull();
+    const placed = await anon.rpc("place_order", {
+      p_point_id: "x",
+      p_city: "x",
+      p_lang: "ro",
+      p_name: "x",
+      p_phone: "x",
+      p_address: null,
+      p_items: [],
+      p_total: 0,
+      p_ip_hash: null,
+      p_dedup_hash: "x",
+      p_now: new Date().toISOString(),
+      p_dedup_seconds: 1,
+      p_phone_limit: 1,
+      p_phone_window_seconds: 1,
+      p_ip_limit: 1,
+      p_ip_window_seconds: 1,
+    });
+    expect(placed.error).not.toBeNull();
     const settings = await anon.from("settings").select("key").limit(1);
     expect(
       settings.error?.code ?? (settings.data?.length === 0 ? "empty" : "data"),
     ).toMatch(/^(42501|empty)$/);
   });
 
-  it("insert: номер из sequence ≥ 1001 и растёт; дубль и лимиты видят строки", async () => {
+  it("place_order: номер из sequence ≥ 1001 и растёт; дубль → тот же заказ; лимит по телефону", async () => {
     const now = new Date();
-    const a = await insert(
+    const a = await place(
       newOrder({ createdAt: new Date(now.getTime() - 60_000) }),
     );
-    const b = await insert(newOrder({ createdAt: now }));
-    expect(a.number).toBeGreaterThanOrEqual(1001);
-    expect(b.number).toBeGreaterThan(a.number);
-    expect(new Date(b.createdAt).getTime()).toBe(now.getTime());
-
-    // Дубль: самый свежий с тем же dedup_hash за 2 минуты
-    const recent = await store.findRecent(
-      hash("dedup"),
-      new Date(now.getTime() - 2 * 60_000),
+    const b = await place(
+      newOrder({ dedupHash: hash("second"), createdAt: now }),
     );
-    expect(recent).toMatchObject({ number: b.number, total: 22 });
-    expect(recent?.items).toEqual([line]);
-    // Окно позже обоих — пусто
-    expect(
-      await store.findRecent(hash("dedup"), new Date(now.getTime() + 1000)),
-    ).toBeNull();
+    expect(a.outcome).toBe("created");
+    expect(b.outcome).toBe("created");
+    if (a.outcome !== "created" || b.outcome !== "created") return;
+    expect(a.order.number).toBeGreaterThanOrEqual(1001);
+    expect(b.order.number).toBeGreaterThan(a.order.number);
+    expect(new Date(b.order.createdAt).getTime()).toBe(now.getTime());
+    expect(a.order.id).toMatch(/^[0-9a-f-]{36}$/);
 
-    // Лимиты: по телефону и по IP — обе строки; чужой телефон — 0
-    const since = new Date(now.getTime() - 10 * 60_000);
-    expect(await store.countByPhone(phone, since)).toBe(2);
-    expect(await store.countByIp(hash("ip"), since)).toBe(2);
-    expect(await store.countByPhone("+37360000000", since)).toBe(0);
+    // Дубль: тот же dedup_hash в окне 2 минуты → записанный заказ, строки не прибавилось
+    const dup = await place(
+      newOrder({ createdAt: new Date(now.getTime() + 30_000) }),
+    );
+    expect(dup).toMatchObject({
+      outcome: "duplicate",
+      order: { number: a.order.number, total: 22, items: [line] },
+    });
+    // Спустя 3 минуты тот же состав — уже не дубль, но это 3-й заказ с номера
+    const third = await place(
+      newOrder({ createdAt: new Date(now.getTime() + 3 * 60_000) }),
+    );
+    expect(third.outcome).toBe("created");
+    // 4-й за 10 минут — лимит
+    const fourth = await place(
+      newOrder({
+        dedupHash: hash("fourth"),
+        createdAt: new Date(now.getTime() + 4 * 60_000),
+      }),
+    );
+    expect(fourth).toEqual({ outcome: "limited", by: "phone" });
+    // Через 11 минут после первого — снова можно
+    const later = await place(
+      newOrder({
+        dedupHash: hash("later"),
+        createdAt: new Date(now.getTime() + 11 * 60_000),
+      }),
+    );
+    expect(later.outcome).toBe("created");
+  });
+
+  it("атомарный лимит: залп из 6 одновременных заказов с одного номера → ровно 3 приняты", async () => {
+    const burstPhone = `+3736${String(Math.floor(Math.random() * 1e7)).padStart(7, "0")}`;
+    const now = new Date();
+    const results = await Promise.all(
+      Array.from({ length: 6 }, (_, i) =>
+        place(
+          newOrder({
+            phone: burstPhone,
+            dedupHash: hash(`burst${i}`),
+            ipHash: null,
+            createdAt: now,
+          }),
+        ),
+      ),
+    );
+    const outcomes = results.map((r) => r.outcome).sort();
+    expect(outcomes).toEqual([
+      "created",
+      "created",
+      "created",
+      "limited",
+      "limited",
+      "limited",
+    ]);
+  });
+
+  it("лимит по IP: 10 заказов с разных номеров, 11-й — limited by ip", async () => {
+    const ip = hash("burst-ip");
+    const now = new Date();
+    for (let i = 0; i < 10; i++) {
+      const r = await place(
+        newOrder({
+          phone: `+37360${String(100000 + i)}`,
+          dedupHash: hash(`ip${i}`),
+          ipHash: ip,
+          createdAt: now,
+        }),
+      );
+      expect(r.outcome, `order ${i}`).toBe("created");
+    }
+    const eleventh = await place(
+      newOrder({
+        phone: "+37360100099",
+        dedupHash: hash("ip99"),
+        ipHash: ip,
+        createdAt: now,
+      }),
+    );
+    expect(eleventh).toEqual({ outcome: "limited", by: "ip" });
   });
 
   it("anonymize_old_orders(): заказ старше года — без имени, телефона, адреса; свежий цел", async () => {
-    const old = await insert(
+    const old = await place(
       newOrder({
+        phone: "+37360200001",
         address: "Str. Veche 1",
         dedupHash: hash("old"),
         createdAt: new Date(Date.now() - 400 * DAY),
       }),
     );
-    const fresh = await insert(
-      newOrder({ address: "Str. Nouă 2", dedupHash: hash("fresh") }),
+    const fresh = await place(
+      newOrder({
+        phone: "+37360200002",
+        address: "Str. Nouă 2",
+        dedupHash: hash("fresh"),
+      }),
     );
+    expect(old.outcome).toBe("created");
+    expect(fresh.outcome).toBe("created");
+    if (old.outcome !== "created" || fresh.outcome !== "created") return;
 
     expect(await store.anonymizeOldOrders()).toBeGreaterThanOrEqual(1);
 
     const rows = await db
       .from("orders")
       .select("number, name, phone, address, items, total")
-      .in("number", [old.number, fresh.number]);
+      .in("number", [old.order.number, fresh.order.number]);
     expect(rows.error).toBeNull();
     const byNumber = Object.fromEntries(
       (rows.data ?? []).map((r) => [r.number, r]),
     );
-    expect(byNumber[old.number]).toMatchObject({
+    expect(byNumber[old.order.number]).toMatchObject({
       name: "",
       phone: "",
       address: null,
       total: 22,
     });
-    expect(byNumber[old.number]?.items).toEqual([line]);
-    expect(byNumber[fresh.number]).toMatchObject({
+    expect(byNumber[old.order.number]?.items).toEqual([line]);
+    expect(byNumber[fresh.order.number]).toMatchObject({
       name: "Test Integrare",
-      phone,
+      phone: "+37360200002",
       address: "Str. Nouă 2",
     });
   });

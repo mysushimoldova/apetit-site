@@ -1,11 +1,10 @@
-// Приём заказа (SPEC §3 шаг 5, §9.3, §9.4). Одна функция, в которую следующая
-// задача добавит Telegram — форма и Server Action не меняются.
+// Приём заказа (SPEC §3 шаг 5, §9.3, §9.4). Форма и Server Action тонкие.
 //
 // Порядок проверок: вход (zod) → ловушка для ботов → точка есть и принимает
 // заказы → рабочие часы точки → каждая позиция продаётся в точке и собрана
-// из разрешённого (размер, добавки, «без») → повтор за 2 минуты (тот же номер
-// из базы) → лимиты номера и IP (запросы по индексам) → один INSERT, номер
-// выдаёт sequence базы → снимок → лог.
+// из разрешённого (размер, добавки, «без») → place_order() в базе одной
+// транзакцией: повтор за 2 минуты (тот же номер) → лимиты номера и IP →
+// INSERT, номер из sequence → снимок → лог → ctx.onAccepted (Telegram).
 // Цена считается здесь, по каталогу точки; сумм от клиента нет и не
 // принимается (OrderInputSchema — strictObject).
 import { getPoint as getRealPoint, type Point } from "@/data/points";
@@ -21,14 +20,8 @@ import {
   type ReceiptLine,
 } from "@/lib/order/receipt";
 import { z } from "@/lib/zod";
-import { sha256Hex } from "./hash";
-import {
-  DEDUP_MS,
-  IP_LIMIT,
-  PHONE_LIMIT,
-  StoreError,
-  type OrderStore,
-} from "./store";
+import { ipHash as hashIp, sha256Hex } from "./hash";
+import { StoreError, type OrderStore } from "./store";
 
 export type SubmitResult =
   | { ok: true; receipt: OrderReceipt }
@@ -42,12 +35,31 @@ export type SubmitResult =
   /** Мусор, неизвестная точка, ловушка — без подробностей */
   | { ok: false; code: "rejected" };
 
+/** Принятый (новый) заказ — для Telegram; повтор и отказы сюда не попадают. */
+export interface AcceptedOrder {
+  id: string;
+  number: number;
+  point: Point;
+  /** Язык формы */
+  lang: "ro" | "ru";
+  name: string;
+  phone: string;
+  address: string | null;
+  lines: ReceiptLine[];
+  total: number;
+  createdAt: string;
+}
+
 export interface SubmitContext {
   now: Date;
   /** IP клиента — только из надёжного источника (cf-connecting-ip); null — не знаем */
   ip: string | null;
   store: OrderStore;
   log: (message: string, data: Record<string, unknown>) => void;
+  /** Секрет для ip_hash (ORDER_HASH_SECRET); нет — SHA-256 и предупреждение */
+  hashSecret?: string;
+  /** Заказ записан — отправить в Telegram (после ответа клиенту) */
+  onAccepted?: (order: AcceptedOrder) => void;
   /** Подмена в тестах (точка на паузе) */
   getPoint?: (id: string) => Point | undefined;
 }
@@ -163,46 +175,25 @@ export async function submitOrder(
     createdAt,
   });
 
-  const since = (windowMs: number) => new Date(ctx.now.getTime() - windowMs);
   const dedupHash = await sha256Hex(
     `${input.phone}|${fingerprint(point.id, input.lines)}`,
   );
-  const ipHash = ctx.ip === null ? null : await sha256Hex(ctx.ip);
+  const ipHash =
+    ctx.ip === null
+      ? null
+      : await hashIp(ctx.ip, ctx.hashSecret, (message) =>
+          ctx.log("warning", { message }),
+        );
+  const address = input.address === "" ? null : input.address;
 
   try {
-    // Тот же телефон и тот же состав за 2 минуты — вернуть записанный заказ
-    const recent = await ctx.store.findRecent(dedupHash, since(DEDUP_MS));
-    if (recent) {
-      const stored = StoredLinesSchema.safeParse(recent.items);
-      return {
-        ok: true,
-        receipt: receipt(
-          recent.number,
-          recent.createdAt,
-          stored.success
-            ? { lines: stored.data, total: recent.total }
-            : { lines, total },
-        ),
-      };
-    }
-
-    const byPhone = await ctx.store.countByPhone(
-      input.phone,
-      since(PHONE_LIMIT.windowMs),
-    );
-    if (byPhone >= PHONE_LIMIT.max) return { ok: false, code: "rate_limited" };
-    if (ipHash !== null) {
-      const byIp = await ctx.store.countByIp(ipHash, since(IP_LIMIT.windowMs));
-      if (byIp >= IP_LIMIT.max) return { ok: false, code: "rate_limited" };
-    }
-
-    const inserted = await ctx.store.insert({
+    const placed = await ctx.store.place({
       pointId: point.id,
       city: point.citySlug,
-      lang: point.locale,
+      lang: input.lang,
       name: input.name,
       phone: input.phone,
-      address: input.address === "" ? null : input.address,
+      address,
       items: lines,
       total,
       ipHash,
@@ -210,21 +201,51 @@ export async function submitOrder(
       createdAt: ctx.now,
     });
 
-    // TODO (следующая задача): сообщение в Telegram точке, telegram_message_id
-    // в строку заказа. Имя и адрес экранировать (parse_mode HTML). Заказ из
-    // базы не отдавать по одному номеру без проверки: номера сквозные.
+    if (placed.outcome === "limited") {
+      return { ok: false, code: "rate_limited" };
+    }
+
+    if (placed.outcome === "duplicate") {
+      // Тот же телефон и состав за 2 минуты — вернуть записанный заказ
+      const stored = StoredLinesSchema.safeParse(placed.order.items);
+      return {
+        ok: true,
+        receipt: receipt(
+          placed.order.number,
+          placed.order.createdAt,
+          stored.success
+            ? { lines: stored.data, total: placed.order.total }
+            : { lines, total },
+        ),
+      };
+    }
+
+    const order = placed.order;
     ctx.log("order accepted", {
-      number: inserted.number,
+      number: order.number,
       point: point.id,
       total,
       lines: lines.length,
       phone: maskPhone(input.phone),
-      address: input.address !== "",
+      address: address !== null,
+    });
+
+    ctx.onAccepted?.({
+      id: order.id,
+      number: order.number,
+      point,
+      lang: input.lang,
+      name: input.name,
+      phone: input.phone,
+      address,
+      lines,
+      total,
+      createdAt: order.createdAt,
     });
 
     return {
       ok: true,
-      receipt: receipt(inserted.number, inserted.createdAt, { lines, total }),
+      receipt: receipt(order.number, order.createdAt, { lines, total }),
     };
   } catch (error) {
     // Клиенту — «попробуй ещё раз»; в лог — причина, без данных заказа

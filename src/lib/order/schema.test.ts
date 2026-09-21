@@ -16,9 +16,22 @@ const valid = {
   phone: "067 578 757",
   address: "",
   website: "",
+  lang: "ro",
 };
 
 describe("вход заказа (zod)", () => {
+  it("lang — только ro или ru", () => {
+    expect(OrderInputSchema.safeParse({ ...valid, lang: "ru" }).success).toBe(
+      true,
+    );
+    expect(OrderInputSchema.safeParse({ ...valid, lang: "en" }).success).toBe(
+      false,
+    );
+    const { lang: _lang, ...withoutLang } = valid;
+    void _lang;
+    expect(OrderInputSchema.safeParse(withoutLang).success).toBe(false);
+  });
+
   it("нормализует имя и телефон, адрес необязателен", () => {
     const r = OrderInputSchema.safeParse(valid);
     expect(r.success).toBe(true);

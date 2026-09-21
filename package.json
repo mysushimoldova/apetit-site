@@ -14,7 +14,9 @@
     "screens": "playwright test -c playwright.screenshots.config.ts",
     "images": "py -3 scripts/prepare-images.py",
     "test:py": "py -3 -m unittest scripts/test_prepare_images.py",
-    "test:e2e:prod": "playwright test -c playwright.prod.config.ts"
+    "test:e2e:prod": "playwright test -c playwright.prod.config.ts",
+    "telegram:dev": "node scripts/telegram-dev.mjs",
+    "telegram:setup": "node scripts/telegram-setup.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

@@ -1,43 +1,60 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPoint, type Point } from "@/data/points";
 import type { CartLine } from "@/lib/cart/lines";
-import { StoreError, type NewOrder, type OrderStore } from "./store";
+import {
+  DEDUP_MS,
+  IP_LIMIT,
+  PHONE_LIMIT,
+  StoreError,
+  type NewOrder,
+  type OrderStore,
+} from "./store";
 import { submitOrder, type SubmitContext } from "./submit";
 
 /**
- * Подмена базы: массив строк и те же четыре запроса, что делает настоящий
- * store (по dedup_hash, по телефону, по IP, вставка с номером из «sequence»).
+ * Подмена базы: массив строк и та же логика, что в функции place_order()
+ * (дубль по dedup_hash за окно → лимит по телефону → лимит по IP → вставка с
+ * номером из «sequence»). Атомарность проверяет интеграционный тест.
  */
-function createFakeStore(): OrderStore & {
-  rows: (NewOrder & { number: number })[];
-} {
-  const rows: (NewOrder & { number: number })[] = [];
+type Row = NewOrder & { id: string; number: number };
+function createFakeStore(): OrderStore & { rows: Row[] } {
+  const rows: Row[] = [];
   let next = 1001;
-  const after = (since: Date) => rows.filter((r) => r.createdAt > since);
+  const placed = (r: Row) => ({
+    id: r.id,
+    number: r.number,
+    items: JSON.parse(JSON.stringify(r.items)) as unknown,
+    total: r.total,
+    createdAt: r.createdAt.toISOString(),
+  });
   return {
     rows,
-    async findRecent(dedupHash, since) {
-      const hit = after(since)
-        .filter((r) => r.dedupHash === dedupHash)
+    async place(order) {
+      const now = order.createdAt.getTime();
+      const after = (ms: number) =>
+        rows.filter((r) => r.createdAt.getTime() > now - ms);
+      const dup = after(DEDUP_MS)
+        .filter((r) => r.dedupHash === order.dedupHash)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-      if (!hit) return null;
-      return {
-        number: hit.number,
-        items: JSON.parse(JSON.stringify(hit.items)),
-        total: hit.total,
-        createdAt: hit.createdAt.toISOString(),
+      if (dup) return { outcome: "duplicate", order: placed(dup) };
+      const byPhone = after(PHONE_LIMIT.windowMs).filter(
+        (r) => r.phone === order.phone,
+      ).length;
+      if (byPhone >= PHONE_LIMIT.max)
+        return { outcome: "limited", by: "phone" };
+      if (order.ipHash !== null) {
+        const byIp = after(IP_LIMIT.windowMs).filter(
+          (r) => r.ipHash === order.ipHash,
+        ).length;
+        if (byIp >= IP_LIMIT.max) return { outcome: "limited", by: "ip" };
+      }
+      const row: Row = {
+        ...order,
+        id: `00000000-0000-4000-8000-${String(next).padStart(12, "0")}`,
+        number: next++,
       };
-    },
-    async countByPhone(phone, since) {
-      return after(since).filter((r) => r.phone === phone).length;
-    },
-    async countByIp(ipHash, since) {
-      return after(since).filter((r) => r.ipHash === ipHash).length;
-    },
-    async insert(order) {
-      const number = next++;
-      rows.push({ ...order, number });
-      return { number, createdAt: order.createdAt.toISOString() };
+      rows.push(row);
+      return { outcome: "created", order: placed(row) };
     },
     async anonymizeOldOrders() {
       return 0;
@@ -71,6 +88,7 @@ const order = (over: Record<string, unknown> = {}) => ({
   phone: "067 111 222",
   address: "",
   website: "",
+  lang: "ro",
   ...over,
 });
 
@@ -134,6 +152,54 @@ describe("submitOrder — приём заказа", () => {
   it("без адреса и без IP — address null, ip_hash null", async () => {
     await submitOrder(order(), ctx);
     expect(store.rows[0]).toMatchObject({ address: null, ipHash: null });
+  });
+
+  it("lang — язык формы, не точки: Сороки на русском → ru", async () => {
+    await submitOrder(order({ lang: "ru" }), ctx);
+    expect(store.rows[0].lang).toBe("ru");
+    expect(await submitOrder(order({ lang: "en" }), ctx)).toEqual({
+      ok: false,
+      code: "rejected",
+    });
+  });
+
+  it("ip_hash — HMAC с секретом: другой секрет → другой хэш (без секрета — см. hash.test.ts)", async () => {
+    const withIp = { ...ctx, ip: "203.0.113.7" };
+    await submitOrder(order(), { ...withIp, hashSecret: "secret-a" });
+    await submitOrder(order({ phone: "067111333" }), {
+      ...withIp,
+      hashSecret: "secret-b",
+    });
+    expect(store.rows[0].ipHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(store.rows[0].ipHash).not.toBe(store.rows[1].ipHash);
+    expect(ctx.log).not.toHaveBeenCalledWith("warning", expect.anything());
+  });
+
+  it("onAccepted получает записанный заказ (id, номер, точку, контакты, состав)", async () => {
+    const onAccepted = vi.fn();
+    await submitOrder(order({ address: "Str. Independenței 1" }), {
+      ...ctx,
+      onAccepted,
+    });
+    expect(onAccepted).toHaveBeenCalledOnce();
+    expect(onAccepted.mock.calls[0][0]).toMatchObject({
+      id: store.rows[0].id,
+      number: 1001,
+      point: { id: "soroca-centru", locale: "ro" },
+      lang: "ro",
+      name: "Ion",
+      phone: "+37367111222",
+      address: "Str. Independenței 1",
+      total: 228,
+      createdAt: NOON.toISOString(),
+    });
+    // Повтор за 2 минуты — в Telegram второй раз не уходит
+    await submitOrder(order({ address: "Str. Independenței 1" }), {
+      ...ctx,
+      now: minutes(1),
+      onAccepted,
+    });
+    expect(onAccepted).toHaveBeenCalledOnce();
   });
 
   it("номера сквозные с 1001", async () => {
@@ -286,13 +352,13 @@ describe("submitOrder — приём заказа", () => {
   });
 
   it("база не ответила — db_error, в логе шаг и код, без данных заказа", async () => {
-    store.insert = async () => {
-      throw new StoreError("insert", "57P01", "terminating connection");
+    store.place = async () => {
+      throw new StoreError("place", "57P01", "terminating connection");
     };
     const r = await submitOrder(order(), ctx);
     expect(r).toEqual({ ok: false, code: "db_error" });
     expect(ctx.log).toHaveBeenCalledWith("db error", {
-      step: "insert",
+      step: "place",
       code: "57P01",
       message: "terminating connection",
     });
@@ -301,8 +367,8 @@ describe("submitOrder — приём заказа", () => {
     expect(logged).not.toContain("Ion");
   });
 
-  it("ошибка на проверке дубля (нет env, сеть) — тоже db_error, заказ не пишется", async () => {
-    store.findRecent = async () => {
+  it("любая другая ошибка базы (нет env, сеть) — тоже db_error, заказ не пишется", async () => {
+    store.place = async () => {
       throw new Error("fetch failed");
     };
     const r = await submitOrder(order(), ctx);

@@ -69,6 +69,8 @@ export const OrderInputSchema = z.strictObject({
   address: AddressSchema,
   /** Поле-ловушка для ботов (SPEC §9.4): человек его не видит и не заполняет. */
   website: z.string().max(500),
+  /** Язык, на котором посетитель оформлял (переключатель RO/RU) — для Telegram и писем */
+  lang: z.enum(["ro", "ru"]),
 });
 export type OrderInput = z.infer<typeof OrderInputSchema>;
 

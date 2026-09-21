@@ -124,8 +124,11 @@ def save_manifest(manifest: dict) -> None:
     manifest["pipeline"] = PIPELINE
     manifest["products"] = dict(sorted(manifest["products"].items()))
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    # newline: на Windows иначе выйдет CRLF, а репозиторий хранит LF
     MANIFEST.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", "utf-8"
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+        "utf-8",
+        newline="\n",
     )
 
 

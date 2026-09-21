@@ -1,4 +1,7 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 
 // Оформление заказа (SPEC §3 шаги 5–6). Профиль — телефон 390px.
 // Время: браузеру — page.clock, серверу — заголовок x-apetit-test-now
@@ -40,10 +43,33 @@ async function seedCart(page: Page, city: string, lines: Line[]) {
 }
 
 /** Новый номер на каждый запуск: лимит — 3 заказа с номера за 10 минут. */
+const usedPhones: string[] = [];
 function uniquePhone(): string {
   const digits = String(Math.floor(Math.random() * 1e6)).padStart(6, "0");
+  usedPhones.push(`+37369${digits}`); // как хранится в базе
   return `069${digits}`;
 }
+
+// Заказы этого прогона — удалить из настоящей базы (service-role из
+// .env.local). Только по своим телефонам и тестовому имени: настоящие
+// заказы не трогаем. Нет .env.local — нечего удалять (заказы не писались).
+test.afterAll(async () => {
+  const envFile = resolve(process.cwd(), ".env.local");
+  if (usedPhones.length === 0 || !existsSync(envFile)) return;
+  process.loadEnvFile(envFile);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  const db = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await db
+    .from("orders")
+    .delete()
+    .eq("name", "Ion Popescu")
+    .in("phone", usedPhones);
+  if (error) throw new Error(`cleanup: ${error.code} ${error.message}`);
+});
 
 async function fillForm(page: Page, phone = uniquePhone()) {
   await page.getByLabel("Nume").fill("Ion Popescu");

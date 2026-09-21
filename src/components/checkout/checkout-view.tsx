@@ -99,6 +99,8 @@ export function CheckoutView({
   const [unavailable, setUnavailable] = useState<number[]>([]);
   const [serverClosed, setServerClosed] = useState(false);
   const honeypot = useRef<HTMLInputElement>(null);
+  // Язык, на котором оформляли (RO/RU) — уходит с заказом для Telegram и писем
+  const langField = useRef<HTMLInputElement>(null);
 
   // Контакты с прошлого заказа: на сервере их нет (null), в браузере —
   // подставляем один раз; то, что человек уже начал вводить, не затираем
@@ -177,6 +179,7 @@ export function CheckoutView({
         phone: values.phone,
         address: values.address,
         website: honeypot.current?.value ?? "",
+        lang: langField.current?.value ?? locale,
       });
       if (result.ok) {
         saveReceipt(result.receipt);
@@ -320,6 +323,7 @@ export function CheckoutView({
               defaultValue=""
             />
           </div>
+          <input ref={langField} type="hidden" name="lang" value={locale} />
         </div>
 
         <section

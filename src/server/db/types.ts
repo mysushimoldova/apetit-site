@@ -1,4 +1,4 @@
-// Типы таблиц Supabase — вручную, по supabase/migrations/0001_orders.sql.
+// Типы таблиц Supabase — вручную, по supabase/migrations/000*.sql.
 // Кодогенерации нет (CLI Supabase не ставим): меняешь схему — меняй здесь.
 // type, а не interface: supabase-js требует Record<string, unknown>, а у
 // interface нет индексной сигнатуры.
@@ -33,6 +33,11 @@ export type OrderRow = {
   ip_hash: string | null;
   dedup_hash: string;
   telegram_message_id: number | null;
+  /** Сколько напоминаний «⏰ ждёт» уже отправлено (0002) */
+  reminders_sent: number;
+  last_reminder_at: string | null;
+  /** Почему заказ не ушёл в Telegram (null — ушёл или ещё не пробовали) */
+  telegram_error: string | null;
 };
 
 export type OrderInsert = {
@@ -52,6 +57,30 @@ export type OrderInsert = {
   ip_hash?: string | null;
   dedup_hash: string;
   telegram_message_id?: number | null;
+  reminders_sent?: number;
+  last_reminder_at?: string | null;
+  telegram_error?: string | null;
+};
+
+export type TelegramChatRow = {
+  point_id: string;
+  chat_id: number;
+  title: string | null;
+  linked_at: string;
+};
+
+export type OwnerChatRow = {
+  chat_id: number;
+  label: string | null;
+  linked_at: string;
+};
+
+export type TelegramCodeRow = {
+  code: string;
+  kind: "point" | "owner";
+  point_id: string | null;
+  label: string;
+  created_at: string;
 };
 
 export type SettingRow = {
@@ -75,11 +104,73 @@ export type Database = {
         Update: { key?: string; value?: Json; updated_at?: string };
         Relationships: [];
       };
+      telegram_chats: {
+        Row: TelegramChatRow;
+        Insert: {
+          point_id: string;
+          chat_id: number;
+          title?: string | null;
+          linked_at?: string;
+        };
+        Update: Partial<TelegramChatRow>;
+        Relationships: [];
+      };
+      owner_chats: {
+        Row: OwnerChatRow;
+        Insert: { chat_id: number; label?: string | null; linked_at?: string };
+        Update: Partial<OwnerChatRow>;
+        Relationships: [];
+      };
+      telegram_codes: {
+        Row: TelegramCodeRow;
+        Insert: {
+          code: string;
+          kind: "point" | "owner";
+          point_id?: string | null;
+          label: string;
+          created_at?: string;
+        };
+        Update: Partial<TelegramCodeRow>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
       /** Заказам старше 365 дней стирает имя, телефон, адрес; возвращает число строк */
       anonymize_old_orders: { Args: Record<string, never>; Returns: number };
+      /** Дубль → лимиты → INSERT в одной транзакции; jsonb с outcome (0002) */
+      place_order: {
+        Args: {
+          p_point_id: string;
+          p_city: string;
+          p_lang: string;
+          p_name: string;
+          p_phone: string;
+          p_address: string | null;
+          p_items: Json;
+          p_total: number;
+          p_ip_hash: string | null;
+          p_dedup_hash: string;
+          p_now: string;
+          p_dedup_seconds: number;
+          p_phone_limit: number;
+          p_phone_window_seconds: number;
+          p_ip_limit: number;
+          p_ip_window_seconds: number;
+        };
+        Returns: Json;
+      };
+      /** Заказы, которым пора напомнить; счётчик поднят тем же UPDATE */
+      claim_due_reminders: {
+        Args: {
+          p_now: string;
+          p_interval_seconds: number;
+          p_max: number;
+          /** Только для тестов: свои заказы; сайт передаёт null */
+          p_point_id?: string | null;
+        };
+        Returns: Json[];
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

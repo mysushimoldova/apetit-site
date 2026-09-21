@@ -1,9 +1,12 @@
 // Хранилище заказов (SPEC §9.3, §9.4) — таблица orders в Supabase.
-// Здесь только запросы к базе; решения (лимит превышен, вернуть прежний
-// номер) принимает submit.ts. В unit-тестах вместо этого — fake store.
+// Приём заказа — одна функция базы place_order(): дубль, лимиты и INSERT в
+// одной транзакции с блокировкой по телефону и IP (залп запросов лимит не
+// пробьёт). Здесь только вызовы базы; решения по outcome — в submit.ts.
+// В unit-тестах вместо этого — fake store.
 import type { ReceiptLine } from "@/lib/order/receipt";
 import type { DbClient } from "@/server/db/supabase";
 import type { Json } from "@/server/db/types";
+import { z } from "@/lib/zod";
 
 export const PHONE_LIMIT = { max: 3, windowMs: 10 * 60_000 };
 export const IP_LIMIT = { max: 10, windowMs: 10 * 60_000 };
@@ -12,6 +15,7 @@ export const DEDUP_MS = 2 * 60_000;
 export interface NewOrder {
   pointId: string;
   city: string;
+  /** Язык формы (ro/ru) */
   lang: string;
   name: string;
   /** Нормализованный: +373XXXXXXXX */
@@ -24,7 +28,8 @@ export interface NewOrder {
   createdAt: Date;
 }
 
-export interface StoredOrder {
+export interface PlacedOrder {
+  id: string;
   number: number;
   /** Снимок позиций как лежит в базе — проверяется схемой при чтении */
   items: unknown;
@@ -32,14 +37,15 @@ export interface StoredOrder {
   createdAt: string;
 }
 
+export type PlaceOutcome =
+  | { outcome: "created"; order: PlacedOrder }
+  /** Тот же телефон и состав за 2 минуты — записанный ранее заказ */
+  | { outcome: "duplicate"; order: PlacedOrder }
+  | { outcome: "limited"; by: "phone" | "ip" };
+
 export interface OrderStore {
-  /** Самый свежий заказ с тем же dedup_hash не старше since (дубль за 2 мин) */
-  findRecent(dedupHash: string, since: Date): Promise<StoredOrder | null>;
-  /** Сколько заказов с номера / с IP не старше since (лимиты) */
-  countByPhone(phone: string, since: Date): Promise<number>;
-  countByIp(ipHash: string, since: Date): Promise<number>;
-  /** Один INSERT; номер выдаёт sequence базы */
-  insert(order: NewOrder): Promise<{ number: number; createdAt: string }>;
+  /** Дубль → лимиты → INSERT одной транзакцией; номер выдаёт sequence базы */
+  place(order: NewOrder): Promise<PlaceOutcome>;
   /** anonymize_old_orders() — сколько заказов старше года обезличено */
   anonymizeOldOrders(): Promise<number>;
 }
@@ -56,9 +62,26 @@ export class StoreError extends Error {
   }
 }
 
-function fail(step: string, error: { code?: string; message: string }): never {
+export function fail(
+  step: string,
+  error: { code?: string; message: string },
+): never {
   throw new StoreError(step, error.code ?? "", error.message);
 }
+
+const PlacedSchema = z.object({
+  id: z.string().uuid(),
+  number: z.number().int().positive(),
+  items: z.unknown(),
+  total: z.number().int().nonnegative(),
+  created_at: z.string(),
+});
+
+const OutcomeSchema = z.discriminatedUnion("outcome", [
+  PlacedSchema.extend({ outcome: z.literal("created") }),
+  PlacedSchema.extend({ outcome: z.literal("duplicate") }),
+  z.object({ outcome: z.literal("limited"), by: z.enum(["phone", "ip"]) }),
+]);
 
 /**
  * Клиент берётся функцией, а не значением: если env не задан, ошибка
@@ -66,66 +89,46 @@ function fail(step: string, error: { code?: string; message: string }): never {
  */
 export function createSupabaseOrderStore(getDb: () => DbClient): OrderStore {
   return {
-    async findRecent(dedupHash, since) {
-      const { data, error } = await getDb()
-        .from("orders")
-        .select("number, items, total, created_at")
-        .eq("dedup_hash", dedupHash)
-        .gt("created_at", since.toISOString())
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) fail("findRecent", error);
-      if (!data) return null;
+    async place(order) {
+      const { data, error } = await getDb().rpc("place_order", {
+        p_point_id: order.pointId,
+        p_city: order.city,
+        p_lang: order.lang,
+        p_name: order.name,
+        p_phone: order.phone,
+        p_address: order.address,
+        // ReceiptLine — обычный JSON (строки, числа, null, массивы)
+        p_items: order.items as unknown as Json,
+        p_total: order.total,
+        p_ip_hash: order.ipHash,
+        p_dedup_hash: order.dedupHash,
+        p_now: order.createdAt.toISOString(),
+        p_dedup_seconds: DEDUP_MS / 1000,
+        p_phone_limit: PHONE_LIMIT.max,
+        p_phone_window_seconds: PHONE_LIMIT.windowMs / 1000,
+        p_ip_limit: IP_LIMIT.max,
+        p_ip_window_seconds: IP_LIMIT.windowMs / 1000,
+      });
+      if (error) fail("place", error);
+      const parsed = OutcomeSchema.safeParse(data);
+      if (!parsed.success) {
+        fail("place", {
+          code: "bad_result",
+          message: "place_order: unexpected result",
+        });
+      }
+      const r = parsed.data;
+      if (r.outcome === "limited") return { outcome: "limited", by: r.by };
       return {
-        number: data.number,
-        items: data.items,
-        total: data.total,
-        createdAt: data.created_at,
+        outcome: r.outcome,
+        order: {
+          id: r.id,
+          number: r.number,
+          items: r.items,
+          total: r.total,
+          createdAt: r.created_at,
+        },
       };
-    },
-
-    async countByPhone(phone, since) {
-      const { count, error } = await getDb()
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("phone", phone)
-        .gt("created_at", since.toISOString());
-      if (error) fail("countByPhone", error);
-      return count ?? 0;
-    },
-
-    async countByIp(ipHash, since) {
-      const { count, error } = await getDb()
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("ip_hash", ipHash)
-        .gt("created_at", since.toISOString());
-      if (error) fail("countByIp", error);
-      return count ?? 0;
-    },
-
-    async insert(order) {
-      const { data, error } = await getDb()
-        .from("orders")
-        .insert({
-          point_id: order.pointId,
-          city: order.city,
-          lang: order.lang,
-          name: order.name,
-          phone: order.phone,
-          address: order.address,
-          // ReceiptLine — обычный JSON (строки, числа, null, массивы)
-          items: order.items as unknown as Json,
-          total: order.total,
-          ip_hash: order.ipHash,
-          dedup_hash: order.dedupHash,
-          created_at: order.createdAt.toISOString(),
-        })
-        .select("number, created_at")
-        .single();
-      if (error) fail("insert", error);
-      return { number: data.number, createdAt: data.created_at };
     },
 
     async anonymizeOldOrders() {
