@@ -27,6 +27,16 @@ const frameStats = (frame: Frame): Promise<Stats | null> =>
 
 /** Страница меню внутри рамки, с уже работающим движком. */
 async function preview(page: Page): Promise<Frame> {
+  // Первый заход — прогрев. На холодном dev-сервере Next собирает /dev/motion
+  // и меню секундами; движок за это время намеряет «мало кадров» и уходит в
+  // стоп, а уровень запоминается в sessionStorage — и на проверке running
+  // тест падал (аудит Т3). Поэтому: дождаться сборки, стереть запомненный
+  // уровень и открыть панель заново, уже по готовому.
+  await page.goto("/dev/motion");
+  const warm = page.frameLocator('iframe[title="Меню Сорок"]');
+  await warm.locator("canvas.motion-canvas").waitFor({ state: "attached" });
+  await page.evaluate(() => sessionStorage.clear());
+
   await page.goto("/dev/motion");
   const frame = page.frameLocator('iframe[title="Меню Сорок"]');
   await frame.locator("canvas.motion-canvas[data-ready]").waitFor({
