@@ -75,7 +75,7 @@ describe("юниформы слоя фона", () => {
     ]);
     expect(
       contoursUniforms({ ...settings, color: "smoke" }, frame).rgb,
-    ).toEqual([0x7a / 255, 0x71 / 255, 0x6a / 255]);
+    ).toEqual([0x6b / 255, 0x62 / 255, 0x5b / 255]);
     expect(contoursUniforms({ ...settings, color: "sand" }, frame).rgb).toEqual(
       [0xea / 255, 0xe2 / 255, 0xd5 / 255],
     );
@@ -94,6 +94,15 @@ describe("шейдеры: WebGL2 и запасной WebGL1", () => {
     const count = (source: string) => source.split("v += W(p,").length - 1;
     expect(count(FRAGMENT_300)).toBe(10);
     expect(count(FRAGMENT_100)).toBe(10);
+  });
+
+  it("цвет домножен на альфу — иначе Safari на iOS рисует линии белыми", () => {
+    for (const source of [FRAGMENT_300, FRAGMENT_100]) {
+      expect(source).toContain("float a = line * uA;");
+      expect(source).toContain("vec4(uC * a, a)");
+      // Недомноженного вида остаться не должно
+      expect(source).not.toContain("vec4(uC, line * uA)");
+    }
   });
 
   it("одинаковые юниформы под одинаковыми именами", () => {

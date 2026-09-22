@@ -2,12 +2,19 @@
 // Ничего про конкретные эффекты — это дело слоёв (src/motion/layers).
 import type { GL } from "./types";
 
-/** Настройки контекста: прозрачный холст, цвета НЕ домножены на альфу
- *  (иначе линии с opacity 0.45 потемнеют), сглаживание не нужно —
- *  края линий даёт сам шейдер. */
-const CONTEXT_ATTRS: WebGLContextAttributes = {
+/** Настройки контекста: прозрачный холст, цвета домножены на альфу,
+ *  сглаживание не нужно — края линий даёт сам шейдер.
+ *
+ *  Почему premultipliedAlpha: true. Safari на iOS складывает холст со
+ *  страницей ТОЛЬКО как premultiplied, что бы здесь ни стояло. При
+ *  premultipliedAlpha: false он всё равно считал наш цвет уже домноженным,
+ *  и полупрозрачная линия выходила светлее фона — на iPhone линии были
+ *  белыми вместо серых. Поэтому домножаем сами: шейдер отдаёт
+ *  vec4(uC * a, a), режим смешивания — ONE / ONE_MINUS_SRC_ALPHA
+ *  (src/motion/layers/contours.ts). */
+export const CONTEXT_ATTRS: WebGLContextAttributes = {
   alpha: true,
-  premultipliedAlpha: false,
+  premultipliedAlpha: true,
   antialias: false,
   depth: false,
   stencil: false,

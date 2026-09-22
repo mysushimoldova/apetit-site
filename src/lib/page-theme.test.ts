@@ -11,10 +11,11 @@ describe("цвет фона страницы", () => {
     });
   });
 
-  it("вариант A даёт ровно то, что было в globals.css до задачи", () => {
-    const vars = pageThemeVars("#FAF7F2");
-    expect(vars["--glass-bg"]).toBe("rgba(250, 247, 242, 0.78)");
-    expect(vars["--glass-bg-fallback"]).toBe("rgba(250, 247, 242, 0.96)");
+  it("вариант B — основной кремовый, он же по умолчанию в globals.css", () => {
+    const vars = pageThemeVars("#F7F2EA");
+    expect(vars["--color-cream"]).toBe("#F7F2EA");
+    expect(vars["--glass-bg"]).toBe("rgba(247, 242, 234, 0.78)");
+    expect(vars["--glass-bg-fallback"]).toBe("rgba(247, 242, 234, 0.96)");
   });
 
   it("все четыре варианта разбираются", () => {

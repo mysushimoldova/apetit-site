@@ -8,8 +8,8 @@ const css = readFileSync(
 ).toLowerCase();
 
 describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
-  it("цвета: Cream #FAF7F2, Milk #FFFDFA, жёлтый и тёплый чёрный", () => {
-    expect(css).toContain("--color-cream: #faf7f2");
+  it("цвета: Cream #F7F2EA, Milk #FFFDFA, жёлтый и тёплый чёрный", () => {
+    expect(css).toContain("--color-cream: #f7f2ea");
     expect(css).toContain("--color-milk: #fffdfa");
     expect(css).toContain("--color-yellow: #ffbc0d");
     expect(css).toContain("--color-ink: #1a1714");
@@ -50,10 +50,10 @@ describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
     expect(css).not.toContain("peach");
   });
 
-  it("стекло по 2.1: rgba(250,247,242,.78), blur 16px saturate 130%", () => {
-    expect(css).toContain("rgba(250, 247, 242, 0.78)");
+  it("стекло по 2.1: rgba(247,242,234,.78), blur 16px saturate 130%", () => {
+    expect(css).toContain("rgba(247, 242, 234, 0.78)");
     expect(css).toContain("blur(16px) saturate(130%)");
-    expect(css).toContain("rgba(250, 247, 242, 0.96)");
+    expect(css).toContain("rgba(247, 242, 234, 0.96)");
   });
 
   it("шкала текста: billboard есть, category нет, caption заглавными +0.08em", () => {

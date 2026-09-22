@@ -22,9 +22,9 @@ function asColor(value: string): ContourColor {
 // Список здесь повторён числами, а не взят из схемы: config-schema.ts тянет
 // за собой zod, а этот модуль попадает в браузер (см. комментарий там).
 function asPageBackground(value: string): PageBackground {
-  return value === "#F7F2EA" || value === "#F4EDE2" || value === "#F1E9DB"
+  return value === "#FAF7F2" || value === "#F4EDE2" || value === "#F1E9DB"
     ? value
-    : "#FAF7F2";
+    : "#F7F2EA";
 }
 
 const background: BackgroundSettings = {

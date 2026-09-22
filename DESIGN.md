@@ -28,14 +28,14 @@ Apetit — фастфуд, и еда должна выглядеть так, ч�
 
 | Name | Value | Token | Role |
 |------|-------|-------|------|
-| Cream | `#FAF7F2` | `--color-cream` | Фон всего сайта. Тёплый белый: крем, но ближе к белому. Значение НЕ в CSS: выбирается в панели `/dev/motion` и лежит в `src/config/motion.json` → `page.background`; четыре варианта — A `#FAF7F2`, B `#F7F2EA`, C `#F4EDE2`, D `#F1E9DB` (скриншоты docs/screens/09-fon-*-390.png). Фон не меняется ни в одной секции — нет тёмных полос, нет цветных блоков |
+| Cream | `#F7F2EA` | `--color-cream` | Основной кремовый: фон всего сайта. Тёплый, не белый — `#FAF7F2` на телефоне читался как белый. Значение НЕ в CSS: выбирается в панели `/dev/motion` и лежит в `src/config/motion.json` → `page.background`; четыре варианта — A `#FAF7F2`, **B `#F7F2EA` (основной)**, C `#F4EDE2`, D `#F1E9DB` (скриншоты docs/screens/09-fon-*-390.png). Фон не меняется ни в одной секции — нет тёмных полос, нет цветных блоков |
 | Milk | `#FFFDFA` | `--color-milk` | Только поверхности, которые лежат НАД страницей: лист блюда, инпуты, карточка точки, подтверждение заказа |
 | Sand | `#EAE2D5` | `--color-sand` | Фон выключенных элементов, плитка-заглушка без фото |
 | Yellow | `#FFBC0D` | `--color-yellow` | ЕДИНСТВЕННЫЙ цветной акцент: цена, кнопка «+», Primary-кнопка, активный размер. Только заливка, никогда текст |
 | Yellow Deep | `#E9A800` | `--color-yellow-deep` | Нажатое состояние жёлтого |
 | Ink | `#1A1714` | `--color-ink` | Текст, линии-рамки, разделители, активный чип, рисованные иконки. Тёплый чёрный из меню |
 | Charcoal | `#3D3733` | `--color-charcoal` | Второстепенный текст, состав |
-| Smoke | `#7A716A` | `--color-smoke` | Граммы, подписи, плейсхолдеры |
+| Smoke | `#6B625B` | `--color-smoke` | Граммы, подписи, плейсхолдеры. Затемнён с `#7A716A` (решение архитектора 22.09.2026): на любом из четырёх фонов даёт контраст ≥ 4.9 — норма WCAG AA выполняется |
 | Ash | `#A79E95` | `--color-ash` | Подвал, самый тихий текст |
 | Open | `#2F8F5B` | `--color-open` | Только точка-индикатор «открыто» |
 | Closed | `#C9473A` | `--color-closed` | Только «закрыто» и ошибки формы |
@@ -123,13 +123,13 @@ Apetit — фастфуд, и еда должна выглядеть так, ч�
 ### Glass (ровно три места: шапка, корзина снизу, оверлей смены города)
 
 ```
-background: rgba(250, 247, 242, 0.78);
+background: rgba(247, 242, 234, 0.78);
 backdrop-filter: blur(16px) saturate(130%);
 -webkit-backdrop-filter: blur(16px) saturate(130%);
 border-bottom: 1px solid #1A1714;   /* шапка: линия, не тень */
 ```
-Fallback: `background: rgba(250,247,242,0.96)`. Нигде больше.
-Цифры в примере — для фона A. На деле цвет берётся из фона страницы:
+Fallback: `background: rgba(247,242,234,0.96)`. Нигде больше.
+Цифры в примере — для основного фона B. На деле цвет берётся из фона страницы:
 переменные `--glass-bg` и `--glass-bg-fallback` ставит корневой layout
 (см. Surfaces), поэтому при смене фона шапка и корзина меняются вместе с ним.
 
@@ -153,7 +153,7 @@ Fallback: `background: rgba(250,247,242,0.96)`. Нигде больше.
 | `speed` | 0.35 | скорость жизни линий |
 | `parallax` | 1.2 | сдвиг при прокрутке, доля от прокрутки |
 | `ease` | 0.1 | инертность общего сглаживания прокрутки |
-| `color` | `ash` | Ash `#A79E95` · Smoke `#7A716A` · Sand `#EAE2D5` |
+| `color` | `ash` | Ash `#A79E95` · Smoke `#6B625B` · Sand `#EAE2D5` |
 
 - **Масштаб от ширины экрана.** Размер клетки узора не в CSS-пикселях, а
   долей экрана: `uScale = ширина холста в пикселях экрана / tilesAcross`,
@@ -165,6 +165,12 @@ Fallback: `background: rgba(250,247,242,0.96)`. Нигде больше.
   зависит — она берётся из производной поля (`fwidth`).
 - **Цвет фона под линиями** — `page.background` из того же файла (см.
   Surfaces).
+- **Смешивание — premultiplied alpha.** Шейдер отдаёт цвет, уже домноженный
+  на прозрачность (`vec4(uC * a, a)`), холст создаётся с
+  `premultipliedAlpha: true`, режим смешивания — `ONE / ONE_MINUS_SRC_ALPHA`.
+  Иначе Safari на iPhone складывает холст со страницей по-своему и линии
+  выходят белыми, а не серыми. Менять этот набор нельзя по частям — только
+  все три вместе.
 - **Слой:** экран городов, меню, оформление, правовые страницы. Холст
   `position: fixed`, под всем контентом (z-index −1), `pointer-events: none`,
   высотой `100lvh` (при прятанье адресной строки размер не меняется и рисунок
@@ -394,7 +400,7 @@ Cream фон, круг 96px Yellow с галочкой Ink, номер зака�
 
 | Level | Name | Value | Purpose |
 |-------|------|-------|---------|
-| 0 | Cream | из `motion.json` → `page.background` (сейчас `#FAF7F2`) | Фон всего сайта, всех секций |
+| 0 | Cream | из `motion.json` → `page.background` (сейчас `#F7F2EA`) | Фон всего сайта, всех секций |
 | 1 | Milk | `#FFFDFA` | Лист блюда, инпуты, карточка точки, промо, подтверждение |
 | 2 | Glass | Cream с прозрачностью .78 + blur 16px | Шапка, корзина, оверлей города |
 | 3 | Ink | `#1A1714` | Активный чип, нажатая плитка города, бейдж, Secondary hover |
@@ -429,8 +435,8 @@ Ink; никаких перекрасок в жёлтый.
 ## Agent Prompt Guide
 
 **Quick Reference**
-- canvas: #FAF7F2 everywhere · raised surfaces only: #FFFDFA
-- text: #1A1714 · #3D3733 · #7A716A · #A79E95
+- canvas: #F7F2EA everywhere · raised surfaces only: #FFFDFA
+- text: #1A1714 · #3D3733 · #6B625B · #A79E95
 - lines: 1px solid #1A1714 (rule) · 1px dotted rgba(26,23,20,.45) · 1px #EAE2D5 (hairline)
 - action & price: #FFBC0D fill + #1A1714 text · pressed #E9A800
 - status: #2F8F5B open · #C9473A closed/error
@@ -443,12 +449,19 @@ Ink; никаких перекрасок в жёлтый.
 
 **Example Component Prompts**
 1. Category section: dotted rule `1px dotted rgba(26,23,20,.45)`, 48px gap, then the word "KEBAB" in Oswald 600 uppercase, sized to fit the content width on one line (max 180px), line-height .9, transparent fill with 2px #1A1714 text-stroke, left-aligned full width. Below it a 2-column grid (16px/32px gaps) whose first row overlaps the word by −0.22em; tiles have no background.
-2. Product tile: no surface. Food cutout 150px tall centered with a radial puddle shadow beneath (`radial-gradient(ellipse, rgba(26,23,20,.13), transparent 70%)`, 64% width × 10px). Title Manrope 700 17px #1A1714 max 2 lines. Ingredients Montserrat 12px #3D3733, 2 lines clamp. Meta "290 g" Montserrat 13px #7A716A. Row: price pill (#FFBC0D fill, #1A1714 text, Manrope 700 15px, 28px tall, 9999px) left; 32px #FFBC0D circle with "+" right.
-3. City screen: canvas #FAF7F2, no header/footer. Six tiles stacked, 12px gap, 16px side padding: transparent fill, 1px solid #1A1714 border, 16px radius, 88px tall, city name Oswald 600 44px uppercase #1A1714 centered. Pressed: #1A1714 fill, #FAF7F2 text. Tiles enter from y 24→0 with 60ms stagger.
-4. Category chip: 32px tall pill, transparent, 1px solid #1A1714, hand-drawn 16px single-line icon + label Manrope 600 13px, padding 0 12px 0 9px, 8px gap. Active: #1A1714 fill, #FAF7F2 icon and text. Row sticky under the 56px glass header.
-5. Cart bar: fixed bottom, 72px, glass `rgba(250,247,242,.78)` blur 16px, top border 1px solid #1A1714. Left Lucide cart 24px #1A1714 with #1A1714 badge and #FAF7F2 count; center "3 poziții" Montserrat 15px; right Primary pill #FFBC0D "Coș · 250 lei" Manrope 700 15px, 52px tall.
+2. Product tile: no surface. Food cutout 150px tall centered with a radial puddle shadow beneath (`radial-gradient(ellipse, rgba(26,23,20,.13), transparent 70%)`, 64% width × 10px). Title Manrope 700 17px #1A1714 max 2 lines. Ingredients Montserrat 12px #3D3733, 2 lines clamp. Meta "290 g" Montserrat 13px #6B625B. Row: price pill (#FFBC0D fill, #1A1714 text, Manrope 700 15px, 28px tall, 9999px) left; 32px #FFBC0D circle with "+" right.
+3. City screen: canvas #F7F2EA, no header/footer. Six tiles stacked, 12px gap, 16px side padding: transparent fill, 1px solid #1A1714 border, 16px radius, 88px tall, city name Oswald 600 44px uppercase #1A1714 centered. Pressed: #1A1714 fill, #F7F2EA text. Tiles enter from y 24→0 with 60ms stagger.
+4. Category chip: 32px tall pill, transparent, 1px solid #1A1714, hand-drawn 16px single-line icon + label Manrope 600 13px, padding 0 12px 0 9px, 8px gap. Active: #1A1714 fill, #F7F2EA icon and text. Row sticky under the 56px glass header.
+5. Cart bar: fixed bottom, 72px, glass `rgba(247,242,234,.78)` blur 16px, top border 1px solid #1A1714. Left Lucide cart 24px #1A1714 with #1A1714 badge and #F7F2EA count; center "3 poziții" Montserrat 15px; right Primary pill #FFBC0D "Coș · 250 lei" Manrope 700 15px, 52px tall.
 
 ## Журнал изменений
+
+- **2.6 · 22.09.2026** — основной кремовый теплее: `#F7F2EA` (вариант B)
+  вместо `#FAF7F2` — на телефоне прежний читался как белый. Переключатель
+  четырёх вариантов в `/dev/motion` остался. Smoke затемнён до `#6B625B`:
+  теперь граммы и подписи проходят норму контраста на всех четырёх фонах.
+  Линии фона рисуются с домноженной альфой (premultiplied) — на iPhone они
+  были белыми вместо серых.
 
 - **2.5 · 22.09.2026** — фон одинаков на телефоне и компьютере: масштаб
   рисунка считается от ширины экрана (`tilesAcross` вместо `scale`). Цвет

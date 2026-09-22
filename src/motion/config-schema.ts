@@ -11,7 +11,7 @@ import { z } from "@/lib/zod";
 /** Цвета линий фона (DESIGN.md → Tokens — Colors). */
 export const CONTOUR_COLORS = {
   ash: "#A79E95",
-  smoke: "#7A716A",
+  smoke: "#6B625B",
   sand: "#EAE2D5",
 } as const;
 

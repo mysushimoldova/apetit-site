@@ -13,7 +13,7 @@ import type { Frame, GL, Layer } from "../types";
  *  (там zod, он в браузер не идёт; здесь — только числа). */
 const RGB: Record<ContourColor, [number, number, number]> = {
   ash: [0xa7 / 255, 0x9e / 255, 0x95 / 255],
-  smoke: [0x7a / 255, 0x71 / 255, 0x6a / 255],
+  smoke: [0x6b / 255, 0x62 / 255, 0x5b / 255],
   sand: [0xea / 255, 0xe2 / 255, 0xd5 / 255],
 };
 
@@ -45,6 +45,12 @@ const LINE = `
   float w = fwidth(v);
   float line = 1.0 - smoothstep(0.0, uW * w, g);`;
 
+/** Альфа линии и цвет, домноженный на неё (premultiplied alpha).
+ *  Так требует Safari на iOS: он складывает холст со страницей только
+ *  этим способом, иначе линии выходят белыми вместо серых.
+ *  Подробности — в комментарии к CONTEXT_ATTRS в src/motion/gl.ts. */
+const PREMULTIPLIED = `float a = line * uA;`;
+
 const UNIFORMS = `
 uniform float uT, uScale, uW, uA, uSpeed;
 uniform vec2 uOff;
@@ -59,7 +65,8 @@ precision highp float;${UNIFORMS}
 out vec4 o;
 ${FIELD}
 void main(){${LINE}
-  o = vec4(uC, line * uA);
+  ${PREMULTIPLIED}
+  o = vec4(uC * a, a);
 }`;
 
 /** Запасной WebGL1 (GLSL ES 1.00): та же формула, старый синтаксис.
@@ -70,7 +77,8 @@ export const FRAGMENT_100 = `#extension GL_OES_standard_derivatives : enable
 precision highp float;${UNIFORMS}
 ${FIELD}
 void main(){${LINE}
-  gl_FragColor = vec4(uC, line * uA);
+  ${PREMULTIPLIED}
+  gl_FragColor = vec4(uC * a, a);
 }`;
 
 /** Юниформы кадра — чистый расчёт, проверяется тестом.
@@ -151,9 +159,11 @@ export function createContoursLayer(
       gl.uniform1f(u.uSpeed, v.speed);
       gl.uniform2f(u.uOff, 0, v.offY);
       gl.uniform3f(u.uC, v.rgb[0], v.rgb[1], v.rgb[2]);
-      // Линии кладутся на кремовый фон страницы обычной прозрачностью
+      // Линии кладутся на кремовый фон страницы. Цвет из шейдера уже
+      // домножен на альфу (см. PREMULTIPLIED выше и комментарий в gl.ts),
+      // поэтому источник берётся как есть: ONE, а не SRC_ALPHA.
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
 

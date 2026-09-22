@@ -158,11 +158,69 @@ describe("блюда (SPEC приложение А)", () => {
     }
   });
 
-  it("названия блюд в русской версии — как в румынской, без кириллицы", () => {
-    for (const p of PRODUCTS) {
-      expect(p.name.ru, p.slug).toBe(p.name.ro);
-      expect(p.name.ru, p.slug).not.toMatch(/[а-яё]/i);
+  // Уточнение архитектора 22.09.2026: латиницей остаются ФИРМЕННЫЕ названия,
+  // обычные блюда и напитки переводятся. Список фирменных — здесь, чтобы
+  // новое блюдо не попало в латиницу молча.
+  const BRAND_ONLY = [
+    "kebab-philly-beef",
+    "kebab-cheese",
+    "kebab-crispy",
+    "kebab-xl-xxl",
+    "kebab-menu",
+    "burger-menu",
+    "cheeseburger-crispy",
+    "gozleme-mozzarella",
+    "crispy-filets",
+    "mozza-crispy",
+    "hot-dog-classic",
+    "hot-dog-cheese",
+    "pizza-margarita",
+    "pizza-quattro-formaggi",
+    "pizza-pepperoni",
+    "pizza-carbonara",
+    "cola",
+    "fanta",
+    "sprite",
+    "le-coq-margarita",
+    "le-coq-mojito",
+  ];
+
+  it("фирменные названия в русской версии не переводятся", () => {
+    for (const slug of BRAND_ONLY) {
+      const p = bySlug(slug);
+      expect(p.name.ru, slug).toBe(p.name.ro);
+      expect(p.name.ru, slug).not.toMatch(/[а-яё]/i);
     }
+  });
+
+  it("обычные блюда и напитки переведены на русский", () => {
+    const brand = new Set(BRAND_ONLY);
+    for (const p of PRODUCTS) {
+      if (brand.has(p.slug)) continue;
+      expect(p.name.ru, p.slug).not.toBe(p.name.ro);
+      expect(p.name.ru, p.slug).toMatch(/[а-яё]/i);
+      // Румынских букв в переводе остаться не должно
+      expect(p.name.ru, p.slug).not.toMatch(/[ăâîșț]/i);
+    }
+  });
+
+  it("переводы, названные архитектором", () => {
+    const ru = (slug: string) => bySlug(slug).name.ru;
+    expect(ru("salata-greceasca")).toBe("Греческий салат");
+    expect(ru("apa-plata")).toBe("Вода без газа");
+    expect(ru("apa-gazata")).toBe("Вода с газом");
+    expect(ru("supa-ciuperci")).toBe("Крем-суп из грибов");
+    expect(ru("cartofi-pai")).toBe("Картофель фри");
+    expect(ru("sos-usturoi")).toBe("Соус чесночный");
+    // Смешанное название: фирменная часть латиницей, румынская переведена
+    expect(ru("cheeseburger-vita")).toBe("Cheeseburger говядина-свинина");
+    expect(ru("kebab-cheese")).toBe("Kebab Cheese");
+  });
+
+  it("румынские названия не тронуты", () => {
+    expect(bySlug("salata-greceasca").name.ro).toBe("Salată Grecească");
+    expect(bySlug("apa-plata").name.ro).toBe("Apă plată");
+    expect(bySlug("cheeseburger-vita").name.ro).toBe("Cheeseburger Vită-Porc");
   });
 
   it("убрать можно состав без основы; у комбо — ничего (это части набора)", () => {

@@ -30,7 +30,7 @@ describe("src/config/motion.json", () => {
   });
 
   it("цвет фона страницы — один из четырёх вариантов", () => {
-    expect(raw.page).toEqual({ background: "#FAF7F2" });
+    expect(raw.page).toEqual({ background: "#F7F2EA" });
     expect(pageBackground).toBe(raw.page.background);
   });
 

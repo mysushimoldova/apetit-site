@@ -76,7 +76,7 @@ test("панель показывает меню Сорок и управляе�
       () => getComputedStyle(document.querySelector("header")!).backgroundColor,
     ),
   ).toBe("rgba(241, 233, 219, 0.78)");
-  await page.getByRole("button", { name: "A #FAF7F2" }).click();
+  await page.getByRole("button", { name: "B #F7F2EA" }).click();
 
   // Страница сообщает панели кадры в секунду
   await expect
@@ -100,7 +100,7 @@ test("«Сохранить» переписывает src/config/motion.json", a
   try {
     await preview(page);
     await page.getByRole("slider", { name: "Насыщенность" }).fill("0.7");
-    await page.getByRole("button", { name: "B #F7F2EA" }).click();
+    await page.getByRole("button", { name: "C #F4EDE2" }).click();
     await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
 
     await page.getByRole("button", { name: "Сохранить" }).click();
@@ -117,7 +117,7 @@ test("«Сохранить» переписывает src/config/motion.json", a
       opacity: 0.7,
     });
     // Цвет фона страницы сохраняется той же кнопкой
-    expect(saved.page).toEqual({ background: "#F7F2EA" });
+    expect(saved.page).toEqual({ background: "#F4EDE2" });
   } finally {
     writeFileSync(FILE, before);
   }

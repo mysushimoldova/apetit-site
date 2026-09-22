@@ -2,7 +2,14 @@ import type { NextConfig } from "next";
 import { immutableCacheRules } from "./src/lib/cache-headers";
 import { securityHeaders } from "./src/lib/security-headers";
 
+// Адрес, с которого Амян открывает dev-сервер с телефона в домашней сети
+// (например 192.168.50.30). Лежит в .env.local, в git не попадает: у каждого
+// свой. Переменной нет — список пустой, и с телефона dev-сервер не открыть.
+const devOrigin = process.env.DEV_ORIGIN?.trim();
+
 const nextConfig: NextConfig = {
+  allowedDevOrigins: devOrigin ? [devOrigin] : [],
+
   images: {
     // Фото блюд отдаём готовыми WebP в трёх ширинах (scripts/prepare-images.py),
     // без оптимизатора Next — см. src/lib/image-loader.ts.
