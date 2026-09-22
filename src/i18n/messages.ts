@@ -113,6 +113,8 @@ export interface Messages {
       unavailableLine: string;
       pointPaused: string;
       rateLimited: string;
+      /** База не ответила: заказ не записан, но повтор имеет смысл */
+      dbError: string;
       rejected: string;
     };
   };
@@ -243,6 +245,7 @@ export const messages: Record<Locale, Messages> = {
         unavailableLine: "nu este în acest punct",
         pointPaused: "Acest punct nu primește comenzi momentan.",
         rateLimited: "Prea multe comenzi de pe acest număr. Sună la local.",
+        dbError: "Nu am reușit să salvăm comanda. Încearcă din nou.",
         rejected: "Comanda nu a fost primită. Încearcă din nou.",
       },
     },
@@ -362,6 +365,7 @@ export const messages: Record<Locale, Messages> = {
         pointPaused: "Этот пункт временно не принимает заказы.",
         rateLimited:
           "Слишком много заказов с этого номера. Позвоните в заведение.",
+        dbError: "Не смогли записать заказ. Попробуйте ещё раз.",
         rejected: "Заказ не принят. Попробуйте ещё раз.",
       },
     },

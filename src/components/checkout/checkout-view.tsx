@@ -45,13 +45,15 @@ import {
   fieldError,
   type OrderField,
 } from "@/lib/order/fields";
+import {
+  SERVER_ERROR_TEXT,
+  type ServerErrorText,
+} from "@/lib/order/server-error";
 import { useIsOpen } from "@/lib/order/use-is-open";
 import { PointPicker, type PointView } from "./point-picker";
 import { TextField } from "./text-field";
 
 type FormField = OrderField | "point";
-type ServerError =
-  "network" | "unavailable" | "pointPaused" | "rateLimited" | "rejected";
 
 const FIELD_ORDER: readonly FormField[] = ["point", "name", "phone", "address"];
 const NO_LINES: CartLine[] = [];
@@ -104,7 +106,7 @@ export function CheckoutView({
   const [values, setValues] = useState({ name: "", phone: "", address: "" });
   const [errors, setErrors] = useState<Partial<Record<FormField, boolean>>>({});
   const [sending, setSending] = useState(false);
-  const [serverError, setServerError] = useState<ServerError | null>(null);
+  const [serverError, setServerError] = useState<ServerErrorText | null>(null);
   const [unavailable, setUnavailable] = useState<number[]>([]);
   const [serverClosed, setServerClosed] = useState(false);
   const honeypot = useRef<HTMLInputElement>(null);
@@ -229,14 +231,10 @@ export function CheckoutView({
           setUnavailable(result.lines);
           setServerError("unavailable");
           break;
-        case "point_paused":
-          setServerError("pointPaused");
-          break;
-        case "rate_limited":
-          setServerError("rateLimited");
-          break;
+        // Точка на паузе, лимит по номеру, база не ответила, мусор — на
+        // каждый свой текст (список — src/lib/order/server-error.ts)
         default:
-          setServerError("rejected");
+          setServerError(SERVER_ERROR_TEXT[result.code]);
       }
     } catch {
       // Сеть пропала или сервер упал: форма и корзина на месте — нажать ещё раз
