@@ -85,4 +85,23 @@ describe("метаданные страниц", () => {
     expect(ogImagePath("briceni")).toBe("/og/briceni.png");
     expect(String(rootMetadata().metadataBase)).toBe("https://apetit.md/");
   });
+
+  it("Safari не ищет в тексте телефоны сам (иначе падает гидратация)", () => {
+    expect(rootMetadata().formatDetection).toEqual({
+      telephone: false,
+      date: false,
+      address: false,
+      email: false,
+    });
+  });
+
+  it("страницы запрет не перебивают — он достаётся им от корня", () => {
+    const m = pageMetadata({
+      locale: "ro",
+      path: "/contacte",
+      title: "T",
+      description: "D",
+    });
+    expect(m.formatDetection).toBeUndefined();
+  });
 });

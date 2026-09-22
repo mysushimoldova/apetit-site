@@ -12,6 +12,22 @@ function Dot() {
   return <span aria-hidden="true"> · </span>;
 }
 
+/** IDNO — тринадцать цифр подряд, и Safari на iPhone принимает их за телефон:
+ *  дописывает в готовый HTML свою ссылку tel:, а React от этого падает с
+ *  «Hydration failed». Главный запрет — мета-тег format-detection в корневых
+ *  метаданных (src/lib/seo.ts). Здесь вторая защита на случай, если мета-тег
+ *  когда-нибудь потеряется: цифры разложены по двум отдельным элементам, и
+ *  подряд идущего «номера» в разметке просто нет. На вид и при копировании
+ *  строка та же — это проверено тестом. */
+function Idno({ value }: { value: string }) {
+  return (
+    <span translate="no">
+      <span>{value.slice(0, 4)}</span>
+      <span>{value.slice(4)}</span>
+    </span>
+  );
+}
+
 export function SiteFooter({ locale, t }: { locale: Locale; t: Messages }) {
   const href = (path: string) => localePath(locale, path);
   return (
@@ -24,7 +40,9 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Messages }) {
               <span translate="no">{COMPANY.name}</span>
             </span>
             <Dot />
-            <span className="whitespace-nowrap">IDNO {COMPANY.idno}</span>
+            <span className="whitespace-nowrap">
+              IDNO <Idno value={COMPANY.idno} />
+            </span>
             <Dot />
             <span className="whitespace-nowrap">{COMPANY.address[locale]}</span>
           </p>

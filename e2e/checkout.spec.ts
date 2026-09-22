@@ -126,6 +126,11 @@ test("путь целиком: город → блюдо → корзина → 
   await expect(
     page.getByRole("link", { name: /Sună la local · 068 372 707/ }),
   ).toHaveAttribute("href", "tel:+37368372707");
+  // Своя ссылка tel: работает, а искать телефоны в тексте Safari запрещено
+  await expect(page.locator('meta[name="format-detection"]')).toHaveAttribute(
+    "content",
+    "telephone=no, date=no, address=no, email=no",
+  );
 
   // Корзина очищена после ответа сервера
   await page.getByRole("link", { name: "Înapoi la meniu" }).click();

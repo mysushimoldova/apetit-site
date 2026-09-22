@@ -65,5 +65,19 @@ export function pageMetadata({
 
 /** Общие метаданные корневого layout: база адресов для относительных путей. */
 export function rootMetadata(): Metadata {
-  return { metadataBase: new URL(SITE_URL) };
+  return {
+    metadataBase: new URL(SITE_URL),
+    // Safari на iPhone сам находит в тексте «номера», «адреса» и «даты» и
+    // дописывает вокруг них свои ссылки tel:. IDNO в подвале (13 цифр) он
+    // принимал за телефон, дописывал ссылку в уже готовый HTML — и React
+    // падал с «Hydration failed». Этот запрет выключает такую самодеятельность
+    // на всех страницах обоих языков; настоящие ссылки tel:, которые мы
+    // ставим сами, он не трогает (есть тест).
+    formatDetection: {
+      telephone: false,
+      date: false,
+      address: false,
+      email: false,
+    },
+  };
 }

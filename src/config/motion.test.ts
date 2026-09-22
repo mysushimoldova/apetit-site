@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { motionConfigSchema } from "@/motion/config-schema";
+import { motionConfigSchema, PAGE_BACKGROUNDS } from "@/motion/config-schema";
 import { motionConfig, pageBackground } from "./motion";
 
 const raw = JSON.parse(
@@ -14,23 +14,30 @@ describe("src/config/motion.json", () => {
     expect(parsed.success).toBe(true);
   });
 
-  it("значения фона — те, что задал архитектор", () => {
-    expect(raw.background).toEqual({
-      mode: "live",
-      // 1900 px экрана / прежний масштаб 900 px на клетку = 2.11:
-      // вид на компьютере остался прежним (задача 09)
-      tilesAcross: 2.11,
-      width: 0.8,
-      opacity: 0.45,
-      speed: 0.35,
-      parallax: 1.2,
-      ease: 0.1,
-      color: "ash",
-    });
+  // Числа ползунков (плотность, толщина, насыщенность, скорость, сдвиг,
+  // инертность) Амян подбирает сам в панели /dev/motion и сохраняет прямо в
+  // этот файл — пришпиливать их к тесту нельзя, иначе каждая его правка
+  // роняет сборку. Границы и так проверяет схема (тест выше). Здесь сторожим
+  // то, что выбирается не на глаз: набор полей и решения архитектора —
+  // режим «живые линии» и цвет линий Ash.
+  it("набор настроек фона тот же, режим и цвет линий — как решил архитектор", () => {
+    expect(Object.keys(raw.background).sort()).toEqual([
+      "color",
+      "ease",
+      "mode",
+      "opacity",
+      "parallax",
+      "speed",
+      "tilesAcross",
+      "width",
+    ]);
+    expect(raw.background.mode).toBe("live");
+    expect(raw.background.color).toBe("ash");
   });
 
   it("цвет фона страницы — один из четырёх вариантов", () => {
-    expect(raw.page).toEqual({ background: "#F7F2EA" });
+    expect(Object.keys(raw.page)).toEqual(["background"]);
+    expect(Object.keys(PAGE_BACKGROUNDS)).toContain(raw.page.background);
     expect(pageBackground).toBe(raw.page.background);
   });
 

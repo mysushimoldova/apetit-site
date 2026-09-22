@@ -450,3 +450,50 @@ test.describe("поисковики", () => {
     }
   });
 });
+
+// Safari на iPhone сам искал в тексте «телефоны» и дописывал ссылки tel: в
+// готовый HTML — от этого падала гидратация («Hydration failed»). Запрет —
+// мета-тег format-detection в корневых метаданных обоих языков.
+test.describe("Safari не ищет телефоны в тексте сам", () => {
+  const CONTENT = "telephone=no, date=no, address=no, email=no";
+
+  for (const path of [
+    "/",
+    "/soroca",
+    "/contacte",
+    "/termeni",
+    "/ru",
+    "/ru/otaci",
+    "/ru/contacte",
+  ]) {
+    test(`запрет стоит на ${path}`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator('meta[name="format-detection"]')).toHaveCount(
+        1,
+      );
+      await expect(
+        page.locator('meta[name="format-detection"]'),
+      ).toHaveAttribute("content", CONTENT);
+    });
+  }
+
+  test("IDNO в подвале — текст, а не ссылка, и цифры не идут подряд", async ({
+    page,
+  }) => {
+    await page.goto("/contacte");
+    const footer = page.locator("footer");
+    // На вид строка прежняя
+    await expect(footer).toContainText("IDNO 1023607001174");
+    // Ссылки на телефон в подвале нет и быть не должно
+    await expect(footer.locator('a[href^="tel:"]')).toHaveCount(0);
+    // Вторая защита: тринадцати цифр подряд в разметке подвала нет
+    expect(await footer.innerHTML()).not.toContain("1023607001174");
+  });
+
+  test("настоящие ссылки tel: на контактах работают", async ({ page }) => {
+    await page.goto("/contacte");
+    const links = page.locator('main a[href^="tel:"]');
+    await expect(links).toHaveCount(5);
+    await expect(links.first()).toHaveAttribute("href", "tel:+37367578757");
+  });
+});
