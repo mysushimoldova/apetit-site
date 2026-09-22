@@ -121,7 +121,9 @@ def quality_flags(alpha: np.ndarray) -> list[str]:
 
 
 def sha1_file(p: Path) -> str:
-    h = hashlib.sha1()
+    # Отпечаток «картинка изменилась», не защита: usedforsecurity=False говорит
+    # это и проверяющим (semgrep), и системам с запретом SHA-1 в криптографии.
+    h = hashlib.sha1(usedforsecurity=False)
     with p.open("rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
