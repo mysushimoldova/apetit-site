@@ -41,6 +41,13 @@ export interface PendingAlert {
   createdAt: string;
   remindersSent: number;
   ownerAlertsSent: number;
+  /**
+   * Карточка заказа дошла до чата точки (есть telegram_message_id). false —
+   * Telegram не ответил при приёме заказа: точка не видела ни состава, ни
+   * кнопки, и напоминать ей «#N ждёт» бессмысленно — нужно слать карточку
+   * заново (см. alerts.ts).
+   */
+  delivered: boolean;
 }
 
 export type AlertStage = "reminder" | "owner";
@@ -185,7 +192,7 @@ export function createSupabaseTelegramStore(
       let query = getDb()
         .from("orders")
         .select(
-          "id, number, point_id, created_at, reminders_sent, owner_alerts_sent",
+          "id, number, point_id, created_at, reminders_sent, owner_alerts_sent, telegram_message_id",
         )
         .eq("status", "new")
         .lte(
@@ -205,6 +212,7 @@ export function createSupabaseTelegramStore(
         createdAt: r.created_at,
         remindersSent: r.reminders_sent,
         ownerAlertsSent: r.owner_alerts_sent,
+        delivered: r.telegram_message_id !== null,
       }));
     },
 

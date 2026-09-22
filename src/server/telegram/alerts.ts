@@ -5,6 +5,12 @@
 //   владельцам — с ownerAt минут, дальше каждые ownerRepeatEvery, всего
 //               ownerMax раз.
 // В одну минуту дорожки могут совпасть (12-я минута) — тогда уходят обе.
+// Отдельный случай: карточка заказа вообще не дошла до точки (Telegram
+// молчал при приёме заказа, orders.telegram_message_id = null). Тогда
+// первое же напоминание шлёт не «⏰ #N ждёт», а саму карточку с кнопкой —
+// иначе кассир видит номер заказа, но не знает ни состава, ни телефона
+// клиента и не может его принять. Лестница при этом работает как повтор:
+// не вышло сейчас — попробует через reminderEvery минут.
 // Ступень срабатывает, когда «прошло ≥ N минут и она ещё не выполнена» —
 // опоздавший cron её не пропустит и дважды не отправит; за тик каждая
 // дорожка двигается на один шаг, поэтому после долгого простоя не будет
@@ -14,7 +20,10 @@
 import { getPoint as getRealPoint, type Point } from "@/data/points";
 import type { AlertsConfig } from "@/config/alerts";
 import { formatPhoneDisplay } from "@/lib/order/phone";
+import { ReceiptLineSchema } from "@/lib/order/receipt";
+import { z } from "@/lib/zod";
 import type { TelegramApi } from "./api";
+import { acceptCallbackData, orderMessage } from "./message";
 import type { AlertStage, PendingAlert, TelegramStore } from "./store";
 import { BOT_TEXTS } from "./texts";
 
@@ -75,6 +84,34 @@ export interface AlertRun {
 
 function elapsedMinutes(createdAt: string, now: Date): number {
   return (now.getTime() - new Date(createdAt).getTime()) / 60_000;
+}
+
+/** Снимок позиций как он лежит в базе; битый (не должно быть) — null. */
+const StoredLinesSchema = z.array(ReceiptLineSchema).min(1);
+
+/**
+ * Карточка заказа из базы — для повторной отправки, когда первая не дошла.
+ * null — заказа уже нет или снимок позиций не читается.
+ */
+async function cardFor(
+  id: string,
+  pointName: string,
+  deps: { store: TelegramStore },
+) {
+  const order = await deps.store.orderById(id);
+  if (!order) return null;
+  const lines = StoredLinesSchema.safeParse(order.items);
+  if (!lines.success) return null;
+  return {
+    number: order.number,
+    pointName,
+    name: order.name,
+    phone: order.phone,
+    address: order.address,
+    lines: lines.data,
+    total: order.total,
+    createdAt: order.created_at,
+  };
 }
 
 export async function processAlerts(
@@ -151,6 +188,42 @@ export async function processAlerts(
 
         const chat = await deps.store.pointChat(order.pointId);
         if (!chat) throw new Error(`point not linked: ${order.pointId}`);
+
+        // Карточка так и не дошла (Telegram молчал при приёме заказа):
+        // напоминать «#N ждёт» нечем — точка не видела ни состава, ни
+        // кнопки. Шлём саму карточку заново, с кнопкой; получилось —
+        // записываем message_id, и дальше идут обычные напоминания.
+        if (!order.delivered) {
+          const card = await cardFor(order.id, point?.name ?? order.pointId, {
+            store: deps.store,
+          });
+          if (card) {
+            const { messageId } = await api.sendMessage({
+              chatId: chat.chatId,
+              text: orderMessage(card, lang),
+              replyMarkup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: t.accept,
+                      callback_data: acceptCallbackData(order.id),
+                    },
+                  ],
+                ],
+              },
+            });
+            await deps.store.setTelegramResult(order.id, {
+              messageId,
+              error: null,
+            });
+            run.sent.reminder++;
+            deps.log("order card resent", meta);
+            return;
+          }
+          // Заказа в базе уже нет или снимок битый — шлём обычное напоминание
+          deps.log("order card resend: no snapshot", meta);
+        }
+
         await api.sendMessage({
           chatId: chat.chatId,
           text: t.reminder(order.number, minutes),

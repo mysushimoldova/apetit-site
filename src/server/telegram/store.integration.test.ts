@@ -107,6 +107,8 @@ describe.skipIf(!ready)("telegram store в настоящей Supabase", () => {
         createdAt: expect.any(String),
         remindersSent: 0,
         ownerAlertsSent: 0,
+        // message_id записан строкой выше — карточка дошла
+        delivered: true,
       },
     ]);
     expect(await store.pendingAlerts(now, 10, 15, 3, TEST_POINT_ID)).toEqual(

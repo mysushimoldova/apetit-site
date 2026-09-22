@@ -318,3 +318,147 @@ describe("processAlerts — тексты и адресаты", () => {
     }
   });
 });
+
+// Telegram молчал при приёме заказа: карточка до точки не дошла, в базе
+// telegram_message_id = null. Напоминание «#N ждёт» кассиру бесполезно —
+// он не знает ни состава, ни телефона клиента и не может нажать «Принял».
+describe("processAlerts — карточка не дошла до точки", () => {
+  beforeEach(() => {
+    store.orders.set(
+      storedOrder().id,
+      storedOrder({
+        created_at: CREATED.toISOString(),
+        telegram_message_id: null,
+        telegram_error: "sendMessage: 502 Bad Gateway",
+      }),
+    );
+  });
+
+  it("первое напоминание шлёт саму карточку с кнопкой, а не «#N ждёт»", async () => {
+    const { messages } = await tick(2);
+    expect(messages).toHaveLength(1);
+    const card = messages[0];
+    expect(card.chatId).toBe(5001);
+    expect(card.text).toContain("<b>COMANDĂ NOUĂ #1042</b>");
+    expect(card.text).toContain("Ion");
+    expect(card.text).toContain("+373 68 123 456");
+    expect(card.text).toContain("Coca-Cola");
+    expect(card.text).toContain("<b>TOTAL: 22 lei</b>");
+    expect(card.replyMarkup).toEqual({
+      inline_keyboard: [
+        [
+          {
+            text: "✅ Am preluat",
+            callback_data: `accept:${storedOrder().id}`,
+          },
+        ],
+      ],
+    });
+  });
+
+  it("удачная отправка записывает message_id — дальше обычные напоминания", async () => {
+    await tick(2);
+    expect(store.orders.get(storedOrder().id)).toMatchObject({
+      telegram_message_id: 100,
+      telegram_error: null,
+    });
+    const { messages } = await tick(4);
+    expect(messages[0].text).toBe("⏰ Comanda #1042 așteaptă — 4 minute");
+    expect(messages[0].replyMarkup).toBeUndefined();
+  });
+
+  it("Telegram всё ещё лежит — следующая ступень пробует карточку снова", async () => {
+    api.failNext = 1;
+    const { run } = await tick(2);
+    expect(run.failed).toBe(1);
+    expect(api.sent).toHaveLength(0);
+    // Ступень израсходована, но заказ остался «недоставленным»
+    expect(store.orders.get(storedOrder().id)!.telegram_message_id).toBeNull();
+    const { messages } = await tick(4);
+    expect(messages[0].text).toContain("<b>COMANDĂ NOUĂ #1042</b>");
+    expect(messages[0].replyMarkup).toBeDefined();
+  });
+
+  it("кнопка на повторной карточке принимает заказ", async () => {
+    await tick(2);
+    const accepted = await store.acceptOrder(storedOrder().id, at(3));
+    expect(accepted?.status).toBe("accepted");
+    // Принят — лестница молчит
+    const { messages } = await tick(4);
+    expect(messages).toHaveLength(0);
+  });
+
+  it("ru (Otaci): карточка по-русски", async () => {
+    const otaci = {
+      ...TEST_POINT,
+      id: "otaci",
+      name: "Apetit Otaci",
+      locale: "ru" as const,
+    };
+    deps.getPoint = (id) => (id === "otaci" ? otaci : undefined);
+    store.chats.set("otaci", { chatId: 5002, title: null });
+    store.orders.clear();
+    store.orders.set(
+      "o2",
+      storedOrder({
+        id: "o2",
+        point_id: "otaci",
+        created_at: CREATED.toISOString(),
+        telegram_message_id: null,
+      }),
+    );
+    const { messages } = await tick(2);
+    expect(messages[0].text).toContain("<b>НОВЫЙ ЗАКАЗ #1042</b>");
+    expect(messages[0].text).toContain("<b>ИТОГО: 22 лей</b>");
+    expect(messages[0].replyMarkup?.inline_keyboard[0][0].text).toBe(
+      "✅ Принял",
+    );
+  });
+
+  it("заказа в базе уже нет — уходит обычное напоминание, без падения", async () => {
+    const pendingOnly = {
+      ...deps,
+      store: {
+        ...store,
+        orderById: async () => null,
+      },
+    };
+    const run = await processAlerts(at(2), pendingOnly);
+    expect(run.failed).toBe(0);
+    expect(api.sent[0].text).toBe("⏰ Comanda #1042 așteaptă — 2 minute");
+    expect(deps.log).toHaveBeenCalledWith(
+      "order card resend: no snapshot",
+      expect.objectContaining({ number: 1042 }),
+    );
+  });
+
+  it("снимок позиций битый — тоже обычное напоминание", async () => {
+    store.orders.set(
+      storedOrder().id,
+      storedOrder({
+        created_at: CREATED.toISOString(),
+        telegram_message_id: null,
+        items: [{ каша: true }] as unknown as never,
+      }),
+    );
+    const run = await processAlerts(at(2), deps);
+    expect(run.failed).toBe(0);
+    expect(api.sent[0].text).toBe("⏰ Comanda #1042 așteaptă — 2 minute");
+  });
+
+  it("заказ уже старый (ступени шли) — карточка всё равно уходит", async () => {
+    store.orders.set(
+      storedOrder().id,
+      storedOrder({
+        created_at: CREATED.toISOString(),
+        telegram_message_id: null,
+        reminders_sent: 4,
+        owner_alerts_sent: 1,
+      }),
+    );
+    const { messages } = await tick(10);
+    const card = messages.find((m) => m.chatId === 5001)!;
+    expect(card.text).toContain("<b>COMANDĂ NOUĂ #1042</b>");
+    expect(card.replyMarkup).toBeDefined();
+  });
+});

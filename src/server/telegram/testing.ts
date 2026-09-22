@@ -119,6 +119,7 @@ export function fakeStore(): FakeStore {
           createdAt: o.created_at,
           remindersSent: o.reminders_sent,
           ownerAlertsSent: o.owner_alerts_sent,
+          delivered: o.telegram_message_id !== null,
         }));
     },
     async claimStage(id, stage, expected, now) {
