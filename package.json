@@ -20,7 +20,7 @@
     "og": "node scripts/og-images.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
+    "@supabase/supabase-js": "^2.117.0",
     "lucide-react": "^1.47.0",
     "motion": "^13.4.0",
     "next": "^16.3.5",
