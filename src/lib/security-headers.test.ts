@@ -28,6 +28,15 @@ describe("защитные заголовки (SPEC §9.4)", () => {
     });
   });
 
+  it("чужие сайты не подключают наши файлы и не держат нашу вкладку", () => {
+    expect(asMap(false)).toMatchObject({
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+    });
+    // В разработке — те же: панель показывает меню в рамке своего же адреса
+    expect(asMap(true)["Cross-Origin-Resource-Policy"]).toBe("same-origin");
+  });
+
   it("CSP: обязательные директивы из задания", () => {
     const d = directives(contentSecurityPolicy(false));
     expect(d["default-src"]).toEqual(["'self'"]);

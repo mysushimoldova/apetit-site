@@ -57,6 +57,12 @@ export function securityHeaders(isDev: boolean): Header[] {
       key: "Permissions-Policy",
       value: "geolocation=(self), camera=(), microphone=(), payment=()",
     },
+    // Сайт ничего не открывает в window.open и не даёт встраивать себя —
+    // поэтому обе стороны «закрыты по умолчанию»: COOP отрезает нашу вкладку
+    // от той, что её открыла (чужая страница не дотянется до window.opener),
+    // CORP запрещает чужим сайтам подключать наши фото и шрифты как свои.
+    { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+    { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
     { key: "Content-Security-Policy", value: contentSecurityPolicy(isDev) },
   ];
 }
