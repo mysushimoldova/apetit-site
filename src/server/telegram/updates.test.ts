@@ -108,7 +108,7 @@ describe("handleUpdate — кнопка «Принят»", () => {
     store.orders.set(storedOrder().id, storedOrder());
   });
 
-  it("нажатие → status accepted, accepted_at, сообщение без кнопки с «Primit la 18:45», кто принял — в лог", async () => {
+  it("нажатие → status accepted, accepted_at, зелёный заголовок без кнопки, кто принял — в лог", async () => {
     const r = await handleUpdate(callback("accept:" + storedOrder().id), deps);
     expect(r).toBe("accepted");
     const order = store.orders.get(storedOrder().id)!;
@@ -116,9 +116,12 @@ describe("handleUpdate — кнопка «Принят»", () => {
     expect(order.accepted_at).toBe(NOW.toISOString());
     expect(api.edited).toHaveLength(1);
     expect(api.edited[0]).toMatchObject({ chatId: POINT_CHAT, messageId: 500 });
-    expect(api.edited[0].text).toContain("<b>COMANDĂ NOUĂ #1042</b>");
+    expect(api.edited[0].text.split("\n")[0]).toBe(
+      "🟢 <b>PRELUATĂ · 18:45 — #1042</b>",
+    );
+    expect(api.edited[0].text).not.toContain("COMANDĂ NOUĂ");
     expect(api.edited[0].text).toContain("1 × Coca-Cola — 22 lei");
-    expect(api.edited[0].text.endsWith("✅ Primit la 18:45")).toBe(true);
+    expect(api.edited[0].text).not.toContain("Primit la");
     expect(api.answered).toEqual([{ id: "cb1", text: undefined }]);
     expect(deps.log).toHaveBeenCalledWith("order accepted by", {
       number: 1042,
@@ -128,7 +131,7 @@ describe("handleUpdate — кнопка «Принят»", () => {
     });
   });
 
-  it("второе нажатие → «Deja primit», статус и время не меняются", async () => {
+  it("второе нажатие → «Deja preluată», статус и время не меняются", async () => {
     await handleUpdate(callback("accept:" + storedOrder().id), deps);
     const again = await handleUpdate(callback("accept:" + storedOrder().id), {
       ...deps,
@@ -138,9 +141,9 @@ describe("handleUpdate — кнопка «Принят»", () => {
     expect(store.orders.get(storedOrder().id)!.accepted_at).toBe(
       NOW.toISOString(),
     );
-    expect(api.answered[1]).toEqual({ id: "cb1", text: "Deja primit" });
+    expect(api.answered[1]).toEqual({ id: "cb1", text: "Deja preluată" });
     // Сообщение всё равно переписано без кнопки, время — первого нажатия
-    expect(api.edited[1].text.endsWith("✅ Primit la 18:45")).toBe(true);
+    expect(api.edited[1].text).toContain("🟢 <b>PRELUATĂ · 18:45 — #1042</b>");
   });
 
   it("нажатие из чужого чата → не принимается", async () => {

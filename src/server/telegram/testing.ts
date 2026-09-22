@@ -3,7 +3,7 @@
 // формой, что настоящий. Заказы в fake store — по одной строке на заказ.
 import type { Point } from "@/data/points";
 import type { InlineKeyboard, TelegramApi } from "./api";
-import type { DueReminder, StoredOrder, TelegramStore } from "./store";
+import type { StoredOrder, TelegramStore } from "./store";
 
 export interface SentMessage {
   chatId: number;
@@ -57,6 +57,9 @@ export interface FakeStore extends TelegramStore {
       reminders_sent: number;
       last_reminder_at: string | null;
       telegram_error: string | null;
+      alarm_stage: number;
+      owner_alerts_sent: number;
+      last_owner_alert_at: string | null;
     }
   >;
 }
@@ -98,30 +101,39 @@ export function fakeStore(): FakeStore {
       order.telegram_message_id = result.messageId;
       order.telegram_error = result.error;
     },
-    async claimDueReminders(now, intervalMs, max) {
-      const due: DueReminder[] = [];
-      for (const o of store.orders.values()) {
-        const created = new Date(o.created_at).getTime();
-        const last = o.last_reminder_at
-          ? new Date(o.last_reminder_at).getTime()
-          : null;
-        if (
-          o.status === "new" &&
-          created <= now.getTime() - intervalMs &&
-          o.reminders_sent < max &&
-          (last === null || last <= now.getTime() - intervalMs)
-        ) {
-          o.reminders_sent++;
-          o.last_reminder_at = now.toISOString();
-          due.push({
-            id: o.id,
-            number: o.number,
-            pointId: o.point_id,
-            remindersSent: o.reminders_sent,
-          });
-        }
+    async pendingAlerts(now, olderThanMin, reminderMax, ownerMax, pointId) {
+      return [...store.orders.values()]
+        .filter(
+          (o) =>
+            o.status === "new" &&
+            (!pointId || o.point_id === pointId) &&
+            new Date(o.created_at).getTime() <=
+              now.getTime() - olderThanMin * 60_000 &&
+            (o.reminders_sent < reminderMax || o.owner_alerts_sent < ownerMax),
+        )
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map((o) => ({
+          id: o.id,
+          number: o.number,
+          pointId: o.point_id,
+          createdAt: o.created_at,
+          remindersSent: o.reminders_sent,
+          ownerAlertsSent: o.owner_alerts_sent,
+        }));
+    },
+    async claimStage(id, stage, expected, now) {
+      const o = store.orders.get(id);
+      if (!o || o.status !== "new") return false;
+      if (stage === "reminder") {
+        if (o.reminders_sent !== expected) return false;
+        o.reminders_sent++;
+        o.last_reminder_at = now.toISOString();
+      } else {
+        if (o.owner_alerts_sent !== expected) return false;
+        o.owner_alerts_sent++;
+        o.last_owner_alert_at = now.toISOString();
       }
-      return due;
+      return true;
     },
   };
   return store;
@@ -172,6 +184,9 @@ export function storedOrder(
     reminders_sent: 0,
     last_reminder_at: null,
     telegram_error: null,
+    alarm_stage: 0,
+    owner_alerts_sent: 0,
+    last_owner_alert_at: null,
     ...over,
   };
 }

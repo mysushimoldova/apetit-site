@@ -67,7 +67,7 @@ describe.skipIf(!ready)("telegram store в настоящей Supabase", () => {
     expect(await store.ownerChats()).toContain(TEST_OWNER);
   });
 
-  it("orderById, setTelegramResult, acceptOrder (второй раз — null), claim_due_reminders", async () => {
+  it("orderById, setTelegramResult, pendingAlerts, claimStage, acceptOrder (второй раз — null)", async () => {
     const created = new Date(Date.now() - 5 * 60_000); // 5 минут назад
     const ins = await db
       .from("orders")
@@ -96,35 +96,44 @@ describe.skipIf(!ready)("telegram store в настоящей Supabase", () => {
     await store.setTelegramResult(id, { messageId: 12345, error: null });
     expect((await store.orderById(id))?.telegram_message_id).toBe(12345);
 
-    // Напоминание: заказу 5 минут → пора; второй вызов сразу — нет
+    // Кандидаты лестницы: заказу 5 минут → в выборке (старше 2 мин, владельцам < 3)
     const now = new Date();
-    const due = await store.claimDueReminders(now, 120_000, 5, TEST_POINT_ID);
-    const mine = due.filter((d) => d.id === id);
-    expect(mine).toEqual([
+    const pending = await store.pendingAlerts(now, 2, 15, 3, TEST_POINT_ID);
+    expect(pending).toEqual([
       {
         id,
         number: ins.data!.number,
         pointId: TEST_POINT_ID,
-        remindersSent: 1,
+        createdAt: expect.any(String),
+        remindersSent: 0,
+        ownerAlertsSent: 0,
       },
     ]);
-    expect(
-      (await store.claimDueReminders(now, 120_000, 5, TEST_POINT_ID)).filter(
-        (d) => d.id === id,
-      ),
-    ).toEqual([]);
+    expect(await store.pendingAlerts(now, 10, 15, 3, TEST_POINT_ID)).toEqual(
+      [],
+    );
+
+    // Условный UPDATE: ступень забирается один раз; чужое expected — нет
+    expect(await store.claimStage(id, "reminder", 0, now)).toBe(true);
+    expect(await store.claimStage(id, "reminder", 0, now)).toBe(false);
+    expect(await store.claimStage(id, "reminder", 1, now)).toBe(true);
+    expect(await store.claimStage(id, "owner", 0, now)).toBe(true);
+    const counters = await store.pendingAlerts(now, 2, 15, 3, TEST_POINT_ID);
+    expect(counters[0]).toMatchObject({
+      remindersSent: 2,
+      ownerAlertsSent: 1,
+    });
+
+    // Обе дорожки пройдены до конца → заказ больше не кандидат
+    expect(await store.pendingAlerts(now, 2, 2, 1, TEST_POINT_ID)).toEqual([]);
 
     const at = new Date();
     const accepted = await store.acceptOrder(id, at);
     expect(accepted).toMatchObject({ id, status: "accepted" });
     expect(await store.acceptOrder(id, new Date())).toBeNull();
-    // Принятый — из напоминаний выпадает
-    const later = new Date(now.getTime() + 3 * 60_000);
-    expect(
-      (await store.claimDueReminders(later, 120_000, 5, TEST_POINT_ID)).filter(
-        (d) => d.id === id,
-      ),
-    ).toEqual([]);
+    // Принятый — из кандидатов выпадает, ступень забрать нельзя
+    expect(await store.pendingAlerts(now, 2, 15, 3, TEST_POINT_ID)).toEqual([]);
+    expect(await store.claimStage(id, "owner", 1, now)).toBe(false);
     expect(
       await store.orderById("00000000-0000-4000-8000-000000000000"),
     ).toBeNull();

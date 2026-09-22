@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AcceptedOrder } from "@/server/orders/submit";
 import { notifyOrder, RETRY_DELAYS_MS } from "./notify";
-import {
-  processReminders,
-  REMINDER_INTERVAL_MS,
-  REMINDER_MAX,
-} from "./reminders";
 import { fakeApi, fakeStore, storedOrder, TEST_POINT } from "./testing";
 
 const order: AcceptedOrder = {
@@ -49,7 +44,7 @@ describe("notifyOrder — заказ в чат точки и копии влад
     expect(api.sent[0].text).toContain("<b>COMANDĂ NOUĂ #1042</b>");
     expect(api.sent[0].replyMarkup).toEqual({
       inline_keyboard: [
-        [{ text: "✅ Am primit", callback_data: `accept:${order.id}` }],
+        [{ text: "✅ Am preluat", callback_data: `accept:${order.id}` }],
       ],
     });
     expect(api.sent[1]).toEqual({ chatId: 9001, text: api.sent[0].text });
@@ -58,6 +53,23 @@ describe("notifyOrder — заказ в чат точки и копии влад
       telegram_message_id: 100,
       telegram_error: null,
     });
+  });
+
+  it("чат точки записан и как чат владельца → карточка одна, с кнопкой (копия не дублируется)", async () => {
+    store.chats.set("briceni", { chatId: 5001, title: "Briceni" });
+    store.owners.set(5001, "Amian (тот же чат)");
+    store.owners.set(9002, "Părinți");
+    await notifyOrder(order, { api, store, log, sleep });
+    expect(api.sent.map((m) => [m.chatId, Boolean(m.replyMarkup)])).toEqual([
+      [5001, true],
+      [9002, false],
+    ]);
+  });
+
+  it("точка не привязана: копия уходит всем владельцам, включая их собственные чаты", async () => {
+    store.owners.set(5001, "Amian");
+    await notifyOrder(order, { api, store, log, sleep });
+    expect(api.sent.map((m) => m.chatId)).toEqual([5001]);
   });
 
   it("Telegram дважды не ответил → третья попытка проходит; паузы 1 с и 3 с", async () => {
@@ -110,70 +122,5 @@ describe("notifyOrder — заказ в чат точки и копии влад
     const logged = JSON.stringify(log.mock.calls);
     expect(logged).not.toContain("68123456");
     expect(logged).not.toContain("Ion");
-  });
-});
-
-describe("processReminders — «⏰ ждёт» раз в 2 минуты, до 5 раз", () => {
-  const created = new Date("2026-09-19T09:00:00Z");
-  const at = (min: number) => new Date(created.getTime() + min * 60_000);
-
-  beforeEach(() => {
-    store.chats.set("briceni", { chatId: 5001, title: null });
-  });
-
-  it("до 2 минут — тихо; потом каждые 2 минуты, всего 5; между ними — нет", async () => {
-    const deps = { api, store, log, getPoint: () => TEST_POINT };
-    expect(await processReminders(at(1.9), deps)).toEqual({ due: 0, sent: 0 });
-    expect(await processReminders(at(2), deps)).toEqual({ due: 1, sent: 1 });
-    expect(api.sent[0]).toEqual({
-      chatId: 5001,
-      text: "⏰ Comanda 1042 așteaptă",
-    });
-    expect(await processReminders(at(3), deps)).toEqual({ due: 0, sent: 0 });
-    for (const m of [4, 6, 8, 10]) {
-      expect(await processReminders(at(m), deps)).toEqual({ due: 1, sent: 1 });
-    }
-    expect(await processReminders(at(12), deps)).toEqual({ due: 0, sent: 0 });
-    expect(await processReminders(at(60), deps)).toEqual({ due: 0, sent: 0 });
-    expect(api.sent).toHaveLength(REMINDER_MAX);
-    expect(store.orders.get(order.id)!.reminders_sent).toBe(REMINDER_MAX);
-    expect(REMINDER_INTERVAL_MS).toBe(120_000);
-  });
-
-  it("после «Принят» напоминаний нет", async () => {
-    const deps = { api, store, log, getPoint: () => TEST_POINT };
-    await processReminders(at(2), deps);
-    await store.acceptOrder(order.id, at(3));
-    expect(await processReminders(at(4), deps)).toEqual({ due: 0, sent: 0 });
-    expect(api.sent).toHaveLength(1);
-  });
-
-  it("Otaci — по-русски; точка без чата — попытка засчитана, ошибка в лог", async () => {
-    store.orders.set(
-      "o2",
-      storedOrder({ id: "o2", number: 1043, point_id: "otaci" }),
-    );
-    store.chats.set("otaci", { chatId: 5002, title: null });
-    const otaci = { ...TEST_POINT, id: "otaci", locale: "ru" as const };
-    const deps = {
-      api,
-      store,
-      log,
-      getPoint: (id: string) => (id === "otaci" ? otaci : TEST_POINT),
-    };
-    await processReminders(at(2), deps);
-    expect(api.sent.map((m) => m.text)).toEqual([
-      "⏰ Comanda 1042 așteaptă",
-      "⏰ Заказ 1043 ждёт",
-    ]);
-
-    store.chats.delete("briceni");
-    expect(await processReminders(at(4), deps)).toEqual({ due: 2, sent: 1 });
-    expect(log).toHaveBeenCalledWith("reminder failed", {
-      number: 1042,
-      point: "briceni",
-      n: 2,
-      error: "point not linked: briceni",
-    });
   });
 });

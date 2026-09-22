@@ -63,11 +63,15 @@ export async function notifyOrder(
   const meta = { number: order.number, point: order.point.id };
 
   let failure: string | null = null;
+  // Чат точки: копию владельцам в него слать не нужно — заказ там уже есть,
+  // причём с кнопкой (иначе рядом ляжет та же карточка без кнопки).
+  let pointChatId: number | null = null;
   try {
     if (!deps.api) throw new Error("TELEGRAM_BOT_TOKEN not set");
     const api = deps.api;
     const chat = await deps.store.pointChat(order.point.id);
     if (!chat) throw new Error(`point not linked: ${order.point.id}`);
+    pointChatId = chat.chatId;
 
     const { messageId } = await withRetry(
       () =>
@@ -113,6 +117,7 @@ export async function notifyOrder(
     return;
   }
   for (const chatId of owners) {
+    if (chatId === pointChatId) continue;
     try {
       await withRetry(() => api.sendMessage({ chatId, text }), sleep);
     } catch (error) {

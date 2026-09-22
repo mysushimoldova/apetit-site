@@ -7,9 +7,7 @@ import {
   formatPhone,
   formatTime,
   orderMessage,
-  reminderMessage,
 } from "./message";
-import { BOT_TEXTS } from "./texts";
 
 const kebab: ReceiptLine = {
   name: { ro: "Kebab Cheese", ru: "Кебаб с сыром" },
@@ -100,30 +98,22 @@ describe("orderMessage — текст заказа для Telegram (HTML)", () =
     expect(escapeHtml(`a<b>&"c'`)).toBe(`a&lt;b&gt;&amp;"c'`);
   });
 
-  it("acceptedMessage: тот же текст + строка «Primit la 18:45»", () => {
+  it("acceptedMessage: заголовок «🟢 PRELUATĂ · 18:45 — #1042», остальное то же, без строки внизу", () => {
     const text = acceptedMessage(order, "ro", new Date("2026-09-19T15:45:00Z"));
-    expect(text.startsWith(orderMessage(order, "ro"))).toBe(true);
-    expect(text.endsWith("\n\n✅ Primit la 18:45")).toBe(true);
+    const [header, ...rest] = text.split("\n");
+    expect(header).toBe("🟢 <b>PRELUATĂ · 18:45 — #1042</b>");
+    expect(rest.join("\n")).toBe(
+      orderMessage(order, "ro").split("\n").slice(1).join("\n"),
+    );
+    expect(text).not.toContain("Primit la");
     expect(
-      acceptedMessage(order, "ru", new Date("2026-09-19T15:45:00Z")),
-    ).toContain("✅ Принят в 18:45");
+      acceptedMessage(order, "ru", new Date("2026-09-19T15:45:00Z")).split(
+        "\n",
+      )[0],
+    ).toBe("🟢 <b>ПРИНЯТ · 18:45 — #1042</b>");
   });
 
-  it("в готовых текстах бота нет < и > — иначе Telegram (parse_mode HTML) откажет", () => {
-    for (const lang of ["ro", "ru"] as const) {
-      const t = BOT_TEXTS[lang];
-      const strings = [
-        ...Object.values(t).filter((v): v is string => typeof v === "string"),
-        t.reminder(1042),
-        t.pointLinked("Apetit"),
-      ];
-      for (const text of strings) expect(text).not.toMatch(/[<>]/);
-    }
-  });
-
-  it("reminderMessage, время, телефон, callback_data", () => {
-    expect(reminderMessage(1042, "ro")).toBe("⏰ Comanda 1042 așteaptă");
-    expect(reminderMessage(1042, "ru")).toBe("⏰ Заказ 1042 ждёт");
+  it("время, телефон, callback_data", () => {
     // Зима: UTC+2
     expect(formatTime(new Date("2026-12-19T16:42:00Z"))).toBe("18:42");
     expect(formatPhone("+37368123456")).toBe("+373 68 123 456");

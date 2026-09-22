@@ -1,0 +1,7 @@
+{
+  "reminderEvery": 2,
+  "reminderMax": 15,
+  "ownerAt": 12,
+  "ownerRepeatEvery": 10,
+  "ownerMax": 3
+}

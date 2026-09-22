@@ -5,7 +5,6 @@
 import type { DbClient } from "@/server/db/supabase";
 import type { OrderRow } from "@/server/db/types";
 import { fail } from "@/server/orders/store";
-import { z } from "@/lib/zod";
 
 export interface PointChat {
   chatId: number;
@@ -34,13 +33,17 @@ export type StoredOrder = Pick<
   | "telegram_message_id"
 >;
 
-export interface DueReminder {
+/** Непринятый заказ со счётчиками ступеней (см. alerts.ts) */
+export interface PendingAlert {
   id: string;
   number: number;
   pointId: string;
-  /** Номер этого напоминания (1..5) */
+  createdAt: string;
   remindersSent: number;
+  ownerAlertsSent: number;
 }
+
+export type AlertStage = "reminder" | "owner";
 
 export interface TelegramStore {
   pointChat(pointId: string): Promise<PointChat | null>;
@@ -60,21 +63,30 @@ export interface TelegramStore {
     id: string,
     result: { messageId: number | null; error: string | null },
   ): Promise<void>;
-  /** Заказы, которым пора напомнить; счётчик уже поднят. pointId — для тестов */
-  claimDueReminders(
+  /**
+   * Новые заказы старше olderThanMin минут, у которых ещё не пройдена хотя бы
+   * одна дорожка: напоминаний меньше reminderMax или сообщений владельцам
+   * меньше ownerMax. pointId — только для тестов (свои заказы).
+   */
+  pendingAlerts(
     now: Date,
-    intervalMs: number,
-    max: number,
+    olderThanMin: number,
+    reminderMax: number,
+    ownerMax: number,
     pointId?: string,
-  ): Promise<DueReminder[]>;
+  ): Promise<PendingAlert[]>;
+  /**
+   * Атомарно «забрать» ступень: счётчик ступени поднимается, только если он
+   * ещё равен expected и заказ всё ещё new. false — уже забрали параллельно
+   * или заказ приняли.
+   */
+  claimStage(
+    id: string,
+    stage: AlertStage,
+    expected: number,
+    now: Date,
+  ): Promise<boolean>;
 }
-
-const DueSchema = z.object({
-  id: z.string(),
-  number: z.number().int(),
-  point_id: z.string(),
-  reminders_sent: z.number().int(),
-});
 
 const ORDER_COLUMNS =
   "id, number, point_id, name, phone, address, items, total, status, created_at, accepted_at, telegram_message_id";
@@ -169,23 +181,50 @@ export function createSupabaseTelegramStore(
       if (error) fail("setTelegramResult", error);
     },
 
-    async claimDueReminders(now, intervalMs, max, pointId) {
-      const { data, error } = await getDb().rpc("claim_due_reminders", {
-        p_now: now.toISOString(),
-        p_interval_seconds: Math.round(intervalMs / 1000),
-        p_max: max,
-        p_point_id: pointId ?? null,
-      });
-      if (error) fail("claimDueReminders", error);
-      return (data ?? []).map((row) => {
-        const r = DueSchema.parse(row);
-        return {
-          id: r.id,
-          number: r.number,
-          pointId: r.point_id,
-          remindersSent: r.reminders_sent,
-        };
-      });
+    async pendingAlerts(now, olderThanMin, reminderMax, ownerMax, pointId) {
+      let query = getDb()
+        .from("orders")
+        .select(
+          "id, number, point_id, created_at, reminders_sent, owner_alerts_sent",
+        )
+        .eq("status", "new")
+        .lte(
+          "created_at",
+          new Date(now.getTime() - olderThanMin * 60_000).toISOString(),
+        )
+        // Хотя бы одна дорожка не пройдена
+        .or(`reminders_sent.lt.${reminderMax},owner_alerts_sent.lt.${ownerMax}`)
+        .order("created_at");
+      if (pointId) query = query.eq("point_id", pointId);
+      const { data, error } = await query;
+      if (error) fail("pendingAlerts", error);
+      return (data ?? []).map((r) => ({
+        id: r.id,
+        number: r.number,
+        pointId: r.point_id,
+        createdAt: r.created_at,
+        remindersSent: r.reminders_sent,
+        ownerAlertsSent: r.owner_alerts_sent,
+      }));
+    },
+
+    async claimStage(id, stage, expected, now) {
+      const at = now.toISOString();
+      const column =
+        stage === "reminder" ? "reminders_sent" : "owner_alerts_sent";
+      const patch =
+        stage === "reminder"
+          ? { reminders_sent: expected + 1, last_reminder_at: at }
+          : { owner_alerts_sent: expected + 1, last_owner_alert_at: at };
+      const { data, error } = await getDb()
+        .from("orders")
+        .update(patch)
+        .eq("id", id)
+        .eq("status", "new")
+        .eq(column, expected)
+        .select("id");
+      if (error) fail("claimStage", error);
+      return (data ?? []).length === 1;
     },
   };
 }

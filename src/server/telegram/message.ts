@@ -62,11 +62,22 @@ function lineText(line: ReceiptLine, lang: Locale): string {
     : head;
 }
 
-/** Сообщение точке (и копия владельцам): HTML, parse_mode=HTML. */
-export function orderMessage(order: OrderMessageInput, lang: Locale): string {
+/**
+ * Сообщение точке (и копия владельцам): HTML, parse_mode=HTML.
+ * acceptedAt — заголовок принятого «🟢 PRELUATĂ · 21:12 — #1027» вместо
+ * «🔴 COMANDĂ NOUĂ #1027»; остальное без изменений, кнопки нет.
+ */
+export function orderMessage(
+  order: OrderMessageInput,
+  lang: Locale,
+  acceptedAt: Date | null = null,
+): string {
   const t = BOT_TEXTS[lang];
+  const header = acceptedAt
+    ? `🟢 <b>${t.accepted} · ${formatTime(acceptedAt)} — #${order.number}</b>`
+    : `🔴 <b>${t.newOrder} #${order.number}</b>`;
   const parts = [
-    `🔴 <b>${t.newOrder} #${order.number}</b>`,
+    header,
     escapeHtml(order.pointName),
     "",
     `👤 ${escapeHtml(order.name)}`,
@@ -79,18 +90,13 @@ export function orderMessage(order: OrderMessageInput, lang: Locale): string {
   return parts.join("\n");
 }
 
-/** То же сообщение после «Принят»: кнопки нет, внизу «Primit la 19:42». */
+/** То же сообщение после «Am preluat»: зелёный заголовок, кнопки нет. */
 export function acceptedMessage(
   order: OrderMessageInput,
   lang: Locale,
   acceptedAt: Date,
 ): string {
-  const t = BOT_TEXTS[lang];
-  return `${orderMessage(order, lang)}\n\n✅ ${t.acceptedAt} ${formatTime(acceptedAt)}`;
-}
-
-export function reminderMessage(number: number, lang: Locale): string {
-  return BOT_TEXTS[lang].reminder(number);
+  return orderMessage(order, lang, acceptedAt);
 }
 
 /** callback_data кнопки: «accept:<uuid>» — 43 байта, лимит Telegram 64. */

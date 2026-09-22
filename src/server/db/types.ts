@@ -33,11 +33,16 @@ export type OrderRow = {
   ip_hash: string | null;
   dedup_hash: string;
   telegram_message_id: number | null;
-  /** Сколько напоминаний «⏰ ждёт» уже отправлено (0002) */
+  /** «⏰ ждёт» отправлено (0/1) (0002) */
   reminders_sent: number;
   last_reminder_at: string | null;
   /** Почему заказ не ушёл в Telegram (null — ушёл или ещё не пробовали) */
   telegram_error: string | null;
+  /** Сколько тревог (серий 🚨) ушло точке (0003) */
+  alarm_stage: number;
+  /** Сколько сообщений владельцам ушло (0003) */
+  owner_alerts_sent: number;
+  last_owner_alert_at: string | null;
 };
 
 export type OrderInsert = {
@@ -60,6 +65,9 @@ export type OrderInsert = {
   reminders_sent?: number;
   last_reminder_at?: string | null;
   telegram_error?: string | null;
+  alarm_stage?: number;
+  owner_alerts_sent?: number;
+  last_owner_alert_at?: string | null;
 };
 
 export type TelegramChatRow = {
@@ -159,17 +167,6 @@ export type Database = {
           p_ip_window_seconds: number;
         };
         Returns: Json;
-      };
-      /** Заказы, которым пора напомнить; счётчик поднят тем же UPDATE */
-      claim_due_reminders: {
-        Args: {
-          p_now: string;
-          p_interval_seconds: number;
-          p_max: number;
-          /** Только для тестов: свои заказы; сайт передаёт null */
-          p_point_id?: string | null;
-        };
-        Returns: Json[];
       };
     };
     Enums: { [_ in never]: never };
