@@ -16,7 +16,10 @@ const TEST_POINT_ID = "test-point-integrare";
 const TEST_CHAT = -900000000001;
 const TEST_OWNER = -900000000002;
 
-describe.skipIf(!ready)("telegram store в настоящей Supabase", () => {
+/** Сеть медленнее пяти секунд по умолчанию — см. orders/store.integration. */
+const NET = { timeout: 30_000 };
+
+describe.skipIf(!ready)("telegram store в настоящей Supabase", NET, () => {
   let db: DbClient;
   let store: TelegramStore;
   const orderNumbers: number[] = [];

@@ -241,13 +241,24 @@ test("на медленном устройстве движок сам пони�
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 8 });
   await page.goto("/soroca");
   await waitForCanvas(page);
-  // Две секунды измерений — и движок уходит на уровень 3 (30 кадров/с)
-  // или 4 (стоп). Уровень остаётся на время визита (sessionStorage).
+  // Проверяем то, за что отвечает движок: качество упало и запомнилось.
+  //
+  // Насколько именно упало — не проверяем. Движок меряет ровно два окна по
+  // секунде и за окно опускается на одну ступень, поэтому уровень 3 бывает,
+  // только если медленными окажутся оба окна. На компьютере разработчика
+  // торможение замедляет главный поток, а рисует всё равно видеокарта:
+  // после первой ступени кадров снова хватает, и второго понижения нет —
+  // и это правильное поведение. Ожидание «3 и ниже» роняло тест через раз.
   await expect
     .poll(async () => (await stats(page))!.quality, { timeout: 30_000 })
-    .toBeGreaterThanOrEqual(3);
+    .toBeGreaterThan(1);
+  const quality = (await stats(page))!.quality;
   const level = await page.evaluate(() =>
     window.sessionStorage.getItem("apetit.motion.quality"),
   );
-  expect(Number(level)).toBeGreaterThanOrEqual(3);
+  // Уровень остаётся на время визита (sessionStorage) и сам не повышается
+  expect(Number(level)).toBe(quality);
+  await page.goto("/briceni");
+  await waitForCanvas(page);
+  expect((await stats(page))!.quality).toBeGreaterThanOrEqual(quality);
 });

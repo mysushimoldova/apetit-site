@@ -51,7 +51,15 @@ function newOrder(over: Partial<NewOrder> = {}): NewOrder {
   };
 }
 
-describe.skipIf(!ready)("orders в настоящей Supabase (.env.local)", () => {
+/**
+ * Эти тесты ходят в настоящую базу по сети. Пять секунд (умолчание vitest)
+ * при полном параллельном прогоне иногда не хватает — тест падал по
+ * таймауту, хотя код исправен. Тридцати хватает с запасом, и это всё ещё
+ * не «ждать вечно»: настоящий обрыв связи тест поймает.
+ */
+const NET = { timeout: 30_000 };
+
+describe.skipIf(!ready)("orders в настоящей Supabase (.env.local)", NET, () => {
   // Клиент — только когда тесты действительно идут (при пропуске env нет)
   let db: DbClient;
   let store: OrderStore;
