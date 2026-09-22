@@ -63,7 +63,6 @@ export interface FakeStore extends TelegramStore {
       reminders_sent: number;
       last_reminder_at: string | null;
       telegram_error: string | null;
-      alarm_stage: number;
       owner_alerts_sent: number;
       last_owner_alert_at: string | null;
     }
@@ -203,7 +202,6 @@ export function storedOrder(
     reminders_sent: 0,
     last_reminder_at: null,
     telegram_error: null,
-    alarm_stage: 0,
     owner_alerts_sent: 0,
     last_owner_alert_at: null,
     ...over,

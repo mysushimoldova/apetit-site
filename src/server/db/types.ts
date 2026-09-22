@@ -38,8 +38,6 @@ export type OrderRow = {
   last_reminder_at: string | null;
   /** Почему заказ не ушёл в Telegram (null — ушёл или ещё не пробовали) */
   telegram_error: string | null;
-  /** Сколько тревог (серий 🚨) ушло точке (0003) */
-  alarm_stage: number;
   /** Сколько сообщений владельцам ушло (0003) */
   owner_alerts_sent: number;
   last_owner_alert_at: string | null;
@@ -65,7 +63,6 @@ export type OrderInsert = {
   reminders_sent?: number;
   last_reminder_at?: string | null;
   telegram_error?: string | null;
-  alarm_stage?: number;
   owner_alerts_sent?: number;
   last_owner_alert_at?: string | null;
 };
