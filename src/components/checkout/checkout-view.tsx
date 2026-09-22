@@ -44,7 +44,7 @@ import {
   NAME_MAX,
   fieldError,
   type OrderField,
-} from "@/lib/order/schema";
+} from "@/lib/order/fields";
 import { useIsOpen } from "@/lib/order/use-is-open";
 import { PointPicker, type PointView } from "./point-picker";
 import { TextField } from "./text-field";

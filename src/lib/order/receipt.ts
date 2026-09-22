@@ -1,46 +1,64 @@
 // Снимок принятого заказа (SPEC §9.3: «заказ хранит снимок: названия, цены,
-// добавки на момент заказа»). Сервер возвращает его после приёма; клиент
-// показывает экран подтверждения. Базы ещё нет — снимок живёт в
-// sessionStorage вкладки (прочитанное проверяется этой же схемой).
-// Следующая задача отправит его в Telegram и запишет в Supabase.
-import { z } from "@/lib/zod";
-import { LocalizedSchema } from "@/data/menu/schema";
+// добавки на момент заказа»). Сервер возвращает его после приёма и кладёт в
+// orders.items; браузер держит копию в sessionStorage вкладки, чтобы
+// показать экран подтверждения (прочитанное проверяется этой же схемой).
+//
+// Схема — на лёгком zod/mini: она нужна и в браузере (оформление и экран
+// подтверждения), а полный zod весит 308 КБ разобранного кода. Схемы mini и
+// обычного zod совместимы, поэтому сервер вкладывает её в свои схемы как есть.
+import {
+  array,
+  gte,
+  int,
+  minLength,
+  nonnegative,
+  nullable,
+  object,
+  pipe,
+  positive,
+  refine,
+  regex,
+  string,
+  transform,
+  type output,
+} from "@/lib/zod-mini";
+import { LocalizedSchema } from "@/data/menu/localized";
 import { isCitySlug, type CitySlug } from "@/data/points";
 
-const money = z.number().int().nonnegative();
+const money = int().check(nonnegative());
 
-export const ReceiptLineSchema = z.object({
+export const ReceiptLineSchema = object({
   name: LocalizedSchema,
-  variant: LocalizedSchema.nullable(),
+  variant: nullable(LocalizedSchema),
   /** Добавки в блюдо */
-  extra: z.array(LocalizedSchema),
+  extra: array(LocalizedSchema),
   /** Соусы в стаканчике отдельно */
-  cups: z.array(LocalizedSchema),
+  cups: array(LocalizedSchema),
   /** Убранные ингредиенты */
-  without: z.array(LocalizedSchema),
-  qty: z.number().int().min(1),
+  without: array(LocalizedSchema),
+  qty: int().check(gte(1)),
   /** Цена 1 шт. и позиции — посчитаны сервером */
   unit: money,
   total: money,
 });
-export type ReceiptLine = z.infer<typeof ReceiptLineSchema>;
+export type ReceiptLine = output<typeof ReceiptLineSchema>;
 
-export const ReceiptSchema = z.object({
-  number: z.number().int().positive(),
-  pointId: z.string(),
-  pointName: z.string(),
+export const ReceiptSchema = object({
+  number: int().check(positive()),
+  pointId: string(),
+  pointName: string(),
   /** Формат точки: 0XXXXXXXX (идёт в ссылку tel: — только цифры) */
-  pointPhone: z.string().regex(/^0[0-9]{8}$/),
-  city: z
-    .string()
-    .refine(isCitySlug)
-    .transform((c) => c as CitySlug),
-  lines: z.array(ReceiptLineSchema).min(1),
+  pointPhone: string().check(regex(/^0[0-9]{8}$/)),
+  city: pipe(
+    string().check(refine(isCitySlug)),
+    transform((c) => c as CitySlug),
+  ),
+  lines: array(ReceiptLineSchema).check(minLength(1)),
   total: money,
   /** ISO-время приёма */
-  createdAt: z.string(),
+  createdAt: string(),
 });
-export type OrderReceipt = z.infer<typeof ReceiptSchema>;
+export type OrderReceipt = output<typeof ReceiptSchema>;
 
 const storageKey = (n: number) => `apetit.order.${n}`;
 

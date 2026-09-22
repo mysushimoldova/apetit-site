@@ -1,65 +1,50 @@
-// Вход заказа (SPEC §3 шаг 5, §9.3, §9.4) — одна zod-схема для формы и
-// сервера. Клиент присылает только состав (id и количество) и контакты;
-// лишние поля (сумма, цена) — отказ: цену считает только сервер.
+// Вход заказа (SPEC §3 шаг 5, §9.3, §9.4) — серверная схема. Клиент присылает
+// только состав (id и количество) и контакты; лишние поля (сумма, цена) —
+// отказ: цену считает только сервер.
+//
+// Сами правила полей лежат в ./fields (обычные функции, без zod): их же
+// использует форма в браузере, поэтому проверка на экране и на сервере — одно
+// и то же правило, написанное один раз. Полный zod остаётся здесь, на
+// сервере: в браузер он не уезжает.
 import { z } from "@/lib/zod";
 import { CartLineSchema } from "@/lib/cart/lines";
-import { normalizePhone } from "./phone";
+import {
+  MAX_LINES,
+  NAME_RAW_MAX,
+  ADDRESS_RAW_MAX,
+  PHONE_RAW_MAX,
+  normalizeAddress,
+  normalizeName,
+  normalizeOrderPhone,
+} from "./fields";
 
-export const NAME_MIN = 2;
-export const NAME_MAX = 40;
-export const ADDRESS_MAX = 120;
-export const MAX_LINES = 50;
+export {
+  ADDRESS_MAX,
+  MAX_LINES,
+  NAME_MAX,
+  NAME_MIN,
+  fieldError,
+  type OrderField,
+} from "./fields";
 
-/** Управляющие и «невидимые» символы (в т.ч. разворот текста) — запрещены. */
-/** Диапазоны кодов управляющих и «невидимых» символов (в т.ч. разворот текста). */
-const INVISIBLE_RANGES: ReadonlyArray<readonly [number, number]> = [
-  [0x0000, 0x001f],
-  [0x007f, 0x009f],
-  [0x200b, 0x200f],
-  [0x202a, 0x202e],
-  [0x2060, 0x206f],
-  [0xfeff, 0xfeff],
-];
-function hasInvisible(value: string): boolean {
-  for (const ch of value) {
-    const code = ch.codePointAt(0) ?? 0;
-    if (INVISIBLE_RANGES.some(([from, to]) => code >= from && code <= to)) {
-      return true;
-    }
-  }
-  return false;
+/** Поле по правилу из ./fields: не прошло — своя пометка в issues. */
+function field(rawMax: number, normalize: (raw: string) => string | null) {
+  return z
+    .string()
+    .max(rawMax)
+    .transform((value, ctx) => {
+      const clean = normalize(value);
+      if (clean === null) {
+        ctx.addIssue({ code: "custom", message: "invalid" });
+        return z.NEVER;
+      }
+      return clean;
+    });
 }
-/** Буквы любого алфавита, пробел, дефис, апостроф (' и U+2019), точка. */
-const NAME_CHARS = /^\p{L}[\p{L}\p{M} '’.\-]*$/u;
 
-/** Пробелы по краям убраны, несколько пробелов подряд — один. */
-const tidy = (value: string) => value.replace(/\s+/g, " ").trim();
-
-export const NameSchema = z
-  .string()
-  .max(200)
-  .refine((v) => !hasInvisible(v))
-  .transform(tidy)
-  .pipe(z.string().min(NAME_MIN).max(NAME_MAX).regex(NAME_CHARS));
-
-export const PhoneSchema = z
-  .string()
-  .max(32)
-  .transform((v, ctx) => {
-    const phone = normalizePhone(v);
-    if (phone === null) {
-      ctx.addIssue({ code: "custom", message: "phone" });
-      return z.NEVER;
-    }
-    return phone;
-  });
-
-export const AddressSchema = z
-  .string()
-  .max(500)
-  .refine((v) => !hasInvisible(v))
-  .transform(tidy)
-  .pipe(z.string().max(ADDRESS_MAX));
+export const NameSchema = field(NAME_RAW_MAX, normalizeName);
+export const PhoneSchema = field(PHONE_RAW_MAX, normalizeOrderPhone);
+export const AddressSchema = field(ADDRESS_RAW_MAX, normalizeAddress);
 
 export const OrderInputSchema = z.strictObject({
   pointId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -72,20 +57,3 @@ export const OrderInputSchema = z.strictObject({
   /** Язык, на котором посетитель оформлял (переключатель RO/RU) — для Telegram и писем */
   lang: z.enum(["ro", "ru"]),
 });
-export type OrderInput = z.infer<typeof OrderInputSchema>;
-
-export type OrderField = "name" | "phone" | "address";
-
-const FIELD_SCHEMAS = {
-  name: NameSchema,
-  phone: PhoneSchema,
-  address: AddressSchema,
-} as const;
-
-/** Ошибка одного поля для подписи под ним (null — всё хорошо). */
-export function fieldError(
-  field: OrderField,
-  value: string,
-): OrderField | null {
-  return FIELD_SCHEMAS[field].safeParse(value).success ? null : field;
-}

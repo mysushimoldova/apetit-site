@@ -2,19 +2,16 @@
 // SPEC §2.2 (структура блюда), §2.3 (варианты), §2.4 (добавки), §2.1 (точки).
 import { z } from "@/lib/zod";
 
-/** Текст на двух языках: ro — основной, ru — второй (SPEC §7). */
-export const LocalizedSchema = z.object({
-  ro: z.string().trim().min(1),
-  ru: z.string().trim().min(1),
-});
-export type Localized = z.infer<typeof LocalizedSchema>;
-
-/** Список ингредиентов на двух языках (одинаковой длины — есть тест). */
-export const LocalizedListSchema = z.object({
-  ro: z.array(z.string().trim().min(1)),
-  ru: z.array(z.string().trim().min(1)),
-});
-export type LocalizedList = z.infer<typeof LocalizedListSchema>;
+// Текст на двух языках вынесен в ./localized и написан на лёгком zod/mini:
+// он лежит внутри снимка заказа, а тот нужен в браузере. Здесь — обычный
+// re-export, схемы mini и полного zod вкладываются друг в друга как есть.
+export {
+  LocalizedSchema,
+  LocalizedListSchema,
+  type Localized,
+  type LocalizedList,
+} from "./localized";
+import { LocalizedSchema, LocalizedListSchema } from "./localized";
 
 /** Slug — латиница, цифры, дефис; у блюда совпадает с именем файла фото. */
 const slug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -59,8 +56,9 @@ export const VariantSchema = z.object({
   name: LocalizedSchema,
   price,
   grams: grams.nullable(),
-  /** Состав варианта, если отличается (комбо-меню). */
-  ingredients: LocalizedListSchema.nullable(),
+  /** Состав варианта, если отличается (комбо-меню).
+   *  LocalizedListSchema — схема zod/mini, у неё нет метода .nullable(). */
+  ingredients: z.nullable(LocalizedListSchema),
 });
 export type Variant = z.infer<typeof VariantSchema>;
 

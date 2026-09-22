@@ -2,7 +2,7 @@
 // после успешного заказа и подставляются в форму в следующий раз.
 // Хранятся только в localStorage этого телефона; прочитанное проверяется
 // теми же правилами, что и форма (чужое или битое — не подставляем).
-import { fieldError } from "./schema";
+import { fieldError } from "./fields";
 
 export const CONTACT_STORAGE_KEY = "apetit.contact";
 
