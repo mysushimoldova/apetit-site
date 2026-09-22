@@ -200,7 +200,7 @@ test("движок стоит, пока страница едет к катег�
   await page.goto("/soroca");
   await waitForCanvas(page);
   await page
-    .getByRole("navigation")
+    .getByRole("navigation", { name: /Categorii|Категории/ })
     .getByRole("link", { name: "Burgers" })
     .click();
   await expect

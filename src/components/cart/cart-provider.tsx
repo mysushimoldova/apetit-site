@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { CitySlug, Locale } from "@/data/points";
 import { formatPrice, plural, type Messages } from "@/i18n/messages";
+import { localePath, paths } from "@/i18n/routes";
 import type { Hours } from "@/lib/order/hours";
 import type { Catalog } from "@/lib/cart/pricing";
 import {
@@ -91,8 +92,8 @@ export function CartProvider({
 
   const router = useRouter();
   const leaveToCartCity = useCallback(() => {
-    if (cartCity) router.push(`/${cartCity}`);
-  }, [cartCity, router]);
+    if (cartCity) router.push(localePath(locale, paths.city(cartCity)));
+  }, [cartCity, locale, router]);
 
   const { positions, total } = useCitySummary(city, catalog);
   // Корзину опустошили, пока лист открыт, — закрываем его

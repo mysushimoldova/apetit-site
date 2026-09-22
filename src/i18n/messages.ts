@@ -17,6 +17,8 @@ export interface Messages {
     changeCity: string;
     /** Подпись ленты категорий для скринридера */
     categories: string;
+    /** Подпись переключателя RO/RU для скринридера */
+    language: string;
   };
   menu: {
     /** «de la 80 lei» — при вариантах с разной ценой */
@@ -123,7 +125,7 @@ export interface Messages {
     call: string;
     back: string;
   };
-  /** Правовые страницы и подвал меню */
+  /** Правовые страницы и подвал */
   legal: {
     /** Ссылка на /confidentialitate в подвале */
     privacy: string;
@@ -132,18 +134,46 @@ export interface Messages {
     /** Ссылка внизу правовой страницы */
     back: string;
   };
+  /** Страница контактов (SPEC §8) */
+  contacts: {
+    title: string;
+    /** «Lucrăm zilnic {open}–{close}» — часы точек */
+    hours: string;
+    /** Secondary в карточке точки → меню города */
+    order: string;
+    /** Ссылка на Google Maps по Place ID */
+    map: string;
+    /** Ссылка «оставить отзыв» в Google */
+    review: string;
+    /** Подпись блока соцсетей (только для скринридера) */
+    social: string;
+  };
   meta: {
+    /** title и description экрана городов */
+    homeTitle: string;
+    homeDescription: string;
     /** title страницы города; {city} → название города */
     cityTitle: string;
+    cityDescription: string;
     /** title оформления и подтверждения; {city} → название города */
     checkoutTitle: string;
+    checkoutDescription: string;
+    contactsTitle: string;
+    contactsDescription: string;
+    /** description правовых страниц (title — из src/i18n/legal.ts) */
+    privacyDescription: string;
+    termsDescription: string;
   };
 }
 
 export const messages: Record<Locale, Messages> = {
   ro: {
     cityScreen: { title: "Alege orașul" },
-    header: { changeCity: "Schimbă orașul", categories: "Categorii" },
+    header: {
+      changeCity: "Schimbă orașul",
+      categories: "Categorii",
+      language: "Limba",
+    },
     menu: { from: "de la", currency: "lei", grams: "g" },
     product: { add: "Adaugă" },
     sheet: {
@@ -229,14 +259,42 @@ export const messages: Record<Locale, Messages> = {
       terms: "Termeni",
       back: "Înapoi la meniu",
     },
+    // Кнопки и заголовок — из задания 22.09.2026; строка часов — по ru-тексту
+    // задания, ro — черновик на утверждение (PROGRESS.md)
+    contacts: {
+      title: "Contacte",
+      hours: "Lucrăm zilnic {open}–{close}",
+      order: "Comandă",
+      map: "Vezi pe hartă",
+      review: "Lasă o recenzie",
+      social: "Rețele sociale",
+    },
+    // Заголовок меню — SPEC §8; описания — черновик на утверждение
     meta: {
+      homeTitle: "Apetit — kebab, burgeri, gözleme. Comandă online",
+      homeDescription:
+        "Apetit — fast food în Soroca, Sculeni, Otaci și Briceni. Alege orașul, vezi meniul și comandă online în 30 de secunde.",
       cityTitle: "Apetit {city} — kebab, burgeri, comandă online",
+      cityDescription:
+        "Meniul Apetit {city}: kebab, burgeri, gözleme, crispy, pizza. Comandă online — casierul te sună pentru confirmare. Zilnic 08:30–23:00.",
       checkoutTitle: "Comandă — Apetit {city}",
+      checkoutDescription: "Finalizează comanda la Apetit {city}.",
+      contactsTitle: "Contacte — Apetit",
+      contactsDescription:
+        "Punctele Apetit din Soroca, Sculeni, Otaci și Briceni: adrese, telefoane, program 08:30–23:00, hartă și recenzii Google.",
+      privacyDescription:
+        "Ce date păstrează Apetit când comanzi online și cum le protejăm.",
+      termsDescription:
+        "Condițiile în care Apetit primește și pregătește comenzile online.",
     },
   },
   ru: {
     cityScreen: { title: "Выберите город" },
-    header: { changeCity: "Сменить город", categories: "Категории" },
+    header: {
+      changeCity: "Сменить город",
+      categories: "Категории",
+      language: "Язык",
+    },
     menu: { from: "от", currency: "лей", grams: "г" },
     product: { add: "Добавить" },
     sheet: {
@@ -321,9 +379,32 @@ export const messages: Record<Locale, Messages> = {
       terms: "Условия",
       back: "Вернуться в меню",
     },
+    // TODO ru: проверить
+    contacts: {
+      title: "Контакты",
+      hours: "Работаем ежедневно {open}–{close}",
+      order: "Заказать",
+      map: "Показать на карте",
+      review: "Оставить отзыв",
+      social: "Социальные сети",
+    },
+    // TODO ru: проверить
     meta: {
+      homeTitle: "Apetit — кебаб, бургеры, гёзлеме. Заказ онлайн",
+      homeDescription:
+        "Apetit — фастфуд в Сороках, Скуленах, Отачь и Бричанах. Выберите город, посмотрите меню и закажите онлайн за 30 секунд.",
       cityTitle: "Apetit {city} — кебаб, бургеры, заказ онлайн",
+      cityDescription:
+        "Меню Apetit {city}: кебаб, бургеры, гёзлеме, криспи, пицца. Заказ онлайн — кассир перезвонит для подтверждения. Ежедневно 08:30–23:00.",
       checkoutTitle: "Заказ — Apetit {city}",
+      checkoutDescription: "Оформление заказа в Apetit {city}.",
+      contactsTitle: "Контакты — Apetit",
+      contactsDescription:
+        "Точки Apetit в Сороках, Скуленах, Отачь и Бричанах: адреса, телефоны, часы 08:30–23:00, карта и отзывы Google.",
+      privacyDescription:
+        "Какие данные Apetit хранит при заказе онлайн и как мы их защищаем.",
+      termsDescription:
+        "Условия, на которых Apetit принимает и готовит онлайн-заказы.",
     },
   },
 };

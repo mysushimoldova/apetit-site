@@ -2379,3 +2379,189 @@ ownerRepeatEvery 2, ownerMax 2`, заказ **#1097**:
    закрытия или оставить как есть?
 3. Интервалы пока в файле; в админку (SPEC §4.3 «настраиваются») — отдельной
    задачей?
+
+## 2026-09-22 — Этап 5 — контакты, подвал, русские адреса /ru/, SEO
+
+Коммит `feat: contacts, footer, ru routes and SEO`. План:
+`docs/superpowers/plans/2026-09-22-contacts-footer-ru-seo.md`. Отчёт
+безопасности: `docs/security/2026-09-22-i18n-seo-review.md`.
+
+### 1. Русские адреса и переключатель
+
+- Румынский — как раньше: `/`, `/soroca`, `/soroca/comanda`,
+  `/confidentialitate`, `/termeni`, новая `/contacte`. Русский — те же
+  страницы с `/ru`: `/ru`, `/ru/soroca`, `/ru/soroca/comanda`,
+  `/ru/contacte`, `/ru/confidentialitate`, `/ru/termeni`. Все статические
+  (в сборке 33 страницы). Неизвестный город на `/ru/…` — 404, как и на ro.
+- Как устроено (по правилам Next 16, проверено через context7 и
+  `node_modules/next/dist/docs`): два корневых layout через группу
+  маршрутов — `app/(ro)/layout.tsx` даёт `<html lang="ro">`,
+  `app/ru/layout.tsx` — `<html lang="ru">`. Файлы страниц в `app/` стали
+  тонкими (5–15 строк), а тела страниц, общие для обоих языков, лежат в
+  `src/routes/` (home, city-menu, checkout, confirmation, legal, contacts).
+  Никаких новых библиотек и никакого proxy/rewrites — на Cloudflare нечему
+  ломаться. Адреса везде собираются одним помощником `src/i18n/routes.ts`
+  (`localePath`, `paths`, `switchLocalePath`), поэтому язык не теряется ни
+  в корзине, ни при переходе на оформление, ни в ссылках подвала.
+- **Otaci** открывается на русском: плитка на `/` ведёт на `/ru/otaci`,
+  редирект с `/` на сохранённый город тоже учитывает язык города. Прямой
+  адрес `/otaci` — румынская версия (по заданию: румынский — по нынешним
+  адресам, русский — с `/ru`).
+- **Память языка.** Клик по RO/RU сохраняет выбор на устройстве
+  (`localStorage apetit.lang`). Выбор уважают плитки на `/` и редирект с `/`
+  (выбрал RO → Otaci откроется как `/otaci`; выбрал RU → все города как
+  `/ru/…`). Просто открыть `/ru/otaci` — не выбор: это язык города по
+  умолчанию. На `/ru` все плитки ведут на `/ru/…`, «сменить город» с
+  русской страницы ведёт на `/ru`.
+- **Переключатель RO/RU** в шапке — теперь настоящие ссылки (`<a hreflang>`)
+  на тот же экран в другом языке: `/soroca/comanda` ↔ `/ru/soroca/comanda`,
+  `/contacte` ↔ `/ru/contacte`, подтверждение заказа с тем же номером.
+  Текущий язык — не ссылка (`aria-current`). Переход — полная загрузка
+  страницы (так устроены два корневых layout). Корзина и город живут в
+  localStorage и остаются; **введённое на оформлении** (имя, телефон, адрес,
+  выбранная точка) теперь пишется черновиком в `sessionStorage`
+  (`src/lib/order/draft.ts`) при каждом вводе и подставляется обратно после
+  смены языка; после успешного заказа черновик стирается. Проверено e2e:
+  ввёл данные → RU → всё на месте, корзина на месте.
+- Правовые страницы упростились: язык теперь из адреса, поэтому убрал
+  старую механику «обе версии в HTML + скрипт до отрисовки»
+  (`legal-lang.ts`, `legal-root.tsx`, `legal-header.tsx`,
+  `use-legal-locale.ts`). Заголовок вкладки на `/ru/…` теперь русский —
+  вопрос из отчёта от 19.09 закрыт сам собой.
+
+### 2. SEO
+
+- `<title>` и `<meta description>` — свои на каждую страницу и язык
+  (`src/lib/seo.ts` → `pageMetadata`). Меню: «Apetit Soroca — kebab,
+  burgeri, comandă online» / «Apetit Soroca — кебаб, бургеры, заказ онлайн».
+- `canonical` на каждой странице; `hreflang` ro ↔ ru и `x-default` → ro
+  (в `<head>` и в sitemap). `metadataBase` = `https://apetit.md`
+  (`src/config/site.ts`).
+- `sitemap.xml` и `robots.txt` — генерируемые (`app/sitemap.ts`,
+  `app/robots.ts`, списки в `src/lib/sitemap.ts`): 16 адресов (главная, 4
+  города, контакты, 2 правовые — ×2 языка), без страниц заказа. robots
+  закрывает `/admin`, `/api/`, `/dev/`, `…/comanda` на обоих языках; у
+  оформления и подтверждения `noindex, nofollow`.
+- Open Graph и Twitter-карточки (`summary_large_image`). Картинки 1200×630
+  собрал: `public/og/apetit.png` (общая) + `soroca/sculeni/otaci/briceni.png`.
+  Кремовый фон, фирменные контурные линии (та же формула, что у живого фона,
+  один кадр), крупно APETIT (Oswald), под ним город, снизу жёлтая полоса.
+  Как сделано: макет — dev-страница `/dev/og?city=…` (в боевой сборке 404,
+  проверено e2e-prod), снимает скрипт `npm run og` (Playwright, при
+  запущенном `npm run dev`). Картинки лежат в git, пересобирать только при
+  смене макета.
+- Schema.org (JSON-LD, `src/lib/schema-org.ts`): `Restaurant` на каждую
+  точку (название, адрес, координаты, телефон +373…, часы Mo–Su
+  08:30–23:00, `priceRange "$"`, `hasMenu` → меню города на языке страницы)
+  — на контактах все 5, на меню города — его точки; `BreadcrumbList` на меню
+  (Apetit → город) и оформлении (… → Comandă); `Organization` на главной
+  (название, юрлицо, сайт, e-mail, Instagram, TikTok). JSON экранирует `<`.
+- `lang="ro"` / `lang="ru"` на `<html>` — через два корневых layout.
+- Lighthouse mobile (production-сборка, 13.4.1): `/soroca` — Performance 86,
+  SEO **100**, Best Practices 100, A11y 96 (Smoke-контраст, как раньше);
+  `/contacte` — 93 / 100 / 100 / 96; `/ru/otaci` — 84–86 (три прогона).
+  Сравнение с прежней сборкой на тех же условиях: `/soroca` 87, `/otaci`
+  84–86 — не ниже нынешнего (разброс ±2 — шум прогонов; один прогон
+  `/ru/otaci` показал 75 и оказался выбросом, три повторных — 84–86).
+
+### 3. Страница контактов
+
+`/contacte` и `/ru/contacte`, ссылка в подвале. Заголовок Oswald «CONTACTE» /
+«КОНТАКТЫ» (44px, как города), под ним «Lucrăm zilnic 08:30–23:00» (часы
+берутся из данных точек). Карточки точек — Point Card из DESIGN.md (Milk,
+рамка rule, 16px, padding 16px), порядок: Soroca Centru, Soroca Nouă,
+Sculeni, Otaci, Briceni. В карточке: название (Manrope 700 17px), «Soroca,
+Str. Independenței 72» (13px Charcoal), телефон Manrope 700 18px как ссылка
+`tel:+373…`, «Comandă» — Secondary-кнопка на всю ширину (телефон) / по
+содержимому (десктоп) → меню города на текущем языке, «Vezi pe hartă» и
+«Lasă o recenzie» — текстовые ссылки на Google по place_id из задания
+(place_id лежат в `src/data/points.ts`, ссылки собирает `src/lib/places.ts`).
+Почему так: жёлтая Primary допустима одна на экран, а три пилюли в карточке
+358px ломались бы на две строки — карта и отзыв ушли в текстовые ссылки
+(зона нажатия 44px). Внизу — Section Rule и соцсети текстом: Instagram,
+TikTok (адреса в `src/data/company.ts`). Форм, карт-виджетов и иконок нет.
+Десктоп — карточки в две колонки.
+
+### 4. Подвал
+
+`SiteFooter` — общий компонент на всех страницах (меню, оформление,
+подтверждение, контакты, обе правовые), кроме экранов городов `/` и `/ru`
+(проверено e2e). Строки: реквизиты из `company.ts` (без изменений);
+Contacte · Politica de confidențialitate · Termeni · e-mail; Instagram ·
+TikTok. На `/ru/…` подписи русские и ссылки на `/ru/…`.
+
+### 5. Тексты (все через `src/i18n/messages.ts`, ru помечены TODO ru)
+
+Из задания: «Contacte»/«Контакты», «Comandă», «Vezi pe hartă»,
+«Lasă o recenzie», строка часов по-русски «Работаем ежедневно 08:30–23:00».
+Мои черновики — **на утверждение**:
+- ro строка часов: «Lucrăm zilnic {open}–{close}»;
+- ru кнопки/ссылки контактов: «Заказать», «Показать на карте»,
+  «Оставить отзыв»;
+- подписи для скринридера: «Limba»/«Язык» (переключатель), «Rețele
+  sociale»/«Социальные сети» (блок соцсетей);
+- meta description (поисковая выдача, на экране не видны):
+  - главная ro: «Apetit — fast food în Soroca, Sculeni, Otaci și Briceni.
+    Alege orașul, vezi meniul și comandă online în 30 de secunde.»;
+  - меню ro: «Meniul Apetit {city}: kebab, burgeri, gözleme, crispy, pizza.
+    Comandă online — casierul te sună pentru confirmare. Zilnic 08:30–23:00.»;
+  - контакты ro: «Punctele Apetit din Soroca, Sculeni, Otaci și Briceni:
+    adrese, telefoane, program 08:30–23:00, hartă și recenzii Google.»;
+  - политика/условия ro: «Ce date păstrează Apetit când comanzi online și
+    cum le protejăm.» / «Condițiile în care Apetit primește și pregătește
+    comenzile online.»;
+  - title главной: «Apetit — kebab, burgeri, gözleme. Comandă online»;
+  - русские версии всех перечисленных — в `messages.ts` (TODO ru).
+`[ТЕКСТ: …]`-заглушек в интерфейсе нет.
+
+### 6. Проверки
+
+- Vitest **368** (было 332): адреса и переключение (`routes.test.ts`, 31),
+  память языка, скрипт редиректа с языком (9), черновик формы (4),
+  метаданные/hreflang (5), Schema.org (6), sitemap/robots (3), Place ID (2).
+  Один интеграционный тест с настоящей Supabase (`store.integration`)
+  иногда упирается в 5-секундный таймаут при полном параллельном прогоне;
+  отдельно проходит стабильно — сеть, не код.
+- Playwright **102** (было 55+): новый `e2e/i18n-seo.spec.ts` (25): обе
+  ветки открываются с нужным `lang`, canonical и hreflang; переключатель
+  сохраняет экран, корзину, город и введённые данные; Otaci → `/ru/otaci`
+  и повторное открытие `/`; память языка; на `/ru` — всё на `/ru`;
+  контакты (телефоны, «Comandă», карта и отзыв по нужным place_id, соцсети,
+  нет форм/iframe); подвал на 6 страницах и его отсутствие на `/` и `/ru`;
+  sitemap (16 адресов, hreflang) и robots; JSON-LD на 4 страницах; OG-файлы
+  отдаются. `legal.spec.ts` переписан под адреса. Тесты чипов теперь ищут
+  навигацию по имени «Categorii» — в шапке появилась вторая (язык).
+  e2e-prod (боевая сборка) — 5, добавлен `/dev/og` → 404.
+- `npm run lint` ✓, `tsc` ✓, `npm run build` ✓ (код 0), prettier ✓ (кроме
+  `src/data/images.json` и `.mcp.json` — так было до задачи).
+- Скиллы: DESIGN.md → `frontend-design`, `ui-ux-pro-max` (зона нажатия ≥44px,
+  8px между целями, tel-ссылки, `translate="no"` на брендах);
+  `web-design-guidelines` в конце (добавил `touch-action: manipulation` и
+  `nowrap` на телефоны/ссылки контактов); `owasp-security` +
+  `differential-review` — отчёт по ссылке выше: уязвимостей нет, одно место
+  укреплено превентивно (переключатель не соберёт `//чужой-сайт` из адреса).
+  context7 — Next 16: i18n, `alternates`/`metadataBase`, sitemap/robots,
+  несколько корневых layout. semgrep — перед релизом, не запускал.
+
+**Скриншоты:** `docs/screens/08-contacte-390.png`, `08-contacte-1280.png`,
+`08-subsol-390.png` (подвал на оформлении, с корзиной), `08-meniu-ru-390.png`.
+
+### 7. Что не сделано / отличия
+
+- Отзывы Google в подвале (SPEC §8: рейтинг + 5 последних) — не в этой
+  задаче; на контактах только ссылки по place_id.
+- В карточке точки нет точки-индикатора «открыто/закрыто» из DESIGN → Point
+  Card: в задании её нет, а часы одинаковые у всех и стоят строкой сверху.
+- E-mail в подвале оставил (задание велело оставить строку реквизитов,
+  про e-mail не сказано — убрать легко).
+- В `app/` больше нет общего `layout.tsx`; 404 для неизвестных адресов —
+  стандартная страница Next (как и раньше).
+
+### 8. Вопросы архитектору
+
+1. Утвердить черновики текстов из п. 5 (особенно meta description и
+   «Lucrăm zilnic»).
+2. Соцсети видны дважды на контактах (блок внизу страницы и подвал) — так
+   по заданию; оставить обе или убрать блок над подвалом?
+3. SPEC §8 всё ещё называет политику `/politica-de-confidentialitate` и не
+   знает про `/termeni` и `/ru/…` — обновить?

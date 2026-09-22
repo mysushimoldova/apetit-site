@@ -7,6 +7,11 @@ test("панели /dev/motion в боевой сборке нет", async ({ pa
   expect(response?.status()).toBe(404);
 });
 
+test("макета /dev/og в боевой сборке нет", async ({ page }) => {
+  expect((await page.goto("/dev/og"))?.status()).toBe(404);
+  expect((await page.goto("/dev/og?city=soroca"))?.status()).toBe(404);
+});
+
 test("маршрута /api/dev/motion в боевой сборке нет", async ({ request }) => {
   expect((await request.get("/api/dev/motion")).status()).toBe(404);
   const post = await request.post("/api/dev/motion", {

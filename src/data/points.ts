@@ -28,6 +28,9 @@ export interface Point {
   acceptingOrders: boolean;
   /** Координаты — для «~1,2 km» при оформлении; null — расстояние не показываем. */
   coords: { lat: number; lng: number } | null;
+  /** Google Place ID точки — ссылки «Vezi pe hartă» и «Lasă o recenzie»
+   *  на странице контактов (src/lib/places.ts). */
+  placeId: string;
 }
 
 const HOURS = { open: "08:30", close: "23:00" } as const;
@@ -54,6 +57,7 @@ export const POINTS: readonly Point[] = [
     address: "Str. Independenței 72",
     acceptingOrders: true,
     coords: { lat: 48.156795, lng: 28.3036351 },
+    placeId: "ChIJO-lRcwDrzEAR53WfxGtH6CA",
   },
   {
     id: "soroca-noua",
@@ -66,6 +70,7 @@ export const POINTS: readonly Point[] = [
     address: "Dimitrie Cantemir 24F",
     acceptingOrders: true,
     coords: { lat: 48.1750314, lng: 28.3205164 },
+    placeId: "ChIJnaNq3VbpzEAR4XOsS2bnFuM",
   },
   {
     id: "sculeni",
@@ -78,6 +83,7 @@ export const POINTS: readonly Point[] = [
     address: "Calea Ieșilor E58",
     acceptingOrders: true,
     coords: { lat: 47.3272293, lng: 27.6120934 },
+    placeId: "ChIJDbnsHgAdy0ARW_CWq39nIY8",
   },
   {
     id: "otaci",
@@ -90,6 +96,7 @@ export const POINTS: readonly Point[] = [
     address: "Prieteniei 66",
     acceptingOrders: true,
     coords: { lat: 48.4422993, lng: 27.7876133 },
+    placeId: "ChIJpR_aSAAvM0cR2zRBKtyg9mE",
   },
   {
     id: "briceni",
@@ -102,6 +109,7 @@ export const POINTS: readonly Point[] = [
     address: "Strada Mihai Eminescu 54",
     acceptingOrders: true,
     coords: { lat: 48.3529048, lng: 27.0849932 },
+    placeId: "ChIJ2YI2WgBzM0cRVzCmzQHNyfQ",
   },
 ];
 

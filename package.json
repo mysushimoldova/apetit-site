@@ -16,7 +16,8 @@
     "test:py": "py -3 -m unittest scripts/test_prepare_images.py",
     "test:e2e:prod": "playwright test -c playwright.prod.config.ts",
     "telegram:dev": "node scripts/telegram-dev.mjs",
-    "telegram:setup": "node scripts/telegram-setup.mjs"
+    "telegram:setup": "node scripts/telegram-setup.mjs",
+    "og": "node scripts/og-images.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

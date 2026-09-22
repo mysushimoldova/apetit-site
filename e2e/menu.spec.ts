@@ -28,7 +28,11 @@ test("/soroca: 11 категорий без пиццы, шапка и чипы �
   const names = await billboards.allInnerTexts();
   expect(names.map((n) => n.trim().toUpperCase())).not.toContain("PIZZA");
   expect(names[0].trim().toUpperCase()).toBe("KEBAB");
-  await expect(page.getByRole("navigation").getByRole("link")).toHaveCount(11);
+  await expect(
+    page
+      .getByRole("navigation", { name: /Categorii|Категории/ })
+      .getByRole("link"),
+  ).toHaveCount(11);
 });
 
 test("/briceni: пицца есть", async ({ page }) => {
@@ -44,7 +48,7 @@ test("клик по чипу Burgers плавно скроллит к BURGERS и
 }) => {
   await page.goto("/soroca");
   const chip = page
-    .getByRole("navigation")
+    .getByRole("navigation", { name: /Categorii|Категории/ })
     .getByRole("link", { name: "Burgers" });
   await chip.click();
   const section = page.locator("#burgers");
@@ -76,9 +80,7 @@ async function recordActiveChips(page: Page) {
 }
 
 const activeLog = (page: Page) =>
-  page.evaluate(
-    () => (window as unknown as { activeLog: string[] }).activeLog,
-  );
+  page.evaluate(() => (window as unknown as { activeLog: string[] }).activeLog);
 
 for (const slug of ["crispy", "desert"]) {
   test(`плавный переход к дальней категории (${slug}): промежуточные чипы не загораются`, async ({
@@ -152,21 +154,31 @@ test("все фото загружаются: нет битых img и нет 40
   expect(await page.locator("main img").count()).toBe(47);
 });
 
-test("/otaci открывается на русском", async ({ page }) => {
-  await page.goto("/otaci");
-  await expect(page.locator("[lang='ru']").first()).toBeVisible();
+test("/ru/otaci — по-русски, /otaci — по-румынски", async ({ page }) => {
+  await page.goto("/ru/otaci");
+  await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await expect(
-    page.getByRole("navigation").getByRole("link", { name: "Бургеры" }),
+    page
+      .getByRole("navigation", { name: /Categorii|Категории/ })
+      .getByRole("link", { name: "Бургеры" }),
   ).toBeVisible();
   await expect(page.getByText("de la")).toHaveCount(0);
   await expect(page.getByText(/^от /).first()).toBeVisible();
+
+  await page.goto("/otaci");
+  await expect(page.locator("html")).toHaveAttribute("lang", "ro");
+  await expect(
+    page
+      .getByRole("navigation", { name: /Categorii|Категории/ })
+      .getByRole("link", { name: "Burgers" }),
+  ).toBeVisible();
 });
 
-for (const city of ["soroca", "otaci"]) {
-  test(`${city}: слова-вывески в одну строку и во всю ширину контента`, async ({
+for (const path of ["/soroca", "/ru/otaci"]) {
+  test(`${path}: слова-вывески в одну строку и во всю ширину контента`, async ({
     page,
   }) => {
-    await page.goto(`/${city}`);
+    await page.goto(path);
     await page.evaluate(() => document.fonts.ready);
     const words = await page.locator("main h2").evaluateAll((els) =>
       els.map((el) => {
@@ -201,7 +213,10 @@ test.describe("десктоп", () => {
     page,
   }) => {
     await page.goto("/soroca");
-    const chip = page.getByRole("navigation").getByRole("link").first();
+    const chip = page
+      .getByRole("navigation", { name: /Categorii|Категории/ })
+      .getByRole("link")
+      .first();
     const title = page.locator("main h2").first();
     const chipX = Math.round((await chip.boundingBox())!.x);
     const titleX = Math.round((await title.boundingBox())!.x);

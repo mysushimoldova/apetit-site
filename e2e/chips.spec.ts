@@ -55,7 +55,7 @@ test("нажатие на чип: один оборот иконки 250ms и п
   await recordSpins(page);
   await page.goto("/soroca");
   await page
-    .getByRole("navigation")
+    .getByRole("navigation", { name: /Categorii|Категории/ })
     .getByRole("link", { name: "Burgers" })
     .click();
   const [spin, ...rest] = await spins(page);
@@ -80,7 +80,7 @@ test("чип с клавиатуры: Enter и Space — тот же оборо�
 }) => {
   await recordSpins(page);
   await page.goto("/soroca");
-  const nav = page.getByRole("navigation");
+  const nav = page.getByRole("navigation", { name: /Categorii|Категории/ });
   await nav.getByRole("link", { name: "Burgers" }).focus();
   await page.keyboard.press("Enter");
   await expectAtSection(page, "burgers");
@@ -97,7 +97,7 @@ test("при «уменьшить движение» иконка не крут�
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/soroca");
   await page
-    .getByRole("navigation")
+    .getByRole("navigation", { name: /Categorii|Категории/ })
     .getByRole("link", { name: "Burgers" })
     .click();
   await expectAtSection(page, "burgers");

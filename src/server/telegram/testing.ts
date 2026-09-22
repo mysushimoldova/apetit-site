@@ -148,6 +148,7 @@ export const TEST_POINT: Point = {
   locale: "ro",
   hours: { open: "08:30", close: "23:00" },
   address: "Str. Test 1",
+  placeId: "ChIJ2YI2WgBzM0cRVzCmzQHNyfQ",
   acceptingOrders: true,
   coords: null,
 };

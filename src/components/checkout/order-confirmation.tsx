@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { CitySlug, Locale } from "@/data/points";
 import { fill, formatPrice, type Messages } from "@/i18n/messages";
+import { localePath, paths } from "@/i18n/routes";
 import { describeParts } from "@/lib/cart/describe";
 import { formatPhoneDisplay, phoneHref } from "@/lib/order/phone";
 import { parseReceipt, readReceiptRaw } from "@/lib/order/receipt";
@@ -40,9 +41,9 @@ export function OrderConfirmation({
   // Читаем хранилище напрямую: при гидратации raw ещё «серверный» (null)
   useEffect(() => {
     if (!parseReceipt(readReceiptRaw(number), number, city)) {
-      router.replace(`/${city}`);
+      router.replace(localePath(locale, paths.city(city)));
     }
-  }, [number, city, router]);
+  }, [number, city, locale, router]);
 
   if (!receipt) return <main className="page min-h-[60dvh]" />;
 
@@ -124,7 +125,10 @@ export function OrderConfirmation({
             </span>
           </span>
         </a>
-        <Link href={`/${city}`} className="btn-primary">
+        <Link
+          href={localePath(locale, paths.city(city))}
+          className="btn-primary"
+        >
           {t.confirmation.back}
         </Link>
       </div>

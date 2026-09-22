@@ -6,6 +6,8 @@
 // Десктоп: поля и кнопка слева, «Coș» — колонкой справа.
 // Корзина очищается только после ответа сервера «принято»; тогда же имя,
 // телефон и адрес запоминаются на устройстве (SPEC §3 шаг 6).
+// Пока заказ не отправлен, введённое лежит черновиком в sessionStorage —
+// переключение RO/RU (полная загрузка страницы) его не стирает.
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,17 +19,24 @@ import {
   useSyncExternalStore,
   type FormEvent,
 } from "react";
-import { submitOrderAction } from "@/app/[city]/comanda/actions";
+import { submitOrderAction } from "@/server/order/actions";
 import { ClosedBanner } from "@/components/order/closed-banner";
 import type { Localized } from "@/data/menu/schema";
 import type { CitySlug, Locale } from "@/data/points";
 import { fillNodes } from "@/i18n/fill-nodes";
 import { formatPrice, type Messages } from "@/i18n/messages";
+import { localePath, paths } from "@/i18n/routes";
 import { describeParts, lineParts } from "@/lib/cart/describe";
 import { lineKey, type CartLine } from "@/lib/cart/lines";
 import { priceLine, type Catalog } from "@/lib/cart/pricing";
 import { cartStore, hydrateCart, useCart } from "@/lib/cart/store";
 import { parseContact, readContactRaw, saveContact } from "@/lib/order/contact";
+import {
+  clearDraft,
+  parseDraft,
+  readDraftRaw,
+  saveDraft,
+} from "@/lib/order/draft";
 import { maskPhoneInput } from "@/lib/order/phone";
 import { saveReceipt } from "@/lib/order/receipt";
 import {
@@ -81,9 +90,9 @@ export function CheckoutView({
   const submitted = useRef(false);
   useEffect(() => {
     if (hydrated && lines.length === 0 && !submitted.current) {
-      router.replace(`/${city}`);
+      router.replace(localePath(locale, paths.city(city)));
     }
-  }, [hydrated, lines.length, city, router]);
+  }, [hydrated, lines.length, city, locale, router]);
 
   const single = points.length === 1;
   const [pointId, setPointId] = useState<string | null>(
@@ -102,18 +111,27 @@ export function CheckoutView({
   // Язык, на котором оформляли (RO/RU) — уходит с заказом для Telegram и писем
   const langField = useRef<HTMLInputElement>(null);
 
-  // Контакты с прошлого заказа: на сервере их нет (null), в браузере —
-  // подставляем один раз; то, что человек уже начал вводить, не затираем
+  // Черновик этой вкладки (после смены языка) важнее контактов с прошлого
+  // заказа; те подставляются, только если поле ещё пустое. На сервере
+  // хранилищ нет (null), в браузере — подставляем один раз; то, что
+  // человек уже начал вводить, не затираем
+  const draftRaw = useSyncExternalStore(noop, readDraftRaw, () => null);
   const savedRaw = useSyncExternalStore(noop, readContactRaw, () => null);
   const [prefilled, setPrefilled] = useState(false);
-  if (savedRaw !== null && !prefilled) {
+  if (!prefilled && (draftRaw !== null || savedRaw !== null)) {
     setPrefilled(true);
+    const draft = parseDraft(draftRaw);
     const saved = parseContact(savedRaw);
-    if (saved) {
+    if (draft?.pointId && points.some((p) => p.id === draft.pointId)) {
+      setPointId(draft.pointId);
+    }
+    if (draft || saved) {
+      const pick = (field: keyof typeof values) =>
+        draft?.[field] || saved?.[field] || "";
       setValues((v) => ({
-        name: v.name || saved.name,
-        phone: v.phone || saved.phone,
-        address: v.address || saved.address,
+        name: v.name || pick("name"),
+        phone: v.phone || pick("phone"),
+        address: v.address || pick("address"),
       }));
     }
   }
@@ -126,7 +144,10 @@ export function CheckoutView({
   }
 
   function setValue(field: OrderField, value: string) {
-    setValues((v) => ({ ...v, [field]: value }));
+    const next = { ...values, [field]: value };
+    setValues(next);
+    // Черновик — при каждом вводе, пока заказ не отправлен
+    saveDraft({ ...next, pointId });
     // Ошибка уже показана — убираем, как только поле исправили
     if (errors[field] && check(field, value)) {
       setErrors((e) => ({ ...e, [field]: false }));
@@ -184,9 +205,12 @@ export function CheckoutView({
       if (result.ok) {
         saveReceipt(result.receipt);
         saveContact(values);
+        clearDraft();
         submitted.current = true;
         cartStore.getState().clear();
-        router.replace(`/${city}/comanda/${result.receipt.number}`);
+        router.replace(
+          localePath(locale, paths.confirmation(city, result.receipt.number)),
+        );
         return; // кнопка остаётся неактивной до перехода
       }
       switch (result.code) {
@@ -232,7 +256,7 @@ export function CheckoutView({
 
   return (
     <main className="page pt-4 pb-16 lg:pt-8">
-      <Link href={`/${city}`} className="back-link">
+      <Link href={localePath(locale, paths.city(city))} className="back-link">
         <ArrowLeft size={18} strokeWidth={1.75} aria-hidden="true" />
         {t.checkout.back}
       </Link>
@@ -259,6 +283,7 @@ export function CheckoutView({
               value={pointId}
               onChange={(id) => {
                 setPointId(id);
+                saveDraft({ ...values, pointId: id });
                 setErrors((e) => ({ ...e, point: false }));
                 setUnavailable([]);
                 setServerError(null);
@@ -401,12 +426,20 @@ export function CheckoutView({
           <p className="consent-note mt-2 text-center font-body text-meta text-smoke">
             {fillNodes(t.checkout.consent.text, {
               terms: (
-                <Link href="/termeni" target="_blank" rel="noopener">
+                <Link
+                  href={localePath(locale, paths.terms())}
+                  target="_blank"
+                  rel="noopener"
+                >
                   {t.checkout.consent.terms}
                 </Link>
               ),
               privacy: (
-                <Link href="/confidentialitate" target="_blank" rel="noopener">
+                <Link
+                  href={localePath(locale, paths.privacy())}
+                  target="_blank"
+                  rel="noopener"
+                >
                   {t.checkout.consent.privacy}
                 </Link>
               ),

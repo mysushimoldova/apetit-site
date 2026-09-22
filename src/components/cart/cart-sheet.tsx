@@ -14,6 +14,7 @@ import { lineKey, type CartLine } from "@/lib/cart/lines";
 import { priceLine } from "@/lib/cart/pricing";
 import { cartStore } from "@/lib/cart/store";
 import { useIsOpen } from "@/lib/order/use-is-open";
+import { localePath, paths } from "@/i18n/routes";
 import { useCartContext, useCartSummary } from "./cart-context";
 import { ClearCartButton } from "./clear-cart-button";
 import { QuantityStepper } from "./quantity-stepper";
@@ -49,7 +50,10 @@ export function CartSheet({
           {t.cart.order}
         </button>
       ) : (
-        <Link href={`/${city}/comanda`} className="btn-primary mt-3 w-full">
+        <Link
+          href={localePath(locale, paths.checkout(city))}
+          className="btn-primary mt-3 w-full"
+        >
           {t.cart.order}
         </Link>
       )}

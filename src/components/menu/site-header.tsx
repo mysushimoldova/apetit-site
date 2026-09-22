@@ -1,23 +1,23 @@
-// Шапка меню (DESIGN.md → Header): 56px, стекло, снизу линия. Слева APETIT
+// Шапка (DESIGN.md → Header): 56px, стекло, снизу линия. Слева APETIT
 // (пока текстом Oswald — SVG-логотипа ещё нет), справа город + RO/RU.
-// Переключатель языка пока статический: маршрут /ru/[city] (SPEC §7) —
-// следующая задача.
-// Десктоп: справа ещё кнопка корзины (DESIGN.md → Layout); на оформлении
-// заказа её нет (cart={false}) — корзина уже на экране.
+// city — страницы города (меню, оформление, подтверждение); без city
+// (контакты, правовые) город берётся из памяти устройства, если выбран.
+// Десктоп: справа ещё кнопка корзины (DESIGN.md → Layout) — только в меню
+// (cart); на оформлении заказа корзина уже на экране.
 import { HeaderCartButton } from "@/components/cart/header-cart-button";
 import type { City, Locale } from "@/data/points";
 import type { Messages } from "@/i18n/messages";
 import { HeaderCityButton } from "./header-city-button";
-
-const LOCALES: Locale[] = ["ro", "ru"];
+import { LangSwitch } from "./lang-switch";
+import { SavedCityButton } from "./saved-city-button";
 
 export function SiteHeader({
   city,
   locale,
   t,
-  cart = true,
+  cart = false,
 }: {
-  city: City;
+  city?: City;
   locale: Locale;
   t: Messages;
   cart?: boolean;
@@ -32,17 +32,16 @@ export function SiteHeader({
           APETIT
         </span>
         <div className="flex items-center gap-3">
-          <HeaderCityButton cityName={city.name} label={t.header.changeCity} />
-          <span className="font-ui text-meta font-semibold" aria-hidden="true">
-            {LOCALES.map((code, i) => (
-              <span key={code}>
-                {i > 0 && <span className="text-smoke"> / </span>}
-                <span className={code === locale ? "text-ink" : "text-smoke"}>
-                  {code.toUpperCase()}
-                </span>
-              </span>
-            ))}
-          </span>
+          {city ? (
+            <HeaderCityButton
+              cityName={city.name}
+              label={t.header.changeCity}
+              locale={locale}
+            />
+          ) : (
+            <SavedCityButton label={t.header.changeCity} locale={locale} />
+          )}
+          <LangSwitch locale={locale} label={t.header.language} />
           {cart && <HeaderCartButton />}
         </div>
       </div>

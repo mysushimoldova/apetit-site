@@ -171,7 +171,7 @@ test("вне часов: баннер в корзине и на оформлен
   await setTime(page, CLOSED);
   await seedCart(page, "otaci", [line("cola")]);
 
-  await page.goto("/otaci/comanda");
+  await page.goto("/ru/otaci/comanda");
   // Otaci — одна точка, блока выбора нет; язык — русский
   await expect(page.getByRole("radio")).toHaveCount(0);
   await expect(page.getByText("Принимаем заказы 08:30–23:00")).toBeVisible();
@@ -179,7 +179,7 @@ test("вне часов: баннер в корзине и на оформлен
     page.getByRole("button", { name: "Отправить заказ" }),
   ).toBeDisabled();
 
-  await page.goto("/otaci");
+  await page.goto("/ru/otaci");
   await page.waitForFunction(() => document.readyState === "complete");
   await page.locator(".cart-bar").getByRole("button").click();
   const cart = page.getByRole("dialog", { name: "Корзина" });

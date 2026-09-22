@@ -1,16 +1,19 @@
-// Подвал страницы меню: Section Rule (1px Ink), затем две строки Montserrat
-// 13px Smoke — реквизиты и ссылки. Реквизиты — из src/data/company.ts.
+// Подвал всех страниц, кроме экрана городов: Section Rule (1px Ink), затем
+// строки Montserrat 13px Smoke — реквизиты, ссылки на страницы, соцсети
+// текстом (без иконок в кружочках). Реквизиты и соцсети — src/data/company.ts.
 // Куски строки не рвутся посередине: перенос только между « · ».
 import Link from "next/link";
 import { COMPANY } from "@/data/company";
 import type { Locale } from "@/data/points";
 import type { Messages } from "@/i18n/messages";
+import { localePath, paths } from "@/i18n/routes";
 
 function Dot() {
   return <span aria-hidden="true"> · </span>;
 }
 
 export function SiteFooter({ locale, t }: { locale: Locale; t: Messages }) {
+  const href = (path: string) => localePath(locale, path);
   return (
     <footer className="site-footer">
       <div className="page">
@@ -26,11 +29,22 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Messages }) {
             <span className="whitespace-nowrap">{COMPANY.address[locale]}</span>
           </p>
           <p>
-            <Link href="/confidentialitate">{t.legal.privacy}</Link>
+            <Link href={href(paths.contacts())}>{t.contacts.title}</Link>
             <Dot />
-            <Link href="/termeni">{t.legal.terms}</Link>
+            <Link href={href(paths.privacy())}>{t.legal.privacy}</Link>
+            <Dot />
+            <Link href={href(paths.terms())}>{t.legal.terms}</Link>
             <Dot />
             <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
+          </p>
+          <p translate="no">
+            <a href={COMPANY.social.instagram} rel="noopener">
+              Instagram
+            </a>
+            <Dot />
+            <a href={COMPANY.social.tiktok} rel="noopener">
+              TikTok
+            </a>
           </p>
         </div>
       </div>

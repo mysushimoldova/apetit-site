@@ -1,18 +1,21 @@
 "use client";
 // Название города в шапке + стрелка вниз: нажатие = сменить город
-// (SPEC §3 шаг 1). Пока просто забывает выбор и ведёт на экран городов;
-// стеклянный оверлей смены города — позже.
+// (SPEC §3 шаг 1). Забывает выбор и ведёт на экран городов на текущем
+// языке; стеклянный оверлей смены города — позже.
 import { ChevronDown } from "lucide-react";
+import type { Locale } from "@/data/points";
 import { useChangeCity } from "@/lib/use-change-city";
 
 export function HeaderCityButton({
   cityName,
   label,
+  locale,
 }: {
   cityName: string;
   label: string;
+  locale: Locale;
 }) {
-  const changeCity = useChangeCity();
+  const changeCity = useChangeCity(locale);
   return (
     <button
       type="button"

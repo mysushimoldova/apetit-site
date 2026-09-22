@@ -34,10 +34,14 @@ test("главная показывает 4 плитки и никакого д�
   expect(consoleErrors).toEqual([]);
 });
 
-test("плитки — ссылки на /[city]", async ({ page }) => {
+test("плитки — ссылки на /[city]; Otaci — на /ru/otaci", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByRole("link", { name: "Soroca" })).toHaveAttribute(
+    "href",
+    "/soroca",
+  );
   const tile = page.getByRole("link", { name: "Otaci" });
-  await expect(tile).toHaveAttribute("href", "/otaci");
+  await expect(tile).toHaveAttribute("href", "/ru/otaci");
   // Web Interface Guidelines: без задержки двойного тапа, названия не переводятся
   await expect(tile).toHaveCSS("touch-action", "manipulation");
   await expect(page.locator("ul")).toHaveAttribute("translate", "no");

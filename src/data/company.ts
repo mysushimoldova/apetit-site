@@ -13,6 +13,11 @@ export const COMPANY = {
     ru: "г. Сорока, ул. Тирасполь 4",
   } satisfies Record<Locale, string>,
   email: "dddpaskary@gmail.com",
+  /** Соцсети — подвал и страница контактов (SPEC §8). Facebook нет. */
+  social: {
+    instagram: "https://www.instagram.com/apetit.md/",
+    tiktok: "https://www.tiktok.com/@apetit.md",
+  },
   /** Год в строке «© 2026 …» подвала */
   copyrightYear: 2026,
 } as const;

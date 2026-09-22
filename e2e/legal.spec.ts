@@ -39,8 +39,9 @@ const h1 = (page: Page) => page.getByRole("heading", { level: 1 });
 test.describe("правовые страницы", () => {
   test("/confidentialitate без выбранного города — ro", async ({ page }) => {
     await page.goto("/confidentialitate");
+    await expect(page.locator("html")).toHaveAttribute("lang", "ro");
     await expect(h1(page)).toHaveText("Politica de confidențialitate");
-    await expect(h1(page)).toHaveCount(1); // русская версия скрыта
+    await expect(h1(page)).toHaveCount(1);
     await expect(
       page.getByRole("heading", { level: 2, name: "Cine suntem" }),
     ).toBeVisible();
@@ -55,33 +56,40 @@ test.describe("правовые страницы", () => {
     ).toHaveCount(0);
   });
 
-  test("Otaci → ru сразу; переключатель RO/RU работает", async ({ page }) => {
+  test("/ru/confidentialitate — по-русски; переключатель ведёт на тот же экран", async ({
+    page,
+  }) => {
     await saveCity(page, "otaci");
-    await page.goto("/confidentialitate");
+    await page.goto("/ru/confidentialitate");
+    await expect(page.locator("html")).toHaveAttribute("lang", "ru");
     await expect(h1(page)).toHaveText("Политика конфиденциальности");
-    await expect(page.locator(".legal-root")).toHaveAttribute(
-      "data-lang",
-      "ru",
-    );
+    await expect(page).toHaveTitle("Политика конфиденциальности — Apetit");
     await expect(
       page.getByRole("link", { name: "Вернуться в меню" }),
-    ).toHaveAttribute("href", "/otaci");
+    ).toHaveAttribute("href", "/ru/otaci");
     await expect(page.getByRole("button", { name: /Otaci/ })).toBeVisible();
 
-    await page.getByRole("button", { name: "RO", exact: true }).click();
+    const nav = page.getByRole("navigation", { name: "Язык" });
+    await expect(nav.getByRole("link", { name: "RO" })).toHaveAttribute(
+      "href",
+      "/confidentialitate",
+    );
+    await nav.getByRole("link", { name: "RO" }).click();
+    await expect(page).toHaveURL(/\/confidentialitate$/);
     await expect(h1(page)).toHaveText("Politica de confidențialitate");
-    await expect(
-      page.getByRole("button", { name: "RO", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await page.getByRole("button", { name: "RU", exact: true }).click();
+    await page
+      .getByRole("navigation", { name: "Limba" })
+      .getByRole("link", { name: "RU" })
+      .click();
+    await expect(page).toHaveURL(/\/ru\/confidentialitate$/);
     await expect(h1(page)).toHaveText("Политика конфиденциальности");
   });
 
-  test("/termeni на ro и ru: 8 пунктов", async ({ page }) => {
+  test("/termeni и /ru/termeni: 8 пунктов", async ({ page }) => {
     await saveCity(page, "soroca");
     await page.goto("/termeni");
     await expect(h1(page)).toHaveText("Termeni și condiții");
-    const ro = page.locator('[data-variant="ro"] li');
+    const ro = page.locator("main li");
     await expect(ro).toHaveCount(8);
     await expect(ro.nth(4)).toHaveText(
       "Comenzile se primesc zilnic, 08:30–23:00.",
@@ -90,9 +98,9 @@ test.describe("правовые страницы", () => {
       page.getByRole("link", { name: "Înapoi la meniu" }),
     ).toHaveAttribute("href", "/soroca");
 
-    await page.getByRole("button", { name: "RU", exact: true }).click();
+    await page.goto("/ru/termeni");
     await expect(h1(page)).toHaveText("Условия");
-    await expect(page.locator('[data-variant="ru"] li')).toHaveCount(8);
+    await expect(page.locator("main li")).toHaveCount(8);
   });
 });
 
@@ -125,12 +133,14 @@ test.describe("ссылки", () => {
     await expect(h1(page)).toHaveText("Politica de confidențialitate");
   });
 
-  test("подвал Otaci — по-русски; переход сохраняет язык", async ({ page }) => {
-    await page.goto("/otaci");
+  test("подвал /ru/otaci — по-русски; переход сохраняет язык", async ({
+    page,
+  }) => {
+    await page.goto("/ru/otaci");
     const footer = page.locator("footer");
     await expect(footer).toContainText("г. Сорока, ул. Тирасполь 4");
     await footer.getByRole("link", { name: "Условия" }).click();
-    await expect(page).toHaveURL(/\/termeni$/);
+    await expect(page).toHaveURL(/\/ru\/termeni$/);
     await expect(h1(page)).toHaveText("Условия");
   });
 
@@ -175,10 +185,15 @@ test.describe("ссылки", () => {
     await expect(page).toHaveURL(/\/soroca\/comanda$/);
   });
 
-  test("строка согласия на ru (Otaci)", async ({ page }) => {
-    await page.goto("/otaci/comanda");
-    await expect(page.locator(".consent-note")).toHaveText(
+  test("строка согласия на ru (Otaci) — ссылки на /ru", async ({ page }) => {
+    await page.goto("/ru/otaci/comanda");
+    const note = page.locator(".consent-note");
+    await expect(note).toHaveText(
       "Отправляя заказ, вы соглашаетесь с Условиями и Политикой конфиденциальности.",
+    );
+    await expect(note.getByRole("link", { name: "Условиями" })).toHaveAttribute(
+      "href",
+      "/ru/termeni",
     );
   });
 });
