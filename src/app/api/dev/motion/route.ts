@@ -20,6 +20,16 @@ const isDev = () => process.env.NODE_ENV === "development";
 
 const notFound = () => new Response(null, { status: 404 });
 
+/** Хост из заголовка Origin («http://localhost:3000» → «localhost:3000»).
+ *  Неразбираемый Origin — точно не наш. */
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   if (!isDev()) return notFound();
   const raw = await readFile(FILE, "utf8");
@@ -37,9 +47,13 @@ export async function POST(request: Request) {
   if (!isDev()) return notFound();
 
   // Браузер всегда ставит Origin на POST с другого сайта — такой запрос
-  // писать файл не должен (запрос из терминала Origin не шлёт вовсе)
+  // писать файл не должен (запрос из терминала Origin не шлёт вовсе).
+  // Сравниваем с заголовком Host — адресом, на который браузер и постучался.
+  // (request.url в dev-сервере Next 16 показывает 0.0.0.0:3000, на что бы
+  // браузер ни открыл страницу, поэтому сравнивать с ним нельзя.)
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  const host = request.headers.get("host");
+  if (origin && (!host || originHost(origin) !== host)) {
     return Response.json({ error: "Чужой источник" }, { status: 403 });
   }
   if (!request.headers.get("content-type")?.includes("application/json")) {

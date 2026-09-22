@@ -1,8 +1,9 @@
 // Страница контактов — /contacte и /ru/contacte (SPEC §8). Заголовок Oswald,
 // строка часов, карточка на каждую точку (DESIGN.md → Point Card): название,
-// адрес, телефон (tel:), «Comandă» → меню города (Secondary), «Vezi pe
+// адрес, телефон (tel:), «Comandă» → меню города (Primary), «Vezi pe
 // hartă» и «Lasă o recenzie» — текстовые ссылки на Google по Place ID.
-// Внизу — соцсети текстом. Ни форм, ни виджетов карт (SPEC §6.5).
+// Соцсети — только в подвале (решение архитектора). Ни форм, ни виджетов
+// карт (SPEC §6.5).
 // Порядок точек — как в src/data/points.ts (Soroca Centru, Soroca Nouă,
 // Sculeni, Otaci, Briceni).
 import type { Metadata } from "next";
@@ -11,7 +12,6 @@ import { SiteFooter } from "@/components/menu/site-footer";
 import { SiteHeader } from "@/components/menu/site-header";
 import { MotionStage } from "@/components/motion/motion-stage";
 import { JsonLd } from "@/components/seo/json-ld";
-import { COMPANY } from "@/data/company";
 import { POINTS, getCity, type Locale } from "@/data/points";
 import { fill, getMessages } from "@/i18n/messages";
 import { localePath, paths } from "@/i18n/routes";
@@ -67,7 +67,7 @@ export function ContactsPage({ locale }: { locale: Locale }) {
                 <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-5">
                   <Link
                     href={localePath(locale, paths.city(city.slug))}
-                    className="btn-secondary w-full lg:w-auto"
+                    className="btn-primary w-full lg:w-auto"
                   >
                     {t.contacts.order}
                   </Link>
@@ -85,15 +85,6 @@ export function ContactsPage({ locale }: { locale: Locale }) {
             );
           })}
         </ul>
-
-        <nav aria-label={t.contacts.social} className="contact-social">
-          <a href={COMPANY.social.instagram} rel="noopener" translate="no">
-            Instagram
-          </a>
-          <a href={COMPANY.social.tiktok} rel="noopener" translate="no">
-            TikTok
-          </a>
-        </nav>
       </main>
       <SiteFooter locale={locale} t={t} />
     </>

@@ -62,6 +62,22 @@ test("панель показывает меню Сорок и управляе�
   await page.getByRole("checkbox", { name: "Уменьшить движение" }).uncheck();
   await expect.poll(async () => (await frameStats(frame))!.running).toBe(true);
 
+  // Цвет фона страницы виден в рамке сразу — и стекло шапки берёт его же
+  await page.getByRole("button", { name: "D #F1E9DB" }).click();
+  await expect
+    .poll(() =>
+      frame.evaluate(() =>
+        document.documentElement.style.getPropertyValue("--color-cream"),
+      ),
+    )
+    .toBe("#F1E9DB");
+  expect(
+    await frame.evaluate(
+      () => getComputedStyle(document.querySelector("header")!).backgroundColor,
+    ),
+  ).toBe("rgba(241, 233, 219, 0.78)");
+  await page.getByRole("button", { name: "A #FAF7F2" }).click();
+
   // Страница сообщает панели кадры в секунду
   await expect
     .poll(async () => page.getByText("Кадров в секунду").isVisible())
@@ -84,6 +100,7 @@ test("«Сохранить» переписывает src/config/motion.json", a
   try {
     await preview(page);
     await page.getByRole("slider", { name: "Насыщенность" }).fill("0.7");
+    await page.getByRole("button", { name: "B #F7F2EA" }).click();
     await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
 
     await page.getByRole("button", { name: "Сохранить" }).click();
@@ -99,6 +116,8 @@ test("«Сохранить» переписывает src/config/motion.json", a
       ...original.background,
       opacity: 0.7,
     });
+    // Цвет фона страницы сохраняется той же кнопкой
+    expect(saved.page).toEqual({ background: "#F7F2EA" });
   } finally {
     writeFileSync(FILE, before);
   }
@@ -116,11 +135,23 @@ test("маршрут настроек не принимает значения �
   request,
 }) => {
   const response = await request.post("/api/dev/motion", {
-    data: { background: { mode: "live", scale: 99999 } },
+    data: { background: { mode: "live", tilesAcross: 99999 } },
   });
   expect(response.status()).toBe(400);
   // Файл не тронут
-  expect(JSON.parse(readFileSync(FILE, "utf8")).background.scale).not.toBe(
-    99999,
-  );
+  expect(
+    JSON.parse(readFileSync(FILE, "utf8")).background.tilesAcross,
+  ).not.toBe(99999);
+});
+
+test("маршрут настроек не принимает запрос с чужого сайта", async ({
+  request,
+}) => {
+  const before = readFileSync(FILE, "utf8");
+  const response = await request.post("/api/dev/motion", {
+    headers: { origin: "http://evil.example" },
+    data: JSON.parse(before),
+  });
+  expect(response.status()).toBe(403);
+  expect(readFileSync(FILE, "utf8")).toBe(before);
 });

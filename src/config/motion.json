@@ -1,12 +1,15 @@
 {
   "background": {
     "mode": "live",
-    "scale": 900,
+    "tilesAcross": 2.11,
     "width": 0.8,
     "opacity": 0.45,
     "speed": 0.35,
     "parallax": 1.2,
     "ease": 0.1,
     "color": "ash"
+  },
+  "page": {
+    "background": "#FAF7F2"
   }
 }

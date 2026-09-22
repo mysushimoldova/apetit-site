@@ -17,9 +17,20 @@ export const CONTOUR_COLORS = {
 
 export type ContourColor = keyof typeof CONTOUR_COLORS;
 
+/** Варианты цвета фона страницы — выбирает Амян в панели /dev/motion.
+ *  A — как было с самого начала, дальше теплее и темнее. */
+export const PAGE_BACKGROUNDS = {
+  "#FAF7F2": "A",
+  "#F7F2EA": "B",
+  "#F4EDE2": "C",
+  "#F1E9DB": "D",
+} as const;
+
+export type PageBackground = keyof typeof PAGE_BACKGROUNDS;
+
 /** Границы ползунков панели /dev/motion. Пары [минимум, максимум, шаг]. */
 export const BACKGROUND_RANGES = {
-  scale: [500, 3200, 10],
+  tilesAcross: [0.8, 6, 0.1],
   width: [0.3, 2, 0.05],
   opacity: [0.1, 1, 0.01],
   speed: [0, 1, 0.01],
@@ -33,9 +44,11 @@ const range = (key: keyof typeof BACKGROUND_RANGES) =>
 export const backgroundSchema = z.strictObject({
   /** live — линии живут, static — один кадр без движения. */
   mode: z.enum(["live", "static"]),
-  /** Масштаб рисунка: сколько пикселей на клетку узора. */
-  scale: range("scale"),
-  /** Толщина линии (множитель к ширине сглаживания). */
+  /** Плотность рисунка: сколько раз он укладывается по ширине экрана.
+   *  Не в пикселях — иначе на телефоне видно меньше половины оборота,
+   *  а на компьютере два (задача 09). */
+  tilesAcross: range("tilesAcross"),
+  /** Толщина линии (множитель к ширине сглаживания), пиксели экрана. */
   width: range("width"),
   /** Насыщенность: прозрачность линий 0…1. */
   opacity: range("opacity"),
@@ -48,9 +61,18 @@ export const backgroundSchema = z.strictObject({
   color: z.enum(["ash", "smoke", "sand"]),
 });
 
+export const pageSchema = z.strictObject({
+  /** Цвет фона всех страниц; от него же берут цвет стеклянные поверхности. */
+  background: z.enum(
+    Object.keys(PAGE_BACKGROUNDS) as [PageBackground, ...PageBackground[]],
+  ),
+});
+
 export const motionConfigSchema = z.strictObject({
   background: backgroundSchema,
+  page: pageSchema,
 });
 
 export type BackgroundSettings = z.infer<typeof backgroundSchema>;
+export type PageSettings = z.infer<typeof pageSchema>;
 export type MotionConfig = z.infer<typeof motionConfigSchema>;

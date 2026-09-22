@@ -74,7 +74,11 @@ void main(){${LINE}
 }`;
 
 /** Юниформы кадра — чистый расчёт, проверяется тестом.
- *  uScale и сдвиг умножаются на dpr: шейдер считает в пикселях холста.
+ *  uScale (пикселей экрана на клетку узора) считается от ширины холста:
+ *  рисунок укладывается tilesAcross раз по ширине экрана, поэтому на
+ *  телефоне он такой же плотный, как на компьютере. Пересчёт каждый кадр —
+ *  значит поворот телефона и смена размера окна учтены сами собой.
+ *  Сдвиг при прокрутке умножается на dpr: шейдер считает в пикселях холста.
  *  Режим «не двигается» останавливает только время линий (uT = 0);
  *  сдвиг при прокрутке работает как обычно (решение архитектора). */
 export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
@@ -83,7 +87,7 @@ export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
     /** uT, секунды */
     t: still ? 0 : frame.t,
     /** uScale */
-    scale: settings.scale * frame.dpr,
+    scale: (frame.width * frame.dpr) / settings.tilesAcross,
     /** uW */
     width: settings.width,
     /** uA */

@@ -13,5 +13,5 @@ export const metadata: Metadata = {
 
 export default function DevMotionPage() {
   if (process.env.NODE_ENV !== "development") notFound();
-  return <MotionPanel saved={motionConfig.background} />;
+  return <MotionPanel saved={motionConfig} />;
 }

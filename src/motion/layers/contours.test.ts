@@ -11,7 +11,7 @@ import {
 
 const settings: BackgroundSettings = {
   mode: "live",
-  scale: 900,
+  tilesAcross: 2.11,
   width: 0.8,
   opacity: 0.45,
   speed: 0.35,
@@ -30,10 +30,11 @@ const frame: Frame = {
 };
 
 describe("юниформы слоя фона", () => {
-  it("масштаб и сдвиг считаются в пикселях холста (× dpr)", () => {
+  it("масштаб — ширина холста в пикселях экрана, делённая на плотность", () => {
     const u = contoursUniforms(settings, frame);
     expect(u.t).toBe(2);
-    expect(u.scale).toBe(1800);
+    // 390 CSS × 2 = 780 пикселей экрана; 780 / 2.11 ≈ 369.7
+    expect(u.scale).toBeCloseTo(780 / 2.11, 6);
     expect(u.width).toBe(0.8);
     expect(u.opacity).toBe(0.45);
     expect(u.speed).toBe(0.35);
@@ -45,7 +46,25 @@ describe("юниформы слоя фона", () => {
     const u = contoursUniforms({ ...settings, mode: "static" }, frame);
     expect(u.t).toBe(0);
     expect(u.offY).toBe(-1200);
-    expect(u.scale).toBe(1800);
+    expect(u.scale).toBeCloseTo(780 / 2.11, 6);
+  });
+
+  it("рисунок укладывается ровно tilesAcross раз по ширине — на любом экране", () => {
+    const phone = contoursUniforms(settings, frame);
+    const desktop = contoursUniforms(settings, {
+      ...frame,
+      width: 1900,
+      dpr: 1,
+    });
+    // Клеток по ширине холста — одинаково: в этом весь смысл tilesAcross
+    expect((frame.width * frame.dpr) / phone.scale).toBeCloseTo(2.11, 6);
+    expect(1900 / desktop.scale).toBeCloseTo(2.11, 6);
+  });
+
+  it("плотность вдвое больше — клетка вдвое мельче", () => {
+    const dense = contoursUniforms({ ...settings, tilesAcross: 4.22 }, frame);
+    const normal = contoursUniforms(settings, frame);
+    expect(dense.scale).toBeCloseTo(normal.scale / 2, 6);
   });
 
   it("цвета — Ash, Smoke, Sand в долях единицы", () => {

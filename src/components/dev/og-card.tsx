@@ -11,6 +11,12 @@ import type { BackgroundSettings } from "@/motion/config-schema";
 export const OG_WIDTH = 1200;
 export const OG_HEIGHT = 630;
 
+/** Масштаб рисунка на картинке, px на клетку узора. На сайте масштаб теперь
+ *  считается от ширины экрана (tilesAcross), но картинка для соцсетей всегда
+ *  одного размера и уже снята — значение оставлено прежним, чтобы файлы в
+ *  public/og не пришлось пересобирать. */
+const OG_SCALE = 900;
+
 const RGB = {
   ash: [167, 158, 149],
   smoke: [122, 113, 106],
@@ -46,7 +52,7 @@ export function drawContours(
   const { width, height } = ctx.canvas;
   const image = ctx.createImageData(width, height);
   const [r, g, b] = RGB[settings.color];
-  const scale = settings.scale;
+  const scale = OG_SCALE;
   const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
   for (let py = 0; py < height; py++) {
     // gl_FragCoord.y считается снизу

@@ -1,6 +1,9 @@
 // Блюда — SPEC приложение А (цены базовые, Briceni; состав — как в печатном
 // меню). Slug = имя файла фото в assets/foto-originale (SPEC 2.7).
-// TODO ru: проверить — ВСЕ русские названия и составы в этом файле черновые.
+// Названия блюд не переводятся и не транслитерируются: в русской версии они
+// такие же, как в румынском меню (решение архитектора 22.09.2026) — поэтому
+// name здесь одна строка на оба языка. Переводятся состав и названия
+// вариантов. TODO ru: проверить — русские СОСТАВЫ в этом файле черновые.
 //
 // Что не сказано в SPEC явно и требует подтверждения (см. PROGRESS.md):
 // - кебабы и бургеры: база из SPEC + отличительный ингредиент из названия
@@ -42,7 +45,8 @@ function removableFrom(
 type ProductInput = {
   slug: string;
   category: Product["category"];
-  name: Product["name"];
+  /** Одно название на оба языка — в русской версии оно не переводится. */
+  name: string;
   price: number;
   grams?: number | null;
   ingredients?: LocalizedList;
@@ -65,7 +69,7 @@ function product(input: ProductInput): Product {
   return {
     slug: input.slug,
     category: input.category,
-    name: input.name,
+    name: { ro: input.name, ru: input.name },
     ingredients,
     grams: input.grams ?? null,
     price: input.price,
@@ -111,7 +115,7 @@ const KEBAB: Product[] = [
     slug: "kebab-philly-beef",
     main: ["vită"],
     category: "kebab",
-    name: { ro: "Kebab Philly Beef", ru: "Кебаб Филли Биф" },
+    name: "Kebab Philly Beef",
     price: 94,
     grams: 360,
     ingredients: kebab(["vită", "cașcaval"], ["говядина", "сыр"]),
@@ -120,7 +124,7 @@ const KEBAB: Product[] = [
     slug: "kebab-cheese",
     main: ["cașcaval"],
     category: "kebab",
-    name: { ro: "Kebab Cheese", ru: "Кебаб Чиз" },
+    name: "Kebab Cheese",
     price: 105,
     grams: 440,
     ingredients: kebab(["cașcaval"], ["сыр"]),
@@ -129,7 +133,7 @@ const KEBAB: Product[] = [
     slug: "kebab-crispy",
     main: ["crispy"],
     category: "kebab",
-    name: { ro: "Kebab Crispy", ru: "Кебаб Криспи" },
+    name: "Kebab Crispy",
     price: 90,
     grams: 360,
     ingredients: kebab(["crispy"], ["криспи"]),
@@ -137,7 +141,7 @@ const KEBAB: Product[] = [
   product({
     slug: "kebab-xl-xxl",
     category: "kebab",
-    name: { ro: "Kebab XL / XXL", ru: "Кебаб XL / XXL" },
+    name: "Kebab XL / XXL",
     price: 80,
     grams: null,
     ingredients: kebab([], []),
@@ -165,7 +169,7 @@ const MENU: Product[] = [
   product({
     slug: "kebab-menu",
     category: "menu",
-    name: { ro: "Kebab Menu XL / XXL", ru: "Кебаб Меню XL / XXL" },
+    name: "Kebab Menu XL / XXL",
     price: 130,
     ingredients: list(
       ["sos", "limonadă", "kebab mic", "cartofi pai mic"],
@@ -197,7 +201,7 @@ const MENU: Product[] = [
   product({
     slug: "burger-menu",
     category: "menu",
-    name: { ro: "Burger Menu XL / XXL", ru: "Бургер Меню XL / XXL" },
+    name: "Burger Menu XL / XXL",
     price: 130,
     ingredients: list(
       ["sos", "limonadă", "cheeseburger mic", "cartofi pai mic"],
@@ -258,7 +262,7 @@ const BURGERS: Product[] = [
     slug: "cheeseburger-dublu-pui",
     main: ["carne de pui", "cașcaval"],
     category: "burgers",
-    name: { ro: "Cheeseburger Dublu Pui", ru: "Двойной чизбургер с курицей" },
+    name: "Cheeseburger Dublu Pui",
     price: 115,
     grams: 385,
     ingredients: burger(["carne de pui", "cașcaval"], ["куриное мясо", "сыр"]),
@@ -267,7 +271,7 @@ const BURGERS: Product[] = [
     slug: "cheeseburger-pui",
     main: ["carne de pui", "cașcaval"],
     category: "burgers",
-    name: { ro: "Cheeseburger Pui", ru: "Чизбургер с курицей" },
+    name: "Cheeseburger Pui",
     price: 85,
     grams: 290,
     ingredients: burger(["carne de pui", "cașcaval"], ["куриное мясо", "сыр"]),
@@ -276,10 +280,7 @@ const BURGERS: Product[] = [
     slug: "cheeseburger-dublu-vita",
     main: ["vită-porc", "cașcaval"],
     category: "burgers",
-    name: {
-      ro: "Cheeseburger Dublu Vită-Porc",
-      ru: "Двойной чизбургер говядина-свинина",
-    },
+    name: "Cheeseburger Dublu Vită-Porc",
     price: 115,
     grams: 385,
     ingredients: burger(["vită-porc", "cașcaval"], ["говядина-свинина", "сыр"]),
@@ -288,7 +289,7 @@ const BURGERS: Product[] = [
     slug: "cheeseburger-vita",
     main: ["vită-porc", "cașcaval"],
     category: "burgers",
-    name: { ro: "Cheeseburger Vită-Porc", ru: "Чизбургер говядина-свинина" },
+    name: "Cheeseburger Vită-Porc",
     price: 85,
     grams: 290,
     ingredients: burger(["vită-porc", "cașcaval"], ["говядина-свинина", "сыр"]),
@@ -297,10 +298,7 @@ const BURGERS: Product[] = [
     slug: "hamburger-dublu-vita",
     main: ["vită-porc"],
     category: "burgers",
-    name: {
-      ro: "Hamburger Dublu Vită-Porc",
-      ru: "Двойной гамбургер говядина-свинина",
-    },
+    name: "Hamburger Dublu Vită-Porc",
     price: 105,
     grams: 365,
     ingredients: burger(["vită-porc"], ["говядина-свинина"]),
@@ -309,7 +307,7 @@ const BURGERS: Product[] = [
     slug: "hamburger-vita",
     main: ["vită-porc"],
     category: "burgers",
-    name: { ro: "Hamburger Vită-Porc", ru: "Гамбургер говядина-свинина" },
+    name: "Hamburger Vită-Porc",
     price: 80,
     grams: 275,
     ingredients: burger(["vită-porc"], ["говядина-свинина"]),
@@ -318,7 +316,7 @@ const BURGERS: Product[] = [
     slug: "cheeseburger-crispy",
     main: ["crispy", "cașcaval"],
     category: "burgers",
-    name: { ro: "Cheeseburger Crispy", ru: "Чизбургер Криспи" },
+    name: "Cheeseburger Crispy",
     price: 85,
     grams: 280,
     ingredients: burger(["crispy", "cașcaval"], ["криспи", "сыр"]),
@@ -331,7 +329,7 @@ const GOZLEME: Product[] = [
     slug: "gozleme-mozzarella",
     main: ["mozzarella"],
     category: "gozleme",
-    name: { ro: "Gözleme Mozzarella", ru: "Гёзлеме с моцареллой" },
+    name: "Gözleme Mozzarella",
     price: 45,
     grams: 130,
     ingredients: list(
@@ -343,7 +341,7 @@ const GOZLEME: Product[] = [
     slug: "gozleme-carne",
     main: ["carne de pui"],
     category: "gozleme",
-    name: { ro: "Gözleme Carne de Pui", ru: "Гёзлеме с курицей" },
+    name: "Gözleme Carne de Pui",
     price: 55,
     grams: 250,
     ingredients: list(
@@ -358,7 +356,7 @@ const CRISPY: Product[] = [
   product({
     slug: "aripioare",
     category: "crispy",
-    name: { ro: "Aripioare", ru: "Крылышки" },
+    name: "Aripioare",
     price: 85,
     grams: 240,
     ingredients: list(["sos sweet chilli"], ["соус сладкий чили"]),
@@ -366,7 +364,7 @@ const CRISPY: Product[] = [
   product({
     slug: "crispy-filets",
     category: "crispy",
-    name: { ro: "Crispy Filets", ru: "Криспи филе" },
+    name: "Crispy Filets",
     price: 85,
     grams: 180,
     ingredients: list(["sos usturoi"], ["чесночный соус"]),
@@ -374,7 +372,7 @@ const CRISPY: Product[] = [
   product({
     slug: "mozza-crispy",
     category: "crispy",
-    name: { ro: "Mozza Crispy", ru: "Моцца Криспи" },
+    name: "Mozza Crispy",
     price: 75,
     grams: 110,
     ingredients: list(["sos muștar/miere"], ["горчично-медовый соус"]),
@@ -382,7 +380,7 @@ const CRISPY: Product[] = [
   product({
     slug: "cartofi-pai",
     category: "crispy",
-    name: { ro: "Cartofi pai", ru: "Картофель фри" },
+    name: "Cartofi pai",
     price: 23,
     grams: null,
     variants: [
@@ -410,7 +408,7 @@ const HOT_DOG: Product[] = [
     slug: "hot-dog-classic",
     main: ["crenvușcă"],
     category: "hot-dog",
-    name: { ro: "Hot Dog Classic", ru: "Хот-дог Классик" },
+    name: "Hot Dog Classic",
     price: 45,
     grams: 270,
     ingredients: list(
@@ -422,7 +420,7 @@ const HOT_DOG: Product[] = [
     slug: "hot-dog-cheese",
     main: ["crenvușcă", "cașcaval"],
     category: "hot-dog",
-    name: { ro: "Hot Dog Cheese", ru: "Хот-дог Чиз" },
+    name: "Hot Dog Cheese",
     price: 55,
     grams: 238,
     ingredients: list(
@@ -438,10 +436,7 @@ const SANDWICH: Product[] = [
     slug: "sandwich-salam",
     main: ["salam"],
     category: "sandwich",
-    name: {
-      ro: "Sandwich cu salam fiert-afumat",
-      ru: "Сэндвич с варёно-копчёной салями",
-    },
+    name: "Sandwich cu salam fiert-afumat",
     price: 55,
     grams: 218,
     ingredients: list(
@@ -453,10 +448,7 @@ const SANDWICH: Product[] = [
     slug: "sandwich-sunca",
     main: ["șuncă"],
     category: "sandwich",
-    name: {
-      ro: "Sandwich cu șuncă de găină",
-      ru: "Сэндвич с куриной ветчиной",
-    },
+    name: "Sandwich cu șuncă de găină",
     price: 55,
     grams: 222,
     ingredients: list(
@@ -471,7 +463,7 @@ const SALAD: Product[] = [
   product({
     slug: "salata-greceasca",
     category: "salad",
-    name: { ro: "Salată Grecească", ru: "Греческий салат" },
+    name: "Salată Grecească",
     price: 75,
     grams: 280,
     ingredients: list(
@@ -500,7 +492,7 @@ const SALAD: Product[] = [
   product({
     slug: "salata-cezar",
     category: "salad",
-    name: { ro: "Salată Cezar", ru: "Салат Цезарь" },
+    name: "Salată Cezar",
     price: 80,
     grams: 245,
     ingredients: list(
@@ -516,7 +508,7 @@ const PIZZA: Product[] = [
   product({
     slug: "pizza-margarita",
     category: "pizza",
-    name: { ro: "Margarita", ru: "Маргарита" },
+    name: "Margarita",
     price: 115,
     grams: 520,
     ingredients: list(
@@ -528,7 +520,7 @@ const PIZZA: Product[] = [
     slug: "pizza-quattro-formaggi",
     main: ["mozzarella", "gouda", "brânză mucegai", "parmezan"],
     category: "pizza",
-    name: { ro: "Quattro Formaggi", ru: "Кватро Формаджи" },
+    name: "Quattro Formaggi",
     price: 125,
     grams: 550,
     ingredients: list(
@@ -540,7 +532,7 @@ const PIZZA: Product[] = [
     slug: "pizza-quattro-formaggi-cu-para",
     main: ["mozzarella", "gouda", "brânză mucegai", "parmezan", "pere"],
     category: "pizza",
-    name: { ro: "Quattro Formaggi cu Pară", ru: "Кватро Формаджи с грушей" },
+    name: "Quattro Formaggi cu Pară",
     price: 135,
     grams: 570,
     ingredients: list(
@@ -559,7 +551,7 @@ const PIZZA: Product[] = [
     slug: "pizza-pepperoni",
     main: ["salam crud-afumat"],
     category: "pizza",
-    name: { ro: "Pepperoni", ru: "Пепперони" },
+    name: "Pepperoni",
     price: 145,
     grams: 520,
     ingredients: list(
@@ -584,7 +576,7 @@ const PIZZA: Product[] = [
   product({
     slug: "pizza-carbonara",
     category: "pizza",
-    name: { ro: "Carbonara", ru: "Карбонара" },
+    name: "Carbonara",
     price: 145,
     grams: 550,
     ingredients: list(
@@ -610,7 +602,7 @@ const PIZZA: Product[] = [
     slug: "pizza-4-carnuri",
     main: ["piept de pui sous-vide", "șuncă de pui", "salam", "bacon"],
     category: "pizza",
-    name: { ro: "4 Cărnuri", ru: "4 вида мяса" },
+    name: "4 Cărnuri",
     price: 155,
     grams: 560,
     ingredients: list(
@@ -636,7 +628,7 @@ const PIZZA: Product[] = [
     slug: "pizza-sunca-si-legume",
     main: ["șuncă de pui"],
     category: "pizza",
-    name: { ro: "Șuncă și Legume", ru: "Ветчина и овощи" },
+    name: "Șuncă și Legume",
     price: 125,
     grams: 570,
     ingredients: list(
@@ -668,52 +660,49 @@ const SOSURI: Product[] = [
   product({
     slug: "sos-usturoi",
     category: "sosuri",
-    name: { ro: "Sos de usturoi", ru: "Чесночный соус" },
+    name: "Sos de usturoi",
     price: 15,
     grams: 50,
   }),
   product({
     slug: "sos-cascaval",
     category: "sosuri",
-    name: { ro: "Sos cașcaval", ru: "Сырный соус" },
+    name: "Sos cașcaval",
     price: 15,
     grams: 50,
   }),
   product({
     slug: "sos-sweet-chilli",
     category: "sosuri",
-    name: { ro: "Sos sweet chilli", ru: "Соус сладкий чили" },
+    name: "Sos sweet chilli",
     price: 15,
     grams: 50,
   }),
   product({
     slug: "sos-ketchup",
     category: "sosuri",
-    name: { ro: "Ketchup", ru: "Кетчуп" },
+    name: "Ketchup",
     price: 10,
     grams: 50,
   }),
   product({
     slug: "sos-mustar-miere",
     category: "sosuri",
-    name: { ro: "Sos de muștar-miere", ru: "Горчично-медовый соус" },
+    name: "Sos de muștar-miere",
     price: 15,
     grams: 50,
   }),
   product({
     slug: "sos-maioneza",
     category: "sosuri",
-    name: { ro: "Maioneză", ru: "Майонез" },
+    name: "Maioneză",
     price: 15,
     grams: 50,
   }),
   product({
     slug: "sos-apetit",
     category: "sosuri",
-    name: {
-      ro: "Sos Apetit (dulce / picant)",
-      ru: "Соус Apetit (сладкий / острый)",
-    },
+    name: "Sos Apetit (dulce / picant)",
     price: 15,
     grams: 50,
     variants: [
@@ -741,98 +730,92 @@ const DRINKS: Product[] = [
   product({
     slug: "limonada-aloe-fresh",
     category: "drinks",
-    name: {
-      ro: "Limonadă Aloe-Fresh (250 ml)",
-      ru: "Лимонад Алоэ-Фреш (250 мл)",
-    },
+    name: "Limonadă Aloe-Fresh (250 ml)",
     price: 30,
     photo: null,
   }),
   product({
     slug: "limonada-portocala",
     category: "drinks",
-    name: {
-      ro: "Limonadă Portocală (250 ml)",
-      ru: "Лимонад Апельсин (250 мл)",
-    },
+    name: "Limonadă Portocală (250 ml)",
     price: 30,
     photo: null,
   }),
   product({
     slug: "cola",
     category: "drinks",
-    name: { ro: "Coca-Cola", ru: "Кока-Кола" },
+    name: "Coca-Cola",
     price: 22,
   }),
   product({
     slug: "fanta",
     category: "drinks",
-    name: { ro: "Fanta", ru: "Фанта" },
+    name: "Fanta",
     price: 22,
   }),
   product({
     slug: "sprite",
     category: "drinks",
-    name: { ro: "Sprite", ru: "Спрайт" },
+    name: "Sprite",
     price: 22,
   }),
   product({
     slug: "apa-plata",
     category: "drinks",
-    name: { ro: "Apă plată", ru: "Вода негазированная" },
+    name: "Apă plată",
     price: 18,
   }),
   product({
     slug: "apa-gazata",
     category: "drinks",
-    name: { ro: "Apă gazată", ru: "Вода газированная" },
+    name: "Apă gazată",
     price: 18,
   }),
   product({
     slug: "ceai-craft",
     category: "drinks",
-    name: { ro: "Ceai craft", ru: "Крафтовый чай" },
+    name: "Ceai craft",
     price: 28,
     photo: null,
   }),
   product({
     slug: "espresso",
     category: "drinks",
-    name: { ro: "Espresso", ru: "Эспрессо" },
+    name: "Espresso",
     price: 22,
     photo: null,
   }),
   product({
     slug: "americano",
     category: "drinks",
-    name: { ro: "Americano", ru: "Американо" },
+    name: "Americano",
     price: 22,
     photo: null,
   }),
   product({
     slug: "latte",
     category: "drinks",
-    name: { ro: "Latte", ru: "Латте" },
+    name: "Latte",
     price: 28,
     photo: null,
   }),
   product({
     slug: "cappuccino",
     category: "drinks",
-    name: { ro: "Cappuccino", ru: "Капучино" },
+    name: "Cappuccino",
     price: 28,
     photo: null,
   }),
   product({
     slug: "le-coq-margarita",
     category: "drinks",
-    name: { ro: "Le Coq Margarita (0 %)", ru: "Le Coq Маргарита (0 %)" },
+    name: "Le Coq Margarita (0 %)",
     price: 36,
   }),
   product({
     slug: "le-coq-mojito",
     category: "drinks",
-    name: { ro: "Le Coq Mojito (0 %)", ru: "Le Coq Мохито (0 %)" },
+    name: "Le Coq Mojito (0 %)",
     price: 36,
   }),
 ];
@@ -842,7 +825,7 @@ const DESERT: Product[] = [
   product({
     slug: "brinzoaice",
     category: "desert",
-    name: { ro: "Brânzoaice (+ gem / iaurt)", ru: "Сырники (+ джем / йогурт)" },
+    name: "Brânzoaice (+ gem / iaurt)",
     price: 50,
     grams: 120,
   }),
@@ -854,19 +837,19 @@ const SUPE: Product[] = [
   product({
     slug: "supa-ciuperci",
     category: "supe",
-    name: { ro: "Supă cremă de ciuperci", ru: "Грибной крем-суп" },
+    name: "Supă cremă de ciuperci",
     price: 80,
   }),
   product({
     slug: "supa-bostan",
     category: "supe",
-    name: { ro: "Supă cremă de bostan", ru: "Тыквенный крем-суп" },
+    name: "Supă cremă de bostan",
     price: 80,
   }),
   product({
     slug: "supa-spanac",
     category: "supe",
-    name: { ro: "Supă cremă de spanac", ru: "Шпинатный крем-суп" },
+    name: "Supă cremă de spanac",
     price: 80,
   }),
 ];

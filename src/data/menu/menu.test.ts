@@ -158,6 +158,13 @@ describe("блюда (SPEC приложение А)", () => {
     }
   });
 
+  it("названия блюд в русской версии — как в румынской, без кириллицы", () => {
+    for (const p of PRODUCTS) {
+      expect(p.name.ru, p.slug).toBe(p.name.ro);
+      expect(p.name.ru, p.slug).not.toMatch(/[а-яё]/i);
+    }
+  });
+
   it("убрать можно состав без основы; у комбо — ничего (это части набора)", () => {
     const removable = (slug: string) =>
       bySlug(slug)?.removable.map((r) => r.id);

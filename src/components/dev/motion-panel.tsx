@@ -13,8 +13,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BACKGROUND_RANGES,
   CONTOUR_COLORS,
+  PAGE_BACKGROUNDS,
   type BackgroundSettings,
   type ContourColor,
+  type MotionConfig,
+  type PageBackground,
 } from "@/motion/config-schema";
 import {
   PANEL_SOURCE,
@@ -40,7 +43,7 @@ const COLOR_NAMES: Record<ContourColor, string> = {
   sand: "Sand",
 };
 
-export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
+export function MotionPanel({ saved }: { saved: MotionConfig }) {
   const [file, setFile] = useState(saved);
   const [value, setValue] = useState(saved);
   const [reduced, setReduced] = useState(false);
@@ -52,20 +55,18 @@ export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
   const dirty = JSON.stringify(file) !== JSON.stringify(value);
 
   // Отправить настройки в страницу. Адрес получателя — свой же.
-  const send = useCallback(
-    (background: BackgroundSettings, reducedMotion: boolean) => {
-      const message: PanelMessage = {
-        source: PANEL_SOURCE,
-        background,
-        reducedMotion,
-      };
-      frameRef.current?.contentWindow?.postMessage(
-        message,
-        window.location.origin,
-      );
-    },
-    [],
-  );
+  const send = useCallback((config: MotionConfig, reducedMotion: boolean) => {
+    const message: PanelMessage = {
+      source: PANEL_SOURCE,
+      background: config.background,
+      page: config.page,
+      reducedMotion,
+    };
+    frameRef.current?.contentWindow?.postMessage(
+      message,
+      window.location.origin,
+    );
+  }, []);
 
   // Ответы страницы: «я подключилась» (шлём ей текущие значения) и кадры
   useEffect(() => {
@@ -88,7 +89,14 @@ export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
   const set = <K extends keyof BackgroundSettings>(
     key: K,
     next: BackgroundSettings[K],
-  ) => setValue((current) => ({ ...current, [key]: next }));
+  ) =>
+    setValue((current) => ({
+      ...current,
+      background: { ...current.background, [key]: next },
+    }));
+
+  const setPageBackground = (background: PageBackground) =>
+    setValue((current) => ({ ...current, page: { background } }));
 
   const save = async () => {
     setSaving(true);
@@ -97,7 +105,7 @@ export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
       const response = await fetch("/api/dev/motion", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ background: value }),
+        body: JSON.stringify(value),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
@@ -144,8 +152,20 @@ export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
 
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
           <Choice
+            label="Фон страницы"
+            value={value.page.background}
+            options={(Object.keys(PAGE_BACKGROUNDS) as PageBackground[]).map(
+              (id) => ({
+                id,
+                label: `${PAGE_BACKGROUNDS[id]} ${id}`,
+                swatch: id,
+              }),
+            )}
+            onChange={setPageBackground}
+          />
+          <Choice
             label="Режим"
-            value={value.mode}
+            value={value.background.mode}
             options={[
               { id: "live", label: "Живые линии" },
               { id: "static", label: "Не двигается" },
@@ -154,51 +174,52 @@ export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
           />
 
           <Slider
-            label="Масштаб рисунка"
-            field="scale"
-            value={value.scale}
-            digits={0}
-            onChange={(next) => set("scale", next)}
+            label="Плотность рисунка"
+            hint="сколько раз рисунок помещается по ширине экрана"
+            field="tilesAcross"
+            value={value.background.tilesAcross}
+            digits={2}
+            onChange={(next) => set("tilesAcross", next)}
           />
           <Slider
             label="Толщина"
             field="width"
-            value={value.width}
+            value={value.background.width}
             digits={2}
             onChange={(next) => set("width", next)}
           />
           <Slider
             label="Насыщенность"
             field="opacity"
-            value={value.opacity}
+            value={value.background.opacity}
             digits={2}
             onChange={(next) => set("opacity", next)}
           />
           <Slider
             label="Скорость"
             field="speed"
-            value={value.speed}
+            value={value.background.speed}
             digits={2}
             onChange={(next) => set("speed", next)}
           />
           <Slider
             label="Сдвиг при прокрутке"
             field="parallax"
-            value={value.parallax}
+            value={value.background.parallax}
             digits={2}
             onChange={(next) => set("parallax", next)}
           />
           <Slider
             label="Инертность"
             field="ease"
-            value={value.ease}
+            value={value.background.ease}
             digits={2}
             onChange={(next) => set("ease", next)}
           />
 
           <Choice
-            label="Цвет"
-            value={value.color}
+            label="Цвет линий"
+            value={value.background.color}
             options={(Object.keys(COLOR_NAMES) as ContourColor[]).map((id) => ({
               id,
               label: COLOR_NAMES[id],
@@ -285,12 +306,15 @@ export function MotionPanel({ saved }: { saved: BackgroundSettings }) {
 /** Ползунок с границами из схемы настроек (src/motion/config-schema.ts). */
 function Slider({
   label,
+  hint,
   field,
   value,
   digits,
   onChange,
 }: {
   label: string;
+  /** Подпись под названием — когда по названию не очевидно, что это. */
+  hint?: string;
   field: keyof typeof BACKGROUND_RANGES;
   value: number;
   digits: number;
@@ -305,6 +329,11 @@ function Slider({
           {value.toFixed(digits)}
         </span>
       </span>
+      {hint && (
+        <span className="mt-1 block font-body text-meta text-smoke">
+          {hint}
+        </span>
+      )}
       <input
         type="range"
         min={min}

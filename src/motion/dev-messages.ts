@@ -5,11 +5,13 @@ import type { QualityLevel } from "./quality";
 export const PANEL_SOURCE = "apetit-motion-panel";
 export const STAGE_SOURCE = "apetit-motion-stage";
 
-/** Панель → страница: настройки фона и «уменьшить движение». */
+/** Панель → страница: настройки фона, цвет фона страницы и «уменьшить
+ *  движение». */
 export interface PanelMessage {
   source: typeof PANEL_SOURCE;
-  /** Проверяется схемой на стороне страницы, поэтому здесь unknown. */
+  /** Проверяются схемой на стороне страницы, поэтому здесь unknown. */
   background: unknown;
+  page: unknown;
   reducedMotion: boolean;
 }
 

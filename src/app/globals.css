@@ -29,7 +29,9 @@
   /* «Лужица» под фото блюда — единственная тень еды (DESIGN.md → Food Image) */
   --puddle: radial-gradient(ellipse, rgba(26, 23, 20, 0.13), transparent 70%);
 
-  /* Стекло (ровно три места: шапка, корзина снизу, оверлей смены города) */
+  /* Стекло (ровно три места: шапка, корзина снизу, оверлей смены города).
+     Цвет — от фона страницы: обе переменные переопределяет <html>
+     (src/lib/page-theme.ts), здесь — значения для варианта A. */
   --glass-bg: rgba(250, 247, 242, 0.78);
   --glass-bg-fallback: rgba(250, 247, 242, 0.96);
   --glass-blur: blur(16px) saturate(130%);
@@ -76,7 +78,10 @@
   /* Цвета: только палитра Apetit. Стандартные цвета Tailwind (white, gray,
      purple…) отключены — по DESIGN.md чистый белый и серый запрещены. */
   --color-*: initial;
-  --color-cream: #faf7f2; /* фон всего сайта, всех секций */
+  /* Фон всего сайта, всех секций. Значение выбирает Амян в панели
+     /dev/motion; <html> переопределяет эту переменную своим style
+     (src/config/motion.json → src/lib/page-theme.ts). Здесь — вариант A. */
+  --color-cream: #faf7f2;
   --color-milk: #fffdfa; /* только поверхности над страницей: лист, инпуты, карточка точки */
   --color-sand: #eae2d5; /* выключенные элементы, плитка-заглушка без фото */
   --color-yellow: #ffbc0d; /* единственный акцент — только заливка, не текст */
@@ -1350,10 +1355,9 @@
       border-radius: 4px;
     }
   }
-  /* «Vezi pe hartă · Lasă o recenzie» и соцсети: текстовые ссылки
+  /* «Vezi pe hartă · Lasă o recenzie»: текстовые ссылки
      Manrope 600 15px, подчёркнуты, зона нажатия 44px */
-  .contact-links,
-  .contact-social {
+  .contact-links {
     font-family: var(--font-ui);
     font-size: var(--text-label);
     font-weight: 600;
@@ -1386,15 +1390,6 @@
     align-items: center;
     gap: 0 4px;
   }
-  /* Соцсети внизу страницы: Section Rule (48px воздуха) и две ссылки в ряд */
-  .contact-social {
-    display: flex;
-    gap: 24px;
-    margin-top: 48px;
-    padding-top: 48px;
-    border-top: var(--rule);
-  }
-
   /* Заголовок: Oswald заглавными. Самое длинное слово — «КОНФИДЕНЦИАЛЬНОСТИ»,
      ≈10.8em: размер от ширины экрана (÷11), чтобы оно всегда стояло целиком
      (на 390px ≈ 33px), потолок 36px; на десктопе — 44px, как города */

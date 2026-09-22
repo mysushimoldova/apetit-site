@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { motionConfigSchema } from "@/motion/config-schema";
-import { motionConfig } from "./motion";
+import { motionConfig, pageBackground } from "./motion";
 
 const raw = JSON.parse(
   readFileSync(new URL("./motion.json", import.meta.url), "utf8"),
@@ -17,7 +17,9 @@ describe("src/config/motion.json", () => {
   it("значения фона — те, что задал архитектор", () => {
     expect(raw.background).toEqual({
       mode: "live",
-      scale: 900,
+      // 1900 px экрана / прежний масштаб 900 px на клетку = 2.11:
+      // вид на компьютере остался прежним (задача 09)
+      tilesAcross: 2.11,
       width: 0.8,
       opacity: 0.45,
       speed: 0.35,
@@ -27,16 +29,28 @@ describe("src/config/motion.json", () => {
     });
   });
 
+  it("цвет фона страницы — один из четырёх вариантов", () => {
+    expect(raw.page).toEqual({ background: "#FAF7F2" });
+    expect(pageBackground).toBe(raw.page.background);
+  });
+
   it("движок получает ровно то, что в файле", () => {
     expect(motionConfig).toEqual(raw);
   });
 
   it("чужие значения схему не проходят", () => {
-    const bad = { background: { ...raw.background, scale: 20000 } };
+    const bad = { ...raw, background: { ...raw.background, tilesAcross: 20 } };
     expect(motionConfigSchema.safeParse(bad).success).toBe(false);
-    const extra = { background: { ...raw.background, лишнее: 1 } };
+    const extra = { ...raw, background: { ...raw.background, лишнее: 1 } };
     expect(motionConfigSchema.safeParse(extra).success).toBe(false);
-    const wrongMode = { background: { ...raw.background, mode: "ambient" } };
+    const wrongMode = {
+      ...raw,
+      background: { ...raw.background, mode: "ambient" },
+    };
     expect(motionConfigSchema.safeParse(wrongMode).success).toBe(false);
+    const wrongColor = { ...raw, page: { background: "#FFFFFF" } };
+    expect(motionConfigSchema.safeParse(wrongColor).success).toBe(false);
+    const noPage = { background: raw.background };
+    expect(motionConfigSchema.safeParse(noPage).success).toBe(false);
   });
 });

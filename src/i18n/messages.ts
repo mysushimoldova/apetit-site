@@ -139,14 +139,12 @@ export interface Messages {
     title: string;
     /** «Lucrăm zilnic {open}–{close}» — часы точек */
     hours: string;
-    /** Secondary в карточке точки → меню города */
+    /** Primary в карточке точки → меню города */
     order: string;
     /** Ссылка на Google Maps по Place ID */
     map: string;
     /** Ссылка «оставить отзыв» в Google */
     review: string;
-    /** Подпись блока соцсетей (только для скринридера) */
-    social: string;
   };
   meta: {
     /** title и description экрана городов */
@@ -267,7 +265,6 @@ export const messages: Record<Locale, Messages> = {
       order: "Comandă",
       map: "Vezi pe hartă",
       review: "Lasă o recenzie",
-      social: "Rețele sociale",
     },
     // Заголовок меню — SPEC §8; описания — черновик на утверждение
     meta: {
@@ -386,7 +383,6 @@ export const messages: Record<Locale, Messages> = {
       order: "Заказать",
       map: "Показать на карте",
       review: "Оставить отзыв",
-      social: "Социальные сети",
     },
     // TODO ru: проверить
     meta: {

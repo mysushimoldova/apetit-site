@@ -5,8 +5,9 @@
 // Только разработка: модуль подгружается отдельным куском и в боевой
 // сборке никогда не запрашивается (см. motion-runtime.tsx). Сообщения
 // принимаются только со своего адреса и проверяются схемой zod.
+import { applyPageTheme } from "@/lib/page-theme";
 import type { BackgroundControl } from "./background";
-import { backgroundSchema } from "./config-schema";
+import { backgroundSchema, pageSchema } from "./config-schema";
 import {
   PANEL_SOURCE,
   STAGE_SOURCE,
@@ -29,8 +30,12 @@ export function connectDevPanel(control: BackgroundControl): () => void {
     const data = event.data as PanelMessage | null;
     if (!data || data.source !== PANEL_SOURCE) return;
     const parsed = backgroundSchema.safeParse(data.background);
-    if (!parsed.success) return;
-    control.apply(parsed.data);
+    if (parsed.success) control.apply(parsed.data);
+    // Цвет фона страницы — не слой движка: это переменные CSS на <html>
+    const page = pageSchema.safeParse(data.page);
+    if (page.success) {
+      applyPageTheme(document.documentElement, page.data.background);
+    }
     engine.setReducedMotion(data.reducedMotion === true ? true : null);
   };
   window.addEventListener("message", onMessage);

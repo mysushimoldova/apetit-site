@@ -1,6 +1,9 @@
 import { test, type Page } from "@playwright/test";
+import { PAGE_BACKGROUNDS } from "../src/motion/config-schema";
+import { pageThemeVars } from "../src/lib/page-theme";
 
-// Скриншоты движка: фон в меню (телефон и компьютер) и панель настройки.
+// Скриншоты движка: фон в меню (телефон и компьютер), панель настройки и
+// четыре варианта цвета фона страницы.
 // Запуск: npm run screens -- motion
 
 /** Значок «N» dev-режима Next — не часть сайта. */
@@ -29,7 +32,7 @@ async function openMenu(page: Page) {
 test("фон меню", async ({ page }, testInfo) => {
   await openMenu(page);
   await page.screenshot({
-    path: `docs/screens/07-fundal-${testInfo.project.name}.png`,
+    path: `docs/screens/09-fundal-${testInfo.project.name}.png`,
   });
 });
 
@@ -45,5 +48,22 @@ test("панель настройки движения", async ({ page }, testIn
   const frame = page.frames().find((f) => f.url().endsWith("/soroca"));
   await frame?.addStyleTag({ content: "nextjs-portal { display: none }" });
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: "docs/screens/07-panou-1280.png" });
+  await page.screenshot({ path: "docs/screens/09-panou-1280.png" });
 });
+
+// Четыре варианта цвета фона на выбор Амяну (задача 09, пункт 2). В файле
+// сохранён вариант A — остальные ставим те же переменные CSS, что поставил бы
+// корневой layout, и снимаем меню.
+for (const [hex, letter] of Object.entries(PAGE_BACKGROUNDS)) {
+  test(`фон страницы ${letter}`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "390", "выбор — на телефоне");
+    await openMenu(page);
+    await page.evaluate((vars) => {
+      for (const [name, value] of Object.entries(vars)) {
+        document.documentElement.style.setProperty(name, value);
+      }
+    }, pageThemeVars(hex));
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: `docs/screens/09-fon-${letter}-390.png` });
+  });
+}

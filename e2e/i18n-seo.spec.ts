@@ -146,8 +146,8 @@ test.describe("переключатель RO/RU", () => {
     await expect(page.getByLabel("Телефон")).toHaveValue("069 123 456");
     await expect(page.getByLabel("Адрес")).toHaveValue("Str. Test 1");
     await expect(page.getByRole("radio").nth(1)).toBeChecked();
-    // Корзина на месте (название блюда — по-русски)
-    await expect(page.getByText("Кебаб Чиз")).toBeVisible();
+    // Корзина на месте (название блюда в русской версии — как в румынской)
+    await expect(page.getByText("Kebab Cheese")).toBeVisible();
   });
 
   test("на подтверждении и контактах — тот же экран", async ({
@@ -271,15 +271,18 @@ test.describe("контакты", () => {
       "https://www.google.com/maps/place/?q=place_id:ChIJ2YI2WgBzM0cRVzCmzQHNyfQ",
     );
 
-    // Соцсети — текстом; форм и карт-виджетов нет
-    const social = page.getByRole("navigation", { name: "Rețele sociale" });
-    await expect(
-      social.getByRole("link", { name: "Instagram" }),
-    ).toHaveAttribute("href", "https://www.instagram.com/apetit.md/");
-    await expect(social.getByRole("link", { name: "TikTok" })).toHaveAttribute(
-      "href",
-      "https://www.tiktok.com/@apetit.md",
+    // «Comandă» — Primary (жёлтая заливка), решение архитектора
+    await expect(centru.getByRole("link", { name: "Comandă" })).toHaveClass(
+      /btn-primary/,
     );
+    // Соцсети — только в подвале, отдельного блока на странице нет
+    await expect(
+      page.locator("main").getByRole("link", { name: "Instagram" }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("main").getByRole("link", { name: "TikTok" }),
+    ).toHaveCount(0);
+    // Форм и карт-виджетов нет
     await expect(page.locator("form, iframe")).toHaveCount(0);
   });
 
