@@ -93,6 +93,13 @@ export interface TelegramStore {
     expected: number,
     now: Date,
   ): Promise<boolean>;
+  /**
+   * Вернуть ступень назад: сообщение не ушло, пусть следующий тик попробует
+   * ещё раз. Счётчик опускается к expected — только если он всё ещё
+   * expected + 1 (иначе ступень успел забрать параллельный запуск) и заказ
+   * всё ещё new. Отметка времени остаётся: это время последней попытки.
+   */
+  releaseStage(id: string, stage: AlertStage, expected: number): Promise<void>;
 }
 
 const ORDER_COLUMNS =
@@ -233,6 +240,22 @@ export function createSupabaseTelegramStore(
         .select("id");
       if (error) fail("claimStage", error);
       return (data ?? []).length === 1;
+    },
+
+    async releaseStage(id, stage, expected) {
+      const column =
+        stage === "reminder" ? "reminders_sent" : "owner_alerts_sent";
+      const patch =
+        stage === "reminder"
+          ? { reminders_sent: expected }
+          : { owner_alerts_sent: expected };
+      const { error } = await getDb()
+        .from("orders")
+        .update(patch)
+        .eq("id", id)
+        .eq("status", "new")
+        .eq(column, expected + 1);
+      if (error) fail("releaseStage", error);
     },
   };
 }

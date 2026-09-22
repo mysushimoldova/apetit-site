@@ -274,7 +274,7 @@ describe("processAlerts — тексты и адресаты", () => {
     ]);
   });
 
-  it("точка не привязана → ступень засчитана, ошибка в лог; владельцам всё равно уходит", async () => {
+  it("точка не привязана → ошибка в лог, ступень не засчитана; владельцам всё равно уходит", async () => {
     store.chats.delete("briceni");
     const { run } = await tick(2);
     expect(run).toEqual({
@@ -289,9 +289,59 @@ describe("processAlerts — тексты и адресаты", () => {
         error: "point not linked: briceni",
       }),
     );
+    // Ступень вернулась: следующий тик попробует напоминание снова
+    expect(counters().remindersSent).toBe(0);
     for (let m = 3; m <= 11; m++) await tick(m);
     const { run: owner } = await tick(12);
     expect(owner.sent.owner).toBe(1);
+  });
+
+  it("ошибка на первом чате владельца не отменяет остальных (Н6)", async () => {
+    for (let m = 1; m <= 11; m++) await tick(m);
+    api.failChats.add(9001); // один из двух владельцев заблокировал бота
+    const { run } = await tick(12);
+    expect(run.sent.owner).toBe(1);
+    expect(run.failed).toBe(0);
+    // Второй владелец сообщение получил
+    expect(api.sent.filter((s) => s.chatId === 9002)).toHaveLength(1);
+    // Ступень пройдена: следующее сообщение владельцам — по расписанию, на 22-й
+    expect(counters().ownerAlertsSent).toBe(1);
+  });
+
+  it("не ответил ни один чат владельцев → ступень возвращается (Н6 + Н7)", async () => {
+    for (let m = 1; m <= 11; m++) await tick(m);
+    api.failChats.add(9001);
+    api.failChats.add(9002);
+    const { run } = await tick(12);
+    expect(run.sent.owner).toBe(0);
+    expect(run.failed).toBe(1);
+    expect(counters().ownerAlertsSent).toBe(0);
+    // Следующий тик пробует ту же ступень снова — и она уходит
+    api.failChats.clear();
+    const again = await tick(13);
+    expect(again.run.sent.owner).toBe(1);
+    expect(again.messages.map((s) => s.chatId)).toEqual([9001, 9002]);
+  });
+
+  it("напоминание не ушло → ступень возвращается, следующий тик повторяет (Н7)", async () => {
+    api.failChats.add(5001); // чат точки не отвечает
+    const { run } = await tick(2);
+    expect(run.failed).toBe(1);
+    expect(counters().remindersSent).toBe(0);
+    api.failChats.clear();
+    const again = await tick(3);
+    expect(again.messages.map((s) => s.text)).toEqual([
+      "⏰ Comanda #1042 așteaptă — 3 minute",
+    ]);
+    expect(counters().remindersSent).toBe(1);
+  });
+
+  it("лестница кончилась — ступень не возвращается, повторов без конца нет", async () => {
+    store.chats.delete("briceni"); // точку так и не привязали
+    // Последнее напоминание — на 30-й минуте (reminderEvery × reminderMax)
+    const late = await tick(31);
+    expect(late.run.failed).toBe(1);
+    expect(counters().remindersSent).toBe(1);
   });
 
   it("нет токена → ничего не отправлено и счётчики не тронуты", async () => {

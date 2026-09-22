@@ -129,6 +129,14 @@ describe.skipIf(!ready)("telegram store в настоящей Supabase", NET, ()
       ownerAlertsSent: 1,
     });
 
+    // Сообщение не ушло — ступень возвращается; чужое expected не трогает
+    await store.releaseStage(id, "reminder", 5);
+    await store.releaseStage(id, "reminder", 1);
+    expect(
+      (await store.pendingAlerts(now, 2, 15, 3, TEST_POINT_ID))[0],
+    ).toMatchObject({ remindersSent: 1 });
+    expect(await store.claimStage(id, "reminder", 1, now)).toBe(true);
+
     // Обе дорожки пройдены до конца → заказ больше не кандидат
     expect(await store.pendingAlerts(now, 2, 2, 1, TEST_POINT_ID)).toEqual([]);
 

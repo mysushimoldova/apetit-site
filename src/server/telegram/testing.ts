@@ -17,6 +17,8 @@ export interface FakeApi extends TelegramApi {
   answered: { id: string; text?: string }[];
   /** Сколько ближайших sendMessage должны упасть */
   failNext: number;
+  /** Чаты, отправка в которые всегда падает (сбой у одного адресата) */
+  failChats: Set<number>;
 }
 
 export function fakeApi(): FakeApi {
@@ -26,7 +28,11 @@ export function fakeApi(): FakeApi {
     edited: [],
     answered: [],
     failNext: 0,
+    failChats: new Set(),
     async sendMessage(params) {
+      if (api.failChats.has(params.chatId)) {
+        throw new Error("sendMessage: 403 Forbidden: bot was blocked");
+      }
       if (api.failNext > 0) {
         api.failNext--;
         throw new Error("sendMessage: 502 Bad Gateway");
@@ -135,6 +141,17 @@ export function fakeStore(): FakeStore {
         o.last_owner_alert_at = now.toISOString();
       }
       return true;
+    },
+    async releaseStage(id, stage, expected) {
+      const o = store.orders.get(id);
+      if (!o || o.status !== "new") return;
+      if (stage === "reminder") {
+        if (o.reminders_sent === expected + 1) o.reminders_sent = expected;
+      } else {
+        if (o.owner_alerts_sent === expected + 1) {
+          o.owner_alerts_sent = expected;
+        }
+      }
     },
   };
   return store;

@@ -15,8 +15,11 @@
 // опоздавший cron её не пропустит и дважды не отправит; за тик каждая
 // дорожка двигается на один шаг, поэтому после долгого простоя не будет
 // залпа. «Am preluat» ставит status=accepted — заказ выпадает из кандидатов,
-// а начатую ступень отменяет условный UPDATE в claimStage. Зовётся раз в
-// минуту: pg_cron → pg_net → POST /api/telegram/reminders (и telegram-dev).
+// а начатую ступень отменяет условный UPDATE в claimStage. Ступень берётся
+// ДО отправки (два параллельных запуска не отправят одно дважды); если
+// отправить не вышло, ступень возвращается назад — следующий тик попробует
+// снова, но не дольше самой лестницы. Зовётся раз в минуту: pg_cron → pg_net
+// → POST /api/telegram/reminders (и telegram-dev).
 import { getPoint as getRealPoint, type Point } from "@/data/points";
 import type { AlertsConfig } from "@/config/alerts";
 import { formatPhoneDisplay } from "@/lib/order/phone";
@@ -84,6 +87,13 @@ export interface AlertRun {
 
 function elapsedMinutes(createdAt: string, now: Date): number {
   return (now.getTime() - new Date(createdAt).getTime()) / 60_000;
+}
+
+/** Минута последней ступени дорожки: позже неё повторять уже незачем. */
+function ladderEnd(stage: AlertStage, cfg: AlertsConfig): number {
+  return stage === "reminder"
+    ? cfg.reminderEvery * cfg.reminderMax
+    : cfg.ownerAt + cfg.ownerRepeatEvery * (cfg.ownerMax - 1);
 }
 
 /** Снимок позиций как он лежит в базе; битый (не должно быть) — null. */
@@ -158,8 +168,9 @@ export async function processAlerts(
         stage: stage.stage,
         n: stage.n,
       };
+      let claimed = false;
       try {
-        const claimed = await deps.store.claimStage(
+        claimed = await deps.store.claimStage(
           order.id,
           stage.stage,
           stage.expected,
@@ -178,11 +189,24 @@ export async function processAlerts(
             minutes,
             point ? formatPhoneDisplay(point.phone) : "",
           );
-          for (const chatId of owners) {
-            await api.sendMessage({ chatId, text });
+          // Все чаты сразу и независимо: раньше ошибка на первом обрывала
+          // цикл и остальные владельцы сообщение не получали, а ступень
+          // была уже забрана (аудит Н6).
+          const results = await Promise.allSettled(
+            owners.map((chatId) => api.sendMessage({ chatId, text })),
+          );
+          const failures = results.filter((r) => r.status === "rejected");
+          if (owners.length > 0 && failures.length === owners.length) {
+            throw failures[0].reason instanceof Error
+              ? failures[0].reason
+              : new Error(String(failures[0].reason));
           }
           run.sent.owner++;
-          deps.log("owner alert sent", { ...meta, owners: owners.length });
+          deps.log("owner alert sent", {
+            ...meta,
+            owners: owners.length,
+            failed: failures.length,
+          });
           return;
         }
 
@@ -236,6 +260,28 @@ export async function processAlerts(
           ...meta,
           error: error instanceof Error ? error.message : String(error),
         });
+        // Сообщение не ушло — ступень возвращаем назад, и следующий тик
+        // попробует её ещё раз (аудит Н7). Возвращаем, только пока идёт сама
+        // лестница: иначе, скажем, непривязанная точка заставила бы повторять
+        // без конца. Редкий риск: Telegram успел доставить и оборвал ответ —
+        // тогда придёт дубль; потерянное сообщение хуже лишнего.
+        if (claimed && minutes <= ladderEnd(stage.stage, cfg)) {
+          try {
+            await deps.store.releaseStage(
+              order.id,
+              stage.stage,
+              stage.expected,
+            );
+          } catch (releaseError) {
+            deps.log("stage release failed", {
+              ...meta,
+              error:
+                releaseError instanceof Error
+                  ? releaseError.message
+                  : String(releaseError),
+            });
+          }
+        }
       }
     }),
   );
