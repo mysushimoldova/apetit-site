@@ -370,6 +370,46 @@ test.describe("геолокация разрешена (человек в Сор
   });
 });
 
+// Системное окно «Разрешить доступ к местоположению?» не должно выскакивать
+// само при открытии страницы (DESIGN.md → Don't, и Lighthouse снимает за это
+// балл). Разрешение ещё не дано → спрашиваем только после действия человека.
+test.describe("геолокация ещё не решена", () => {
+  test("при открытии страницы браузер ничего не спрашивает", async ({
+    page,
+  }) => {
+    const calls: string[] = [];
+    await page.addInitScript(() => {
+      const w = window as unknown as { __geoCalls: number };
+      w.__geoCalls = 0;
+      const real = navigator.geolocation.getCurrentPosition.bind(
+        navigator.geolocation,
+      );
+      navigator.geolocation.getCurrentPosition = ((...args: unknown[]) => {
+        w.__geoCalls++;
+        return (real as (...a: unknown[]) => void)(...args);
+      }) as typeof navigator.geolocation.getCurrentPosition;
+    });
+    await seedCart(page, "soroca", [line("cola")]);
+    await page.goto("/soroca/comanda");
+    await expect(page.locator(".point-card")).toHaveCount(2);
+    await page.waitForTimeout(500);
+    const before = await page.evaluate(
+      () => (window as unknown as { __geoCalls: number }).__geoCalls,
+    );
+    expect(before, calls.join()).toBe(0);
+
+    // Человек что-то нажал — теперь спросить можно
+    await page.getByLabel("Nume").click();
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () => (window as unknown as { __geoCalls: number }).__geoCalls,
+        ),
+      )
+      .toBe(1);
+  });
+});
+
 test("геолокация запрещена — карточки без расстояния, без ошибок", async ({
   page,
 }) => {

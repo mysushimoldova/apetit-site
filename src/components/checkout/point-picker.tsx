@@ -3,8 +3,15 @@
 // городе больше одной точки. Карточка: Milk, рамка rule, 16px, название,
 // адрес, часы, справа расстояние «~1,2 km». Выбранная — рамка 2px Yellow
 // (и галочка Ink: жёлтая рамка на кремовом фоне видна слабо).
-// Геолокация — только здесь, при показе блока, и только если у точек есть
-// координаты. Отказ — просто без расстояния.
+// Геолокация — только здесь и только если у точек есть координаты. Отказ —
+// просто без расстояния.
+//
+// Когда спрашиваем: не при открытии страницы, а после первого действия
+// человека (нажал, ввёл, прокрутил). Системное окно «Разрешить доступ к
+// местоположению?», выскакивающее само на входе, — это всплывающее окно,
+// которых по DESIGN.md быть не должно, и Lighthouse снимает за него балл
+// (geolocation-on-start). Если разрешение уже дано, окна не будет —
+// спрашиваем сразу.
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Locale } from "@/data/points";
@@ -43,13 +50,45 @@ export function PointPicker({
 
   useEffect(() => {
     if (!hasCoords || !("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {
-        // Отказ или ошибка — без расстояния и без уговоров
-      },
-      { maximumAge: 5 * 60_000, timeout: 10_000 },
-    );
+    let asked = false;
+
+    const ask = () => {
+      if (asked) return;
+      asked = true;
+      stopWaiting();
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {
+          // Отказ или ошибка — без расстояния и без уговоров
+        },
+        { maximumAge: 5 * 60_000, timeout: 10_000 },
+      );
+    };
+
+    // Любое действие человека на странице годится: нажатие по карточке
+    // точки, ввод имени, прокрутка колесом, Tab. Слушатели снимаются после
+    // первого же события.
+    const EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    function stopWaiting() {
+      for (const type of EVENTS) window.removeEventListener(type, ask);
+    }
+    for (const type of EVENTS) {
+      window.addEventListener(type, ask, { passive: true });
+    }
+
+    // Разрешение уже дано (человек заказывал раньше) — окна не будет,
+    // спрашиваем сразу, чтобы расстояние появилось без лишних движений.
+    navigator.permissions
+      ?.query({ name: "geolocation" })
+      .then((status) => {
+        if (status.state === "granted") ask();
+      })
+      .catch(() => {
+        // Браузер не умеет спрашивать про разрешения — ждём действия
+      });
+
+    return stopWaiting;
   }, [hasCoords]);
 
   const errorId = `${groupId}-error`;
