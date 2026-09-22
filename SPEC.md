@@ -630,11 +630,16 @@ UX-правила), плюс проверенные скиллы для Next.js/
 |---|---|---|
 | Cheeseburger Dublu Pui | 115 | 385 |
 | Cheeseburger Pui | 85 | 290 |
-| Cheeseburger Dublu Vită-Porc | 115 | 385 |
+| Cheeseburger Dublu Vită-Porc ¹ | 115 | 385 |
 | Cheeseburger Vită-Porc | 85 | 290 |
 | Hamburger Dublu Vită-Porc | 105 | 365 |
 | Hamburger Vită-Porc | 80 | 275 |
 | Cheeseburger Crispy | 85 | 280 |
+
+¹ В плитке меню — короткое название **«Cheeseburger Dublu»**: полное не
+влезает в две строки на телефоне (решение архитектора 22.09.2026). Полное
+название видно в листе блюда, в корзине и в заказе; двойную котлету
+описывает состав.
 
 ### Crispy
 | Блюдо | Цена | Граммы | Примечание |

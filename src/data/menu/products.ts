@@ -61,6 +61,8 @@ type ProductInput = {
    *  (фирменные: Kebab Cheese, Hot Dog Classic, Pepperoni…). Пара {ro, ru} —
    *  если это обычное блюдо или напиток, и его название переводится. */
   name: string | Localized;
+  /** Короткое название для плитки меню, если полное не влезает в две строки. */
+  tileName?: Localized;
   price: number;
   grams?: number | null;
   ingredients?: LocalizedList;
@@ -87,6 +89,7 @@ function product(input: ProductInput): Product {
       typeof input.name === "string"
         ? { ro: input.name, ru: input.name }
         : input.name,
+    tileName: input.tileName ?? null,
     ingredients,
     grams: input.grams ?? null,
     price: input.price,
@@ -301,6 +304,11 @@ const BURGERS: Product[] = [
       ro: "Cheeseburger Dublu Vită-Porc",
       ru: "Cheeseburger двойной говядина-свинина",
     },
+    // Полное название в плитке не влезает в две строки на телефоне
+    // (решение архитектора 22.09.2026): в меню — короткое, полное видно
+    // в листе блюда, а двойную котлету описывает состав.
+    // TODO ru: проверить
+    tileName: { ro: "Cheeseburger Dublu", ru: "Cheeseburger двойной" },
     price: 115,
     grams: 385,
     ingredients: burger(["vită-porc", "cașcaval"], ["говядина-свинина", "сыр"]),

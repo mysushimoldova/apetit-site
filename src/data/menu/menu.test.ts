@@ -217,6 +217,23 @@ describe("блюда (SPEC приложение А)", () => {
     expect(ru("kebab-cheese")).toBe("Kebab Cheese");
   });
 
+  it("короткое название для плитки — только у двойного чизбургера", () => {
+    const withShort = PRODUCTS.filter((p) => p.tileName !== null);
+    expect(withShort.map((p) => p.slug)).toEqual(["cheeseburger-dublu-vita"]);
+    // В плитке — короткое, в листе блюда и в заказе — полное
+    expect(bySlug("cheeseburger-dublu-vita").tileName).toEqual({
+      ro: "Cheeseburger Dublu",
+      ru: "Cheeseburger двойной",
+    });
+    expect(bySlug("cheeseburger-dublu-vita").name.ro).toBe(
+      "Cheeseburger Dublu Vită-Porc",
+    );
+    // Двойную котлету видно по составу
+    expect(bySlug("cheeseburger-dublu-vita").ingredients.ro).toContain(
+      "vită-porc",
+    );
+  });
+
   it("румынские названия не тронуты", () => {
     expect(bySlug("salata-greceasca").name.ro).toBe("Salată Grecească");
     expect(bySlug("apa-plata").name.ro).toBe("Apă plată");

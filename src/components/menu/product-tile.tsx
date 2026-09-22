@@ -1,5 +1,6 @@
 // Плитка блюда (DESIGN.md → Product Tile): без поверхности, рамки и тени.
-// Фото → название (2 строки) → состав (2 строки, «…») → граммы → ценник и «+».
+// Фото → название (2 строки; у длинных — короткое, product.tileName) →
+// состав (2 строки, «…») → граммы → ценник и «+».
 // Нажатие на фото/название открывает лист блюда; «+» — корзина.
 // Сама плитка серверная, интерактивны два островка: название и «+».
 import type { Locale } from "@/data/points";
@@ -32,6 +33,9 @@ export function ProductTile({
   eager?: boolean;
 }) {
   const name = product.name[locale];
+  // В плитке — короткое название, если оно задано: полное не всегда влезает
+  // в две строки на телефоне. Alt фото и лист блюда — всегда полное.
+  const tileName = product.tileName?.[locale] ?? name;
   const ingredients = product.ingredients[locale].join(", ");
   const grams = gramsLabel(product, t.menu.grams);
   const { from, price } = priceLabel(product);
@@ -40,7 +44,7 @@ export function ProductTile({
     <article data-reveal className="relative flex min-w-0 flex-col">
       <FoodImage photo={product.photo} alt={name} eager={eager} />
       <h3 className="mt-4 font-ui text-title text-ink">
-        <TileOpenButton slug={product.slug} name={name} />
+        <TileOpenButton slug={product.slug} name={tileName} />
       </h3>
       {ingredients && (
         <p className="mt-1 line-clamp-2 font-body text-caption font-normal tracking-normal text-charcoal">

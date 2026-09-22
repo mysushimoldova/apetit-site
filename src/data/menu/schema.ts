@@ -72,6 +72,10 @@ export const ProductSchema = z.object({
   slug,
   category: CategorySlugSchema,
   name: LocalizedSchema,
+  /** Короткое название для плитки меню: полное не влезает в две строки на
+   *  телефоне (решение архитектора 22.09.2026). null — плитка показывает
+   *  name. В листе блюда, корзине и заказе всегда полное название. */
+  tileName: z.nullable(LocalizedSchema),
   ingredients: LocalizedListSchema,
   grams: grams.nullable(),
   /** Базовая цена (Briceni). При вариантах — минимальная из них. */
