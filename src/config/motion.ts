@@ -15,13 +15,15 @@ import type {
 } from "@/motion/config-schema";
 import raw from "./motion.json";
 
-function asColor(value: string): ContourColor {
+// Списки здесь повторены значениями, а не взяты из схемы: config-schema.ts
+// тянет за собой zod, а этот модуль попадает в браузер. Чтобы повтор не
+// разошёлся молча, тест (motion.test.ts) прогоняет через обе функции все
+// значения из схемы и ждёт их обратно.
+export function asColor(value: string): ContourColor {
   return value === "smoke" || value === "sand" ? value : "ash";
 }
 
-// Список здесь повторён числами, а не взят из схемы: config-schema.ts тянет
-// за собой zod, а этот модуль попадает в браузер (см. комментарий там).
-function asPageBackground(value: string): PageBackground {
+export function asPageBackground(value: string): PageBackground {
   return value === "#FAF7F2" || value === "#F4EDE2" || value === "#F1E9DB"
     ? value
     : "#F7F2EA";

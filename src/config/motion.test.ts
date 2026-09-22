@@ -1,7 +1,16 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { motionConfigSchema, PAGE_BACKGROUNDS } from "@/motion/config-schema";
-import { motionConfig, pageBackground } from "./motion";
+import {
+  CONTOUR_COLORS,
+  motionConfigSchema,
+  PAGE_BACKGROUNDS,
+} from "@/motion/config-schema";
+import {
+  asColor,
+  asPageBackground,
+  motionConfig,
+  pageBackground,
+} from "./motion";
 
 const raw = JSON.parse(
   readFileSync(new URL("./motion.json", import.meta.url), "utf8"),
@@ -39,6 +48,18 @@ describe("src/config/motion.json", () => {
     expect(Object.keys(raw.page)).toEqual(["background"]);
     expect(Object.keys(PAGE_BACKGROUNDS)).toContain(raw.page.background);
     expect(pageBackground).toBe(raw.page.background);
+  });
+
+  // Цвета перечислены дважды: в схеме (там zod, в браузер не уезжает) и в
+  // motion.ts. Разойдутся — новое значение молча превратится в значение по
+  // умолчанию, и Амян не поймёт, почему панель «не сохраняет» цвет.
+  it("оба списка цветов — те же, что в схеме", () => {
+    for (const color of Object.keys(CONTOUR_COLORS)) {
+      expect(asColor(color)).toBe(color);
+    }
+    for (const background of Object.keys(PAGE_BACKGROUNDS)) {
+      expect(asPageBackground(background)).toBe(background);
+    }
   });
 
   it("движок получает ровно то, что в файле", () => {
