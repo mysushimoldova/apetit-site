@@ -12,8 +12,6 @@
 
 export type QualityLevel = 1 | 2 | 3 | 4;
 
-export const QUALITY_LEVELS: QualityLevel[] = [1, 2, 3, 4];
-
 /** Потолок плотности пикселей по уровню. */
 export const MAX_DPR: Record<QualityLevel, number> = {
   1: 1.5,

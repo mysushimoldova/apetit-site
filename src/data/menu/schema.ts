@@ -39,7 +39,6 @@ export type CategorySlug = z.infer<typeof CategorySlugSchema>;
 
 /** Какие виды добавок принимают блюда категории (SPEC 2.4, предположение). */
 export const AddonKindSchema = z.enum(["ingredient", "sauce-cup"]);
-export type AddonKind = z.infer<typeof AddonKindSchema>;
 
 export const CategorySchema = z.object({
   slug: CategorySlugSchema,

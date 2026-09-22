@@ -33,7 +33,7 @@ export type OrderRow = {
   ip_hash: string | null;
   dedup_hash: string;
   telegram_message_id: number | null;
-  /** «⏰ ждёт» отправлено (0/1) (0002) */
+  /** Сколько напоминаний «⏰ ждёт» ушло точке, до reminderMax (0002) */
   reminders_sent: number;
   last_reminder_at: string | null;
   /** Почему заказ не ушёл в Telegram (null — ушёл или ещё не пробовали) */
