@@ -5,8 +5,12 @@
 // Безопасность (SPEC §9.4): пишем всегда в один и тот же файл проекта, путь
 // из запроса не берём; тело проверяется схемой zod, лишние поля запрещены;
 // запрос с чужой страницы отсекаем по заголовку Origin.
-import { readFile, writeFile } from "node:fs/promises";
+//
+// Запись — через временный файл с переименованием (writeFileAtomic): две
+// одновременные записи больше не оставляют половинчатый motion.json.
+import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { writeFileAtomic } from "@/lib/write-file-atomic";
 import { motionConfigSchema } from "@/motion/config-schema";
 
 // Нужен Node: маршрут пишет файл проекта
@@ -75,6 +79,6 @@ export async function POST(request: Request) {
     );
   }
 
-  await writeFile(FILE, `${JSON.stringify(parsed.data, null, 2)}\n`, "utf8");
+  await writeFileAtomic(FILE, `${JSON.stringify(parsed.data, null, 2)}\n`);
   return Response.json(parsed.data);
 }

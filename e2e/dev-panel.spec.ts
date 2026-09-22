@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { expect, test, type Frame, type Page } from "@playwright/test";
 
 // Панель настройки движения — /dev/motion. Только разработка: слева
@@ -118,6 +119,44 @@ test("«Сохранить» переписывает src/config/motion.json", a
     });
     // Цвет фона страницы сохраняется той же кнопкой
     expect(saved.page).toEqual({ background: "#F4EDE2" });
+  } finally {
+    writeFileSync(FILE, before);
+  }
+});
+
+// Раньше маршрут писал прямо в motion.json, и при наложении двух записей в
+// файле оставался хвост от старого — битый JSON ронял сборку и тесты.
+// Теперь запись идёт через временный файл с переименованием.
+test("несколько записей подряд не оставляют битый файл", async ({
+  request,
+}) => {
+  const before = readFileSync(FILE, "utf8");
+  try {
+    const original = JSON.parse(before);
+    // Одно значение длинное, другое короткое: именно на такой паре и
+    // оставался хвост
+    const long = {
+      ...original,
+      background: { ...original.background, opacity: 0.123456 },
+    };
+    const short = {
+      ...original,
+      background: { ...original.background, opacity: 1 },
+    };
+    const responses = await Promise.all(
+      [long, short, long, short, long, short].map((data) =>
+        request.post("/api/dev/motion", { data }),
+      ),
+    );
+    for (const r of responses) expect(r.status()).toBe(200);
+
+    const text = readFileSync(FILE, "utf8");
+    expect(() => JSON.parse(text)).not.toThrow();
+    // Файл — целиком один из вариантов, не смесь
+    expect([0.123456, 1]).toContain(JSON.parse(text).background.opacity);
+    // Временных файлов рядом не осталось
+    const dir = dirname(FILE);
+    expect(readdirSync(dir).filter((n) => n.endsWith(".tmp"))).toEqual([]);
   } finally {
     writeFileSync(FILE, before);
   }
