@@ -60,6 +60,8 @@ export interface FakeStore extends TelegramStore {
   orders: Map<
     string,
     StoredOrder & {
+      /** Заказ из прогона тестов (0005): напоминаний не получает */
+      is_test: boolean;
       reminders_sent: number;
       last_reminder_at: string | null;
       telegram_error: string | null;
@@ -111,6 +113,7 @@ export function fakeStore(): FakeStore {
         .filter(
           (o) =>
             o.status === "new" &&
+            !o.is_test &&
             (!pointId || o.point_id === pointId) &&
             new Date(o.created_at).getTime() <=
               now.getTime() - olderThanMin * 60_000 &&
@@ -199,6 +202,7 @@ export function storedOrder(
     created_at: "2026-09-19T09:00:00.000Z",
     accepted_at: null,
     telegram_message_id: 500,
+    is_test: false,
     reminders_sent: 0,
     last_reminder_at: null,
     telegram_error: null,

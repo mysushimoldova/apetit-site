@@ -12,7 +12,15 @@
 // бы в настоящий Telegram. reuseExistingServer: false — если на 3000 уже висит
 // чужой `npm run dev`, Playwright честно упадёт, а не прогонит матрицу мимо
 // нужных переменных окружения.
+import { randomUUID } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
+
+// Секрет прогона: сервер поднимаем с ним, тесты шлют его заголовком
+// x-apetit-test. Только по этой паре сервер помечает заказ как тестовый
+// (orders.is_test) и не отправляет его в Telegram. Секрет живёт в памяти
+// одного прогона; воркеры получают его через окружение родителя.
+process.env.APETIT_TEST_SECRET ??= randomUUID();
+const TEST_SECRET = process.env.APETIT_TEST_SECRET;
 
 const PORT = 3000;
 const BASE_URL = `http://localhost:${PORT}`;
@@ -33,9 +41,13 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   outputDir: "test-results/matrix",
+  // Проверка «сервер подняли тесты» — до первого теста (e2e/global-setup.ts)
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",
+    // Секрет прогона: по нему сервер метит заказы как тестовые
+    extraHTTPHeaders: { "x-apetit-test": TEST_SECRET },
   },
   projects: [
     // ---------- Телефоны ----------
@@ -111,7 +123,7 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: BASE_URL,
-    env: { APETIT_E2E: "1" },
+    env: { APETIT_E2E: "1", APETIT_TEST_SECRET: TEST_SECRET },
     reuseExistingServer: false,
     timeout: 180_000,
   },

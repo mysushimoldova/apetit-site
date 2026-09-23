@@ -1,4 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
+
+// Секрет прогона: сервер поднимаем с ним, тесты шлют его заголовком
+// x-apetit-test. Только по этой паре сервер помечает заказ как тестовый
+// (orders.is_test) и не отправляет его в Telegram. Секрет живёт в памяти
+// одного прогона; воркеры получают его через окружение родителя.
+process.env.APETIT_TEST_SECRET ??= randomUUID();
+const TEST_SECRET = process.env.APETIT_TEST_SECRET;
 
 const PORT = 3000;
 const BASE_URL = `http://localhost:${PORT}`;
@@ -18,9 +26,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
+  // Проверка «сервер подняли тесты» — до первого теста (e2e/global-setup.ts)
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",
+    // Секрет прогона: по нему сервер метит заказы как тестовые
+    extraHTTPHeaders: { "x-apetit-test": TEST_SECRET },
   },
   // Главный экран — телефон 390px (CLAUDE.md), поэтому проверяем мобильный профиль
   projects: [
@@ -38,7 +50,7 @@ export default defineConfig({
     url: BASE_URL,
     // Тестовое время для «вне часов» (заголовок x-apetit-test-now) — только
     // в этом dev-сервере, см. src/app/[city]/comanda/actions.ts
-    env: { APETIT_E2E: "1" },
+    env: { APETIT_E2E: "1", APETIT_TEST_SECRET: TEST_SECRET },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

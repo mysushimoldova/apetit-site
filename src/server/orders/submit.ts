@@ -48,6 +48,8 @@ export interface AcceptedOrder {
   lines: ReceiptLine[];
   total: number;
   createdAt: string;
+  /** Заказ оставлен прогоном тестов — в Telegram он не уходит */
+  isTest: boolean;
 }
 
 export interface SubmitContext {
@@ -62,6 +64,12 @@ export interface SubmitContext {
   onAccepted?: (order: AcceptedOrder) => void;
   /** Подмена в тестах (точка на паузе) */
   getPoint?: (id: string) => Point | undefined;
+  /**
+   * Запрос пришёл от прогона тестов (заголовок + секрет, см. test-mode.ts).
+   * Такой заказ помечается в базе is_test = true и не доходит ни до
+   * Telegram, ни до напоминаний.
+   */
+  isTest?: boolean;
 }
 
 const FIELDS: readonly OrderField[] = ["name", "phone", "address"];
@@ -199,6 +207,7 @@ export async function submitOrder(
       ipHash,
       dedupHash,
       createdAt: ctx.now,
+      isTest: ctx.isTest === true,
     });
 
     if (placed.outcome === "limited") {
@@ -223,6 +232,7 @@ export async function submitOrder(
     const order = placed.order;
     ctx.log("order accepted", {
       number: order.number,
+      test: ctx.isTest === true,
       point: point.id,
       total,
       lines: lines.length,
@@ -241,6 +251,7 @@ export async function submitOrder(
       lines,
       total,
       createdAt: order.createdAt,
+      isTest: ctx.isTest === true,
     });
 
     return {

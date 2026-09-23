@@ -12,6 +12,7 @@ import {
   TEST_NAME,
   watchProblems,
 } from "./_shared";
+import { guardTelegram } from "../telegram-guard";
 
 // Путь заказа целиком на каждом профиле: шторка блюда (размеры и «без»),
 // корзина (+/−, удалить, очистить), оформление (пустая отправка → ошибки,
@@ -19,6 +20,8 @@ import {
 
 // Заказы этого прогона удаляем из настоящей базы (уборка — в _shared.ts)
 const uniquePhone = orderCleanup(test);
+// Ни одного запроса к Telegram из тестов — иначе тест падает
+guardTelegram(test);
 
 /** Отметить размер или галочку: сам вход скрыт, нажимаем его подпись. */
 async function pick(

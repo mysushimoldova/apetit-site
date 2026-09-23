@@ -26,6 +26,8 @@ export interface NewOrder {
   ipHash: string | null;
   dedupHash: string;
   createdAt: Date;
+  /** Заказ оставлен прогоном тестов — Telegram и напоминания его не увидят */
+  isTest?: boolean;
 }
 
 export interface PlacedOrder {
@@ -119,6 +121,31 @@ export function createSupabaseOrderStore(getDb: () => DbClient): OrderStore {
       }
       const r = parsed.data;
       if (r.outcome === "limited") return { outcome: "limited", by: r.by };
+      // Заказ из прогона тестов — пометить сразу, отдельным UPDATE:
+      // place_order() и выдачу номеров не трогаем. Напоминания смотрят
+      // только на заказы старше двух минут, так что этот зазор им не виден.
+      // Не получилось пометить по другой причине — приём считается
+      // неудачным (submit.ts вернёт db_error и никуда ничего не отправит):
+      // лучше упавший тест, чем строка, неотличимая от настоящего заказа.
+      if (order.isTest && r.outcome === "created") {
+        const { error: markError } = await getDb()
+          .from("orders")
+          .update({ is_test: true })
+          .eq("id", r.id);
+        // 42703 / PGRST204 — колонки нет: миграция 0005 в этой базе не
+        // применена (PostgREST на UPDATE отвечает про кеш схемы).
+        // Заказ всё равно не уйдёт в Telegram (признак известен этому
+        // запросу), но строка останется неотличимой от настоящей — об этом
+        // надо кричать в лог, а не валить прогон.
+        if (markError?.code === "42703" || markError?.code === "PGRST204") {
+          console.error(
+            "[orders] миграция 0005 не применена: в orders нет колонки is_test —" +
+              " заказ из теста записан как обычный",
+          );
+        } else if (markError) {
+          fail("mark_test", markError);
+        }
+      }
       return {
         outcome: r.outcome,
         order: {

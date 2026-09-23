@@ -2,15 +2,13 @@
 // профилей: что бы мы ни открыли, страница обязана пройти этот список.
 //
 // Файл не заканчивается на .spec.ts — Playwright не считает его тестом.
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   expect,
   type APIRequestContext,
   type Page,
   type TestInfo,
 } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
+import { deleteTestOrders } from "../orders-db";
 
 /* ============================================================
    1. Ошибки браузера
@@ -623,22 +621,7 @@ export function orderCleanup(test: {
 }): () => string {
   const phones: string[] = [];
   test.afterAll(async () => {
-    const envFile = resolve(process.cwd(), ".env.local");
-    if (phones.length === 0 || !existsSync(envFile)) return;
-    process.loadEnvFile(envFile);
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) return;
-    const db = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { error } = await db
-      .from("orders")
-      .delete()
-      .eq("name", TEST_NAME)
-      .in("phone", phones);
-    if (error)
-      throw new Error(`уборка заказов: ${error.code} ${error.message}`);
+    await deleteTestOrders(TEST_NAME, phones);
   });
   return () => {
     const digits = String(Math.floor(Math.random() * 1e6)).padStart(6, "0");

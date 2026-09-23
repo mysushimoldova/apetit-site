@@ -21,7 +21,7 @@ const store = createSupabaseOrderStore(getServiceClient);
 
 export function placeOrder(
   input: unknown,
-  request: { now: Date; ip: string | null },
+  request: { now: Date; ip: string | null; isTest?: boolean },
 ): Promise<SubmitResult> {
   return submitOrder(input, {
     ...request,

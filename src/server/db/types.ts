@@ -33,6 +33,8 @@ export type OrderRow = {
   ip_hash: string | null;
   dedup_hash: string;
   telegram_message_id: number | null;
+  /** Заказ оставлен прогоном тестов (0005): Telegram и напоминания его не видят */
+  is_test: boolean;
   /** Сколько напоминаний «⏰ ждёт» ушло точке, до reminderMax (0002) */
   reminders_sent: number;
   last_reminder_at: string | null;
@@ -60,6 +62,7 @@ export type OrderInsert = {
   ip_hash?: string | null;
   dedup_hash: string;
   telegram_message_id?: number | null;
+  is_test?: boolean;
   reminders_sent?: number;
   last_reminder_at?: string | null;
   telegram_error?: string | null;

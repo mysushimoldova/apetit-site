@@ -512,3 +512,32 @@ describe("processAlerts — карточка не дошла до точки", (
     expect(card.replyMarkup).toBeDefined();
   });
 });
+
+describe("напоминания и заказы из прогона тестов", () => {
+  it("тестовый заказ не попадает в кандидаты — ни одного сообщения", async () => {
+    store.orders.clear();
+    store.orders.set(
+      storedOrder().id,
+      storedOrder({ created_at: CREATED.toISOString(), is_test: true }),
+    );
+    const run = await processAlerts(at(40), deps);
+    expect(run.pending).toBe(0);
+    expect(run.sent).toEqual({ reminder: 0, owner: 0 });
+    expect(api.sent).toEqual([]);
+  });
+
+  it("настоящий заказ рядом с тестовым напоминания получает", async () => {
+    store.orders.set(
+      "00000000-0000-4000-8000-000000002042",
+      storedOrder({
+        id: "00000000-0000-4000-8000-000000002042",
+        number: 2042,
+        created_at: CREATED.toISOString(),
+        is_test: true,
+      }),
+    );
+    const run = await processAlerts(at(3), deps);
+    expect(run.pending).toBe(1);
+    expect(api.sent.map((m) => m.chatId)).toEqual([5001]);
+  });
+});

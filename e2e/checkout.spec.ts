@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { deleteTestOrders } from "./orders-db";
+import { guardTelegram } from "./telegram-guard";
 
 // Оформление заказа (SPEC §3 шаги 5–6). Профиль — телефон 390px.
 // Время: браузеру — page.clock, серверу — заголовок x-apetit-test-now
@@ -54,21 +56,7 @@ function uniquePhone(): string {
 // .env.local). Только по своим телефонам и тестовому имени: настоящие
 // заказы не трогаем. Нет .env.local — нечего удалять (заказы не писались).
 test.afterAll(async () => {
-  const envFile = resolve(process.cwd(), ".env.local");
-  if (usedPhones.length === 0 || !existsSync(envFile)) return;
-  process.loadEnvFile(envFile);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return;
-  const db = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { error } = await db
-    .from("orders")
-    .delete()
-    .eq("name", "Ion Popescu")
-    .in("phone", usedPhones);
-  if (error) throw new Error(`cleanup: ${error.code} ${error.message}`);
+  await deleteTestOrders("Ion Popescu", usedPhones);
 });
 
 async function fillForm(page: Page, phone = uniquePhone()) {
@@ -78,6 +66,9 @@ async function fillForm(page: Page, phone = uniquePhone()) {
 
 const submit = (page: Page) =>
   page.getByRole("button", { name: "Trimite comanda" });
+
+// Из тестов в Telegram не уходит ни одного запроса — иначе тест падает
+guardTelegram(test);
 
 test.beforeEach(async ({ page }) => {
   await setTime(page, OPEN);
@@ -424,4 +415,46 @@ test("геолокация запрещена — карточки без рас
   await expect(cards.first()).toContainText("Str. Independenței 72");
   await expect(cards.first()).not.toContainText("km");
   expect(errors).toEqual([]);
+});
+
+// Главная проверка после «ложных заказов» 22–23.09: заказ, оформленный
+// тестом, помечен в базе как тестовый и в Telegram не ушёл (ни карточки
+// точке, ни копии владельцу — значит и напоминаний по нему не будет).
+test("заказ из теста помечен is_test и в Telegram не отправлен", async ({
+  page,
+}) => {
+  const phone = uniquePhone();
+  await seedCart(page, "soroca", [line("cola")]);
+  await page.goto("/soroca/comanda");
+  const noua = page.getByRole("radio", { name: /Apetit Soroca Nouă/ });
+  await page.locator("label").filter({ has: noua }).click();
+  await page.getByLabel("Nume").fill("Ion Popescu");
+  await page.getByLabel("Telefon").pressSequentially(phone);
+  await submit(page).click();
+  await expect(page).toHaveURL(/\/soroca\/comanda\/\d{4,}$/);
+
+  const envFile = resolve(process.cwd(), ".env.local");
+  test.skip(!existsSync(envFile), "нет .env.local — базу не прочитать");
+  process.loadEnvFile(envFile);
+  const db = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { data, error } = await db
+    .from("orders")
+    .select("is_test, telegram_message_id, telegram_error")
+    .eq("phone", "+37369" + phone.slice(3))
+    .maybeSingle();
+  // 42703 — колонки ещё нет: миграция 0005 в этой базе не применена
+  test.skip(
+    error?.code === "42703",
+    "миграция 0005 не применена — выполнить supabase/migrations/0005_test_orders.sql",
+  );
+  expect(error).toBeNull();
+  expect(data).toMatchObject({
+    is_test: true,
+    telegram_message_id: null,
+    telegram_error: null,
+  });
 });

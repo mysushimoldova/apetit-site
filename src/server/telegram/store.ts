@@ -196,21 +196,40 @@ export function createSupabaseTelegramStore(
     },
 
     async pendingAlerts(now, olderThanMin, reminderMax, ownerMax, pointId) {
-      let query = getDb()
-        .from("orders")
-        .select(
-          "id, number, point_id, created_at, reminders_sent, owner_alerts_sent, telegram_message_id",
-        )
-        .eq("status", "new")
-        .lte(
-          "created_at",
-          new Date(now.getTime() - olderThanMin * 60_000).toISOString(),
-        )
-        // Хотя бы одна дорожка не пройдена
-        .or(`reminders_sent.lt.${reminderMax},owner_alerts_sent.lt.${ownerMax}`)
-        .order("created_at");
-      if (pointId) query = query.eq("point_id", pointId);
-      const { data, error } = await query;
+      const build = (withTestFilter: boolean) => {
+        let query = getDb()
+          .from("orders")
+          .select(
+            "id, number, point_id, created_at, reminders_sent, owner_alerts_sent, telegram_message_id",
+          )
+          .eq("status", "new")
+          .lte(
+            "created_at",
+            new Date(now.getTime() - olderThanMin * 60_000).toISOString(),
+          )
+          // Хотя бы одна дорожка не пройдена
+          .or(
+            `reminders_sent.lt.${reminderMax},owner_alerts_sent.lt.${ownerMax}`,
+          )
+          .order("created_at");
+        // Заказы, оставленные прогонами тестов, напоминаний не получают
+        // (миграция 0005): база у разработки и у боевого сайта одна.
+        if (withTestFilter) query = query.eq("is_test", false);
+        if (pointId) query = query.eq("point_id", pointId);
+        return query;
+      };
+
+      let { data, error } = await build(true);
+      // 42703 — колонки is_test ещё нет: миграция 0005 не применена в этой
+      // базе. Напоминания при этом работают по-старому (тестовые заказы для
+      // них снова видимы), поэтому в лог уходит явное предупреждение.
+      if (error?.code === "42703" || error?.code === "PGRST204") {
+        console.error(
+          "[telegram] миграция 0005 не применена: в orders нет колонки is_test —" +
+            " напоминания снова видят заказы из прогонов тестов",
+        );
+        ({ data, error } = await build(false));
+      }
       if (error) fail("pendingAlerts", error);
       return (data ?? []).map((r) => ({
         id: r.id,

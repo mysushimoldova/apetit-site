@@ -45,6 +45,13 @@ export async function notifyOrder(
   order: AcceptedOrder,
   deps: NotifyDeps,
 ): Promise<void> {
+  // Заказ из прогона тестов (orders.is_test) в Telegram не уходит никогда —
+  // ни точке, ни владельцам. Проверка стоит здесь, у самой отправки, а не
+  // у вызывающего: так её нельзя обойти, откуда бы ни позвали.
+  if (order.isTest) {
+    deps.log("telegram skipped: test order", { number: order.number });
+    return;
+  }
   const sleep = deps.sleep ?? wait;
   const lang = order.point.locale;
   const text = orderMessage(

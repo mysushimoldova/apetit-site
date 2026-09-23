@@ -39,3 +39,14 @@ test("сайт не даёт вставлять себя в чужую рамк�
     "frame-ancestors 'none'",
   );
 });
+
+// Проверка тестового режима — тоже инструмент разработчика: в боевой сборке
+// её нет ни с каким заголовком. Иначе появился бы способ узнать, что сервер
+// принимает «тестовые» заказы, невидимые для точки и владельца.
+test("маршрута /api/dev/e2e в боевой сборке нет", async ({ request }) => {
+  expect((await request.get("/api/dev/e2e")).status()).toBe(404);
+  const withHeader = await request.get("/api/dev/e2e", {
+    headers: { "x-apetit-test": "любой" },
+  });
+  expect(withHeader.status()).toBe(404);
+});

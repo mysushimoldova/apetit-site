@@ -14,6 +14,7 @@ const order: AcceptedOrder = {
   lines: storedOrder().items as AcceptedOrder["lines"],
   total: 22,
   createdAt: "2026-09-19T09:00:00.000Z",
+  isTest: false,
 };
 
 let api: ReturnType<typeof fakeApi>;
@@ -122,5 +123,25 @@ describe("notifyOrder — заказ в чат точки и копии влад
     const logged = JSON.stringify(log.mock.calls);
     expect(logged).not.toContain("68123456");
     expect(logged).not.toContain("Ion");
+  });
+});
+
+describe("notifyOrder — заказ из прогона тестов", () => {
+  it("не шлёт ничего: ни точке, ни владельцам", async () => {
+    store.chats.set("briceni", { chatId: 5001, title: "Briceni" });
+    store.owners.set(9001, "Amian");
+    await notifyOrder({ ...order, isTest: true }, { api, store, log, sleep });
+    expect(api.sent).toEqual([]);
+    expect(log).toHaveBeenCalledWith("telegram skipped: test order", {
+      number: order.number,
+    });
+  });
+
+  it("не трогает заказ в базе (ни message_id, ни ошибки)", async () => {
+    store.chats.set("briceni", { chatId: 5001, title: "Briceni" });
+    await notifyOrder({ ...order, isTest: true }, { api, store, log, sleep });
+    const row = store.orders.get(order.id);
+    expect(row?.telegram_message_id).toBeNull();
+    expect(row?.telegram_error).toBeNull();
   });
 });

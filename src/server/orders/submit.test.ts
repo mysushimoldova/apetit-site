@@ -202,6 +202,19 @@ describe("submitOrder — приём заказа", () => {
     expect(onAccepted).toHaveBeenCalledOnce();
   });
 
+  it("обычный заказ не помечен тестовым — ни в базе, ни для Telegram", async () => {
+    const onAccepted = vi.fn();
+    await submitOrder(order(), { ...ctx, onAccepted });
+    expect(store.rows[0].isTest).toBe(false);
+    expect(onAccepted.mock.calls[0][0]).toMatchObject({ isTest: false });
+  });
+
+  it("заказ из прогона тестов помечается в базе и уходит с пометкой в Telegram", async () => {
+    const onAccepted = vi.fn();
+    await submitOrder(order(), { ...ctx, isTest: true, onAccepted });
+    expect(store.rows[0].isTest).toBe(true);
+    expect(onAccepted.mock.calls[0][0]).toMatchObject({ isTest: true });
+  });
   it("номера сквозные с 1001", async () => {
     await submitOrder(order(), ctx);
     const r = await submitOrder(order({ phone: "067111333" }), ctx);

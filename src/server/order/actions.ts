@@ -4,6 +4,7 @@
 // Next 16 сам сверяет Origin с Host (защита от CSRF для Server Actions).
 import { headers } from "next/headers";
 import { placeOrder, type SubmitResult } from "@/server/orders";
+import { isTestOrderRequest, TEST_HEADER } from "@/server/orders/test-mode";
 
 /**
  * Тестовое время для e2e («вне часов»): только в dev-сервере Playwright
@@ -23,5 +24,9 @@ export async function submitOrderAction(input: unknown): Promise<SubmitResult> {
     // Только Cloudflare: этот заголовок ставит их сеть, подделать его снаружи
     // нельзя. X-Forwarded-For подделывается — ему не доверяем.
     ip: h.get("cf-connecting-ip"),
+    // Заказ из прогона тестов (сервер поднят тестами и знает секрет):
+    // он помечается в базе is_test = true и не уходит ни в Telegram, ни в
+    // напоминания. В боевой среде этот признак невозможен — см. test-mode.ts.
+    isTest: isTestOrderRequest(h.get(TEST_HEADER)),
   });
 }
