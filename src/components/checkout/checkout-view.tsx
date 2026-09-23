@@ -49,6 +49,7 @@ import {
   SERVER_ERROR_TEXT,
   type ServerErrorText,
 } from "@/lib/order/server-error";
+import { CLOSED_ATTRIBUTE } from "@/lib/order/closed-script";
 import { useIsOpen } from "@/lib/order/use-is-open";
 import { PointPicker, type PointView } from "./point-picker";
 import { TextField } from "./text-field";
@@ -140,6 +141,17 @@ export function CheckoutView({
 
   const open = useIsOpen(point.hours);
   const closed = open === false || serverClosed;
+
+  // Признак «закрыто» на <body>: до гидратации его ставит скрипт по часам
+  // устройства, дальше правим сами — часы перепроверяются раз в 30 секунд,
+  // да и сервер может ответить «закрыто» при отправке. Пока open === null
+  // (первая отрисовка) не трогаем: там уже стоит то, что решил скрипт.
+  useEffect(() => {
+    if (open === null) return;
+    document.body.toggleAttribute(CLOSED_ATTRIBUTE, closed);
+  }, [open, closed]);
+  // Уходим со страницы — признак убираем, он только для оформления заказа
+  useEffect(() => () => document.body.removeAttribute(CLOSED_ATTRIBUTE), []);
 
   function check(field: OrderField, value: string): boolean {
     return fieldError(field, value) === null;
@@ -259,11 +271,14 @@ export function CheckoutView({
         {t.checkout.back}
       </Link>
 
-      {closed && (
-        <div className="mt-4">
-          <ClosedBanner hours={point.hours} t={t} />
-        </div>
-      )}
+      {/* Баннер «закрыто» всегда в разметке, а показывает его CSS по признаку
+          data-closed на <body>. Признак ставит скрипт до первой отрисовки
+          (src/lib/order/closed-script.ts), дальше держит эффект ниже. Так
+          баннер не появляется рывком после гидратации и не сдвигает вниз
+          заголовок, форму и подвал. */}
+      <div className="closed-slot mt-4">
+        <ClosedBanner hours={point.hours} t={t} />
+      </div>
 
       <h1 className="mt-4 font-display text-city uppercase">
         {t.checkout.title}
@@ -356,50 +371,59 @@ export function CheckoutView({
           <h2 id={`${ids}-summary`} className="caption-caps">
             {t.cart.title}
           </h2>
-          <ul className="mt-2">
-            {priced.map(({ line, price, parts }) => {
-              const name =
-                names[line.productSlug]?.[locale] ?? line.productSlug;
-              const details = parts ? describeParts(parts, locale, t) : "";
-              return (
-                <li
-                  key={lineKey(line)}
-                  className="summary-line flex items-start justify-between gap-3 py-3"
-                  data-unavailable={price === null || undefined}
-                >
-                  <div className="min-w-0">
-                    <p className="font-ui text-label font-semibold">
-                      <span className="tabular-nums">{line.qty} × </span>
-                      {name}
-                    </p>
-                    {details && (
-                      <p className="mt-0.5 font-body text-meta text-charcoal">
-                        {details}
-                      </p>
-                    )}
-                    {price === null && (
-                      <p className="field-error">
-                        {t.checkout.errors.unavailableLine}
-                      </p>
-                    )}
-                  </div>
-                  {price && (
-                    <span className="flex-none font-ui text-label font-bold tabular-nums">
-                      {formatPrice(locale, t, price.total)}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          <div className="summary-total flex items-baseline justify-between gap-3 pt-3">
-            <span className="font-ui text-label font-semibold">
-              {t.cart.total}
-            </span>
-            <span className="font-ui text-total tabular-nums">
-              {formatPrice(locale, t, total)}
-            </span>
-          </div>
+          {/* Корзина лежит в браузере, сервер её не знает. Поэтому до того,
+              как она подставится, показывать нечего: иначе на долю секунды
+              видно «Total 0 lei», а потом строки заказа встают на место и
+              сдвигают итог вниз (сдвиг вёрстки, CLS). Пусто — и итог
+              появляется сразу на своём месте. */}
+          {hydrated && (
+            <>
+              <ul className="mt-2">
+                {priced.map(({ line, price, parts }) => {
+                  const name =
+                    names[line.productSlug]?.[locale] ?? line.productSlug;
+                  const details = parts ? describeParts(parts, locale, t) : "";
+                  return (
+                    <li
+                      key={lineKey(line)}
+                      className="summary-line flex items-start justify-between gap-3 py-3"
+                      data-unavailable={price === null || undefined}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-ui text-label font-semibold">
+                          <span className="tabular-nums">{line.qty} × </span>
+                          {name}
+                        </p>
+                        {details && (
+                          <p className="mt-0.5 font-body text-meta text-charcoal">
+                            {details}
+                          </p>
+                        )}
+                        {price === null && (
+                          <p className="field-error">
+                            {t.checkout.errors.unavailableLine}
+                          </p>
+                        )}
+                      </div>
+                      {price && (
+                        <span className="flex-none font-ui text-label font-bold tabular-nums">
+                          {formatPrice(locale, t, price.total)}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="summary-total flex items-baseline justify-between gap-3 pt-3">
+                <span className="font-ui text-label font-semibold">
+                  {t.cart.total}
+                </span>
+                <span className="font-ui text-total tabular-nums">
+                  {formatPrice(locale, t, total)}
+                </span>
+              </div>
+            </>
+          )}
         </section>
 
         <div className="lg:col-start-1 lg:row-start-2">

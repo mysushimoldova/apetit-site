@@ -5,6 +5,10 @@ const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Матрица браузеров живёт в e2e/matrix и гоняется своим конфигом
+  // (playwright.matrix.config.ts, npm run test:matrix) — обычный прогон
+  // остаётся быстрым, один телефон.
+  testIgnore: "matrix/**",
   // Один воркер: dev-сервер Next 16 при одновременных ПЕРВЫХ запросах к ещё не
   // скомпилированному динамическому маршруту иногда отвечает 500
   // («Unexpected end of JSON input» в generate-params). Последовательно — всегда

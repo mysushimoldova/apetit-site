@@ -20,6 +20,15 @@ import { useSheetDrag } from "./use-sheet-drag";
 /** = --dur-fast: столько длится закрытие */
 const EXIT_MS = 150;
 
+// Открытые сейчас листы, снизу вверх: «закрыть» для каждого. Нужен, чтобы
+// кнопка «назад» снимала только верхний и чтобы мы знали, чья запись в
+// истории наверху.
+const OPEN_SHEETS: (() => void)[] = [];
+/** Отложенный шаг назад: снимаем свою запись из истории не сразу. */
+let pendingBack: number | null = null;
+/** Шаг назад сделали мы сами — такой popstate не про кнопку «назад». */
+let selfPop = false;
+
 // Блокировка прокрутки страницы, пока открыт хотя бы один лист
 let locks = 0;
 function lockScroll() {
@@ -117,6 +126,58 @@ function SheetDialog({
     };
     // Только при монтировании: initialFocus — ref, он не меняется
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Кнопка «назад» (на Android — системная) закрывает лист, а не уводит со
+  // страницы. На открытие кладём в историю пустую запись, «назад» её
+  // снимает — и мы закрываем лист; если лист закрыли иначе, запись убираем
+  // сами. Учёт ведём своим списком, а не в history.state: маршрутизатор
+  // Next 16 переписывает состояние записи под себя, и полагаться на него
+  // нельзя (проверено — страница уезжала на две записи назад).
+  useEffect(() => {
+    const path = location.pathname + location.search;
+    const dismiss = () => callbacks.current.onDismiss();
+    OPEN_SHEETS.push(dismiss);
+
+    if (pendingBack !== null) {
+      // Предыдущий лист только что закрылся, но свою запись снять не успел —
+      // забираем её себе. Так в режиме разработки React монтирует эффект
+      // дважды (эффект → уборка → эффект): без этого в историю уходили две
+      // записи и «назад» уводил со страницы.
+      window.clearTimeout(pendingBack);
+      pendingBack = null;
+    } else {
+      window.history.pushState(window.history.state, "");
+    }
+
+    const onPop = () => {
+      // Назад шагнули мы сами (закрывали лист) — это не кнопка «назад»
+      if (selfPop) {
+        selfPop = false;
+        return;
+      }
+      // Закрываем только верхний лист: если один открыт поверх другого,
+      // «назад» снимает их по одному
+      if (OPEN_SHEETS[OPEN_SHEETS.length - 1] !== dismiss) return;
+      OPEN_SHEETS.pop();
+      dismiss();
+    };
+    window.addEventListener("popstate", onPop);
+
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      const index = OPEN_SHEETS.indexOf(dismiss);
+      if (index < 0) return; // запись уже сняла кнопка «назад»
+      OPEN_SHEETS.splice(index, 1);
+      // Ушли на другую страницу (из корзины по ссылке «Comandă») — наша
+      // запись уже не наверху. Шагнуть назад значит отменить переход.
+      if (location.pathname + location.search !== path) return;
+      pendingBack = window.setTimeout(() => {
+        pendingBack = null;
+        selfPop = true;
+        window.history.back();
+      }, 0);
+    };
   }, []);
 
   // Открытие/закрытие: data-state на <dialog> → CSS-переходы

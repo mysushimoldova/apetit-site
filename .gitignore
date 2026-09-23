@@ -23,6 +23,12 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+# Снимки матрицы браузеров: 35 МБ и переснимаются на каждом прогоне
+# (npm run test:matrix). В git их не держим — история распухла бы за пару
+# задач. Смотреть локально в docs/screens/matrix/.
+/docs/screens/matrix/
+# Лог последнего прогона матрицы
+/matrix.log
 
 # Разное
 .DS_Store

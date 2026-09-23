@@ -21,7 +21,11 @@ export function HeaderCityButton({
       type="button"
       onClick={changeCity}
       aria-label={`${cityName} — ${label}`}
-      className="inline-flex h-10 touch-manipulation items-center gap-1 rounded-pill px-2 font-ui text-label font-semibold text-ink [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [@media(hover:hover)_and_(pointer:fine)]:hover:bg-sand"
+      // relative + after:… — невидимый запас под палец: сама кнопка 40px
+      // высотой (столько просит шапка в 56px), а нажимается 48px, то есть
+      // больше положенных 44. Вид не меняется: заливка при наведении
+      // остаётся у самой кнопки.
+      className="relative inline-flex h-10 touch-manipulation items-center gap-1 rounded-pill px-2 font-ui text-label font-semibold text-ink [-webkit-tap-highlight-color:transparent] after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [@media(hover:hover)_and_(pointer:fine)]:hover:bg-sand"
     >
       <span>{cityName}</span>
       <ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" />

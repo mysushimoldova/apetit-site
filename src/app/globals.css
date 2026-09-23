@@ -610,6 +610,7 @@
 
 /* Кнопка «+»: круг 32px Yellow, «+» Ink 2px. Нажатие: scale .92 */
 @utility add-button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -620,6 +621,18 @@
   color: var(--color-ink);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+
+  /* Палец шире кружка. Сам кружок — 32px, как в DESIGN.md, но нажимается
+     квадрат 44×44: его задаёт невидимый ::after. Он нужен ещё и потому, что
+     вокруг «+» лежит растянутая на всю плитку кнопка-название (.tile-open) —
+     без запаса промах мимо «+» на пару пикселей открывал лист блюда вместо
+     того, чтобы положить в корзину. Пилюля .tile-cart стоит выше неё
+     (z-index: 1), поэтому запас перекрывает название, а не наоборот. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
   transition:
     transform var(--dur-fast) var(--ease-out),
     background-color var(--dur-fast) var(--ease-out);
@@ -837,6 +850,12 @@
   &[data-active] .add-button[data-count] {
     width: var(--size-add);
   }
+  /* «+» в пилюле «− N +» (у блюда без размеров): запас под палец — только
+     вправо, влево его держит минус. У круга с числом (data-count) минуса
+     нет, там остаётся обычный запас со всех сторон. */
+  &[data-active] .add-button:not([data-count])::after {
+    inset: -6px -14px -6px 0;
+  }
   /* Кольцо фокуса на Ink-пилюле — светлое и внутри */
   &[data-active] .add-button:focus-visible,
   & .tile-cart-minus:focus-visible {
@@ -1024,6 +1043,7 @@
   /* Круглая кнопка-значок 44px (крестик, ± в счётчике): на экране — значок,
      зона нажатия — 44px */
   .icon-button {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1033,6 +1053,16 @@
     color: var(--color-ink);
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+
+    /* Палец: в строке корзины счётчик мельче (size-10, 40px по DESIGN.md) —
+       чтобы и там нажималось 44×44, область нажатия растянута невидимым
+       ::after. Большим кнопкам он не мешает: между «−» и «+» стоит число,
+       оно шире запаса, и половинки не отбирают нажатия друг у друга. */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: -3px;
+    }
     transition:
       transform var(--dur-fast) var(--ease-out),
       background-color var(--dur-fast) var(--ease-out);
@@ -1167,6 +1197,7 @@
   }
 
   .tile-cart-minus {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1177,6 +1208,15 @@
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     transition: transform var(--dur-fast) var(--ease-out);
+
+    /* Половинки пилюли «− N +» стоят вплотную, поэтому запас под палец
+       раздвигаем только наружу: минус влево, плюс вправо. Так у каждой
+       кнопки выходит 44×44 и они не отбирают нажатия друг у друга. */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: -6px 0 -6px -14px;
+    }
 
     &:active {
       transform: scale(0.92);
@@ -1356,6 +1396,18 @@
 
   /* Closed Banner: без заливки, рамка rule, 12px, Montserrat 15px Ink,
      точка Closed */
+  /* Место баннера «закрыто» на оформлении заказа. Баннер лежит в разметке
+     всегда, а показывает его признак data-closed на <body>: его ставит
+     скрипт ДО первой отрисовки (src/lib/order/closed-script.ts) и дальше
+     поддерживает React. Так баннер не выскакивает после гидратации и не
+     сдвигает вниз заголовок, форму и подвал. */
+  .closed-slot {
+    display: none;
+  }
+  body[data-closed] .closed-slot {
+    display: block;
+  }
+
   .closed-banner {
     display: flex;
     align-items: center;
@@ -1468,7 +1520,7 @@
   /* ---------- Переключатель языка, контакты, правовые, подвал ---------- */
 
   /* Переключатель RO/RU в шапке (DESIGN → Header: 13px Smoke): текущий
-     язык — Ink, другой — ссылка Smoke; зона нажатия 40px */
+     язык — Ink, другой — ссылка Smoke; зона нажатия 44×44 */
   .lang-switch {
     display: flex;
     align-items: center;
@@ -1488,9 +1540,19 @@
       color: var(--color-ink);
     }
     & a {
+      position: relative;
       color: var(--color-smoke);
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+
+      /* Палец: буквы занимают 30×40, а нажимается 44×44. Запас невидимый,
+         он заходит на косую черту между RO и RU — она не нажимается, так
+         что отобрать ей нечего. */
+      &::after {
+        content: "";
+        position: absolute;
+        inset: -2px -7px;
+      }
       transition: color var(--dur-fast) var(--ease-out);
 
       @media (hover: hover) and (pointer: fine) {

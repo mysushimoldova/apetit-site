@@ -14,6 +14,7 @@ import { getCity, isCitySlug, pointsOfCity, type Locale } from "@/data/points";
 import { fill, getMessages } from "@/i18n/messages";
 import { paths } from "@/i18n/routes";
 import { buildPointCatalog } from "@/lib/cart/catalog";
+import { buildClosedScript } from "@/lib/order/closed-script";
 import { breadcrumbSchema } from "@/lib/schema-org";
 import { pageMetadata } from "@/lib/seo";
 import type { CityParams } from "./city-menu";
@@ -71,6 +72,17 @@ export async function CheckoutPage({
           { name: city.name, path: paths.city(city.slug) },
           { name: t.checkout.title, path: paths.checkout(city.slug) },
         ])}
+      />
+      {/* Признак «сейчас закрыто» до первой отрисовки — чтобы баннер не
+          выскочил после гидратации и не сдвинул страницу вниз (см.
+          src/lib/order/closed-script.ts). Часы берём у первой точки: у всех
+          точек Apetit они одинаковые (SPEC §1.1), а переключение точки уже
+          после гидратации отработает React. Текст скрипта собран из наших
+          же значений, пользовательских данных в нём нет. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: buildClosedScript(views[0].hours),
+        }}
       />
       <MotionStage />
       <SiteHeader city={city} locale={locale} t={t} />
