@@ -2,6 +2,7 @@
 assets/foto-originale/
 assets/meniu-psd/
 assets/brand/
+assets/splash-video/
 
 # Зависимости
 /node_modules
@@ -27,6 +28,10 @@ next-env.d.ts
 # (npm run test:matrix). В git их не держим — история распухла бы за пару
 # задач. Смотреть локально в docs/screens/matrix/.
 /docs/screens/matrix/
+# Записи движения (npm run motion) — переснимаются каждый раз
+/docs/motion/*.webm
+/docs/motion/.record/
+
 # Лог последнего прогона матрицы
 /matrix.log
 

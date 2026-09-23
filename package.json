@@ -18,7 +18,8 @@
     "test:e2e:prod": "playwright test -c playwright.prod.config.ts",
     "telegram:dev": "node scripts/telegram-dev.mjs",
     "telegram:setup": "node scripts/telegram-setup.mjs",
-    "og": "node scripts/og-images.mjs"
+    "og": "node scripts/og-images.mjs",
+    "motion": "node scripts/record-motion.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
