@@ -2,10 +2,10 @@
   "background": {
     "mode": "live",
     "tilesAcross": 0.8,
-    "width": 0.95,
-    "opacity": 0.38,
+    "width": 0.38,
+    "opacity": 0.47,
     "speed": 0.5,
-    "parallax": 0.4,
+    "parallax": 0.15,
     "ease": 0.12,
     "color": "ash"
   },
@@ -32,10 +32,10 @@
     "lift": {
       "enabled": true,
       "amt": 0.9,
-      "smooth": 0.13,
+      "smooth": 0.1,
       "shadowReact": 0.7,
       "rise": 7,
-      "sensitivity": 12,
+      "sensitivity": 10,
       "settle": 130,
       "grow": 1.5,
       "tilt": 1

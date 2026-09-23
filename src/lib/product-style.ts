@@ -2,11 +2,11 @@
 // Числа выбирает Амян в панели /dev/motion, лежат в src/config/motion.json,
 // раздел "products" (см. src/motion/config-schema.ts).
 //
-// Как это попадает на страницу: корневой layout ставит переменные на <html>,
-// а сами правила (форма тени, переходы) лежат в globals.css. Так значения
-// меняются сразу на всех страницах, а панель /dev/motion может переписать их
-// на живой странице теми же именами (applyProductStyle).
-import type { CSSProperties } from "react";
+// Как это попадает на страницу: корневой layout выводит переменные правилом
+// :root в <style> (src/lib/root-css.ts), а сами правила (форма тени,
+// переходы) лежат в globals.css. Так значения меняются сразу на всех
+// страницах, а панель /dev/motion может переписать их на живой странице теми
+// же именами (applyProductStyle) — уже после монтирования.
 import type {
   ProductLiftSettings,
   ProductRevealSettings,
@@ -118,7 +118,7 @@ function shadowVars(
   };
 }
 
-/** Переменные CSS для <html>. */
+/** Переменные CSS для правила :root. */
 export function productVars(
   products: ProductsSettings,
 ): Record<string, string> {
@@ -132,11 +132,6 @@ export function productVars(
     "--pv-photo-from": from.photo,
     "--pv-shadow-from": from.shadow,
   };
-}
-
-/** То же для атрибута style в React (переменных CSS нет в типе). */
-export function productStyle(products: ProductsSettings): CSSProperties {
-  return productVars(products) as CSSProperties;
 }
 
 /** Минимум, который нужен от элемента — как в src/lib/page-theme.ts. */

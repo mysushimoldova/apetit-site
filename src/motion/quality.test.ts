@@ -3,12 +3,14 @@ import {
   canvasDpr,
   FPS_DOWN,
   FPS_STOP,
+  MAX_DPR,
   MEASURE_WINDOWS,
   MIN_FRAME_MS,
   nextQuality,
   QUALITY_KEY,
   readQuality,
   shouldMeasure,
+  WAVES_BY_QUALITY,
   writeQuality,
   type QualityLevel,
 } from "./quality";
@@ -61,16 +63,25 @@ describe("уровень качества по кадрам в секунду", 
 });
 
 describe("плотность пикселей и частота кадров по уровням", () => {
-  it("первый уровень — до 1.5, дальше — 1", () => {
-    expect(canvasDpr(1, 3)).toBe(1.5);
-    expect(canvasDpr(1, 1.25)).toBe(1.25);
-    expect(canvasDpr(2, 3)).toBe(1);
-    expect(canvasDpr(3, 2)).toBe(1);
+  it("холст рисуется в настоящую плотность экрана, потолок — тройная", () => {
+    expect(MAX_DPR).toBe(3);
+    expect(canvasDpr(3)).toBe(3);
+    expect(canvasDpr(2)).toBe(2);
+    expect(canvasDpr(1.25)).toBe(1.25);
+    // Выше потолка не поднимаемся
+    expect(canvasDpr(4)).toBe(3);
   });
 
   it("плотность не опускается ниже 1", () => {
-    expect(canvasDpr(1, 0.75)).toBe(1);
-    expect(canvasDpr(1, 0)).toBe(1);
+    expect(canvasDpr(0.75)).toBe(1);
+    expect(canvasDpr(0)).toBe(1);
+  });
+
+  it("уровень режет не разрешение холста, а число волн в поле фона", () => {
+    expect(WAVES_BY_QUALITY[1]).toBe(10);
+    expect(WAVES_BY_QUALITY[2]).toBe(6);
+    expect(WAVES_BY_QUALITY[3]).toBe(4);
+    expect(WAVES_BY_QUALITY[4]).toBe(4);
   });
 
   it("третий уровень — 30 кадров в секунду, четвёртый — ни одного", () => {

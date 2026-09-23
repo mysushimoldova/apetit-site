@@ -1,6 +1,7 @@
 // Общие типы движка анимаций (src/motion/engine.ts).
 // Движок один на сайт: один <canvas>, один контекст WebGL, один цикл кадров.
 // Эффекты подключаются к нему слоями — у каждого слоя свои буферы и шейдеры.
+import type { QualityLevel } from "./quality";
 
 /** Контекст WebGL2 или запасной WebGL1 (с OES_standard_derivatives). */
 export type GL = WebGL2RenderingContext | WebGLRenderingContext;
@@ -15,7 +16,8 @@ export interface Frame {
   width: number;
   /** Высота холста в CSS-пикселях. */
   height: number;
-  /** Пикселей экрана на CSS-пиксель (зависит от уровня качества). */
+  /** Пикселей экрана на CSS-пиксель: настоящая плотность экрана, до тройной.
+   *  От уровня качества НЕ зависит (src/motion/quality.ts). */
   dpr: number;
   /** Сглаженная прокрутка страницы, px (src/motion/scroll.ts). Слой сам
    *  умножает её на свой parallax. При «уменьшить движение» — 0. */
@@ -24,6 +26,9 @@ export interface Frame {
    *  своя инертность (карточки блюд сглаживают её по-своему, иначе ползунок
    *  «плавность» в /dev/motion менял бы заодно и фон). */
   scrollY: number;
+  /** Уровень качества движка (1…4): слой сам решает, чем упроститься.
+   *  Фон берёт отсюда число волн в поле (src/motion/quality.ts). */
+  quality: QualityLevel;
 }
 
 /**

@@ -252,6 +252,12 @@ class MotionEngine {
     };
     this.listen(window, "resize", onResize);
     this.listen(window, "orientationchange", onResize);
+    // Safari на iPhone прячет и показывает адресную строку, не трогая
+    // window.resize: высота окна меняется, а событие приходит только сюда.
+    // Без этого холст остаётся прежнего размера и линии растягиваются.
+    if (window.visualViewport) {
+      this.listen(window.visualViewport, "resize", onResize);
+    }
 
     this.listen(document, "visibilitychange", () => this.syncHidden());
     this.syncHidden();
@@ -390,6 +396,7 @@ class MotionEngine {
       dpr: this.dpr,
       scroll: reduced ? 0 : this.scroll.update(scrollY, dt),
       scrollY,
+      quality: this.quality,
     };
     const gl = ctx.gl;
     gl.clearColor(0, 0, 0, 0);
@@ -409,7 +416,7 @@ class MotionEngine {
     const rect = canvas.getBoundingClientRect();
     this.cssWidth = rect.width;
     this.cssHeight = rect.height;
-    this.dpr = canvasDpr(this.quality, window.devicePixelRatio || 1);
+    this.dpr = canvasDpr(window.devicePixelRatio || 1);
     const width = Math.max(1, Math.round(rect.width * this.dpr));
     const height = Math.max(1, Math.round(rect.height * this.dpr));
     if (canvas.width === width && canvas.height === height) return;

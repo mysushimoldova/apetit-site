@@ -275,6 +275,7 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
               />
               <Slider
                 label="Толщина"
+                hint="полутолщина линии в пикселях экрана"
                 range={BACKGROUND_RANGES.width}
                 value={value.background.width}
                 digits={2}

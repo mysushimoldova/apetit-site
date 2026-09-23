@@ -3,11 +3,16 @@ import type { BackgroundSettings } from "../config-schema";
 import type { Frame } from "../types";
 import {
   contoursUniforms,
-  FRAGMENT_100,
-  FRAGMENT_300,
+  fieldSource,
+  fragment100,
+  fragment300,
+  MAX_WAVES,
   VERTEX_100,
   VERTEX_300,
 } from "./contours";
+
+const FRAGMENT_300 = fragment300(MAX_WAVES);
+const FRAGMENT_100 = fragment100(MAX_WAVES);
 
 const settings: BackgroundSettings = {
   mode: "live",
@@ -28,6 +33,7 @@ const frame: Frame = {
   dpr: 2,
   scroll: 500,
   scrollY: 500,
+  quality: 1,
 };
 
 describe("юниформы слоя фона", () => {
@@ -36,7 +42,8 @@ describe("юниформы слоя фона", () => {
     expect(u.t).toBe(2);
     // 390 CSS × 2 = 780 пикселей экрана; 780 / 2.11 ≈ 369.7
     expect(u.scale).toBeCloseTo(780 / 2.11, 6);
-    expect(u.width).toBe(0.8);
+    // Толщина в настройках — в пикселях CSS, шейдер считает в пикселях холста
+    expect(u.width).toBeCloseTo(1.6, 6);
     expect(u.opacity).toBe(0.45);
     expect(u.speed).toBe(0.35);
     // Прокрутка вниз — линии уезжают: 500 × 1.2 × 2
@@ -88,13 +95,45 @@ describe("шейдеры: WebGL2 и запасной WebGL1", () => {
     const formula = "v += W(p, 1.,0.,0.7,0.30,0.95);";
     expect(FRAGMENT_300).toContain(formula);
     expect(FRAGMENT_100).toContain(formula);
-    const line = "float line = 1.0 - smoothstep(0.0, uW * w, g);";
+    const line = "float line = 1.0 - smoothstep(uW - 0.6, uW + 0.6, d);";
     expect(FRAGMENT_300).toContain(line);
     expect(FRAGMENT_100).toContain(line);
     // Десять волн — ровно столько, сколько в задании
     const count = (source: string) => source.split("v += W(p,").length - 1;
     expect(count(FRAGMENT_300)).toBe(10);
     expect(count(FRAGMENT_100)).toBe(10);
+  });
+
+  it("толщина — расстояние в пикселях экрана, а не доля от крутизны поля", () => {
+    for (const source of [FRAGMENT_300, FRAGMENT_100]) {
+      // Расстояние до линии в пикселях: g, делённое на длину градиента
+      expect(source).toContain(
+        "float d = g / max(length(vec2(dFdx(v), dFdy(v))), 1e-5);",
+      );
+      // Старого вида, из-за которого линия схлопывалась на пологих местах,
+      // остаться не должно
+      expect(source).not.toContain("fwidth");
+      expect(source).not.toContain("uW * w");
+    }
+  });
+
+  it("уровень качества убавляет волны, а не разрешение", () => {
+    const count = (source: string) => source.split("v += W(p,").length - 1;
+    expect(count(fieldSource(10))).toBe(10);
+    expect(count(fieldSource(6))).toBe(6);
+    expect(count(fieldSource(4))).toBe(4);
+    // Первой всегда остаётся самая крупная волна
+    expect(fieldSource(4)).toContain("v += W(p, 1.,0.,0.7,0.30,0.95);");
+    expect(fieldSource(4)).not.toContain("v += W(p, -3.,1.,1.8,-0.26,0.13);");
+    // Странные числа не ломают сборку шейдера
+    expect(count(fieldSource(0))).toBe(1);
+    expect(count(fieldSource(99))).toBe(MAX_WAVES);
+  });
+
+  it("на слабом уровне слой просит меньше волн", () => {
+    expect(contoursUniforms(settings, frame).waves).toBe(10);
+    expect(contoursUniforms(settings, { ...frame, quality: 2 }).waves).toBe(6);
+    expect(contoursUniforms(settings, { ...frame, quality: 3 }).waves).toBe(4);
   });
 
   it("цвет домножен на альфу — иначе Safari на iOS рисует линии белыми", () => {
@@ -114,7 +153,7 @@ describe("шейдеры: WebGL2 и запасной WebGL1", () => {
     }
   });
 
-  it("WebGL2 — версия 300 es, WebGL1 — расширение для fwidth", () => {
+  it("WebGL2 — версия 300 es, WebGL1 — расширение для производных", () => {
     expect(VERTEX_300.startsWith("#version 300 es")).toBe(true);
     expect(FRAGMENT_300.startsWith("#version 300 es")).toBe(true);
     expect(FRAGMENT_300).toContain("out vec4 o;");

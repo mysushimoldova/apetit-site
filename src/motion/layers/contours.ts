@@ -1,12 +1,13 @@
 // Слой живого фона: фирменные контурные линии (DESIGN.md → Background).
 //
-// Поле складывается из десяти волн с разными направлениями, фазами и
-// скоростями; линии — это его «горизонтали» (уровни), ширина линии берётся
-// из производной поля (fwidth), поэтому она одинаковая при любом масштабе.
-// Формула проверена на макете и не меняется: правки — только через
-// настройки в src/config/motion.json и панель /dev/motion.
+// Поле складывается из волн с разными направлениями, фазами и скоростями;
+// линии — это его «горизонтали» (уровни). Толщина линии считается в пикселях
+// экрана, поэтому она одинаковая и там, где поле пологое, и там, где крутое.
+// Формула проверена на макете и не меняется: правки — только через настройки
+// в src/config/motion.json и панель /dev/motion.
 import type { BackgroundSettings, ContourColor } from "../config-schema";
 import { createFullscreenTriangle, createProgram, isGL2 } from "../gl";
+import { WAVES_BY_QUALITY } from "../quality";
 import type { Frame, GL, Layer } from "../types";
 
 /** Цвета линий в шейдере — те же, что CONTOUR_COLORS в config-schema.ts
@@ -17,33 +18,59 @@ const RGB: Record<ContourColor, [number, number, number]> = {
   sand: [0xea / 255, 0xe2 / 255, 0xd5 / 255],
 };
 
-/** Общая часть фрагментного шейдера: поле волн. */
-const FIELD = `
+/** Волны поля по убыванию вклада: первые — крупные и сильные, последние
+ *  дорисовывают мелочь. На слабом телефоне берутся только первые
+ *  (WAVES_BY_QUALITY в src/motion/quality.ts): так рисунок упрощается, а
+ *  холст остаётся во всё разрешение экрана — уменьшать его нельзя, линии
+ *  от этого сразу мылятся. */
+export const WAVE_LINES = [
+  "  v += W(p, 1.,0.,0.7,0.30,0.95);",
+  "  v += W(p, 0.,1.,2.1,-0.22,0.80);",
+  "  v += W(p, 1.,1.,4.0,0.17,0.55);",
+  "  v += W(p, 2.,-1.,1.2,-0.31,0.40);",
+  "  v += W(p, -1.,2.,5.4,0.24,0.36);",
+  "  v += W(p, 2.,2.,3.3,-0.14,0.26);",
+  "  v += W(p, 3.,-1.,0.4,0.27,0.20);",
+  "  v += W(p, -2.,3.,2.7,-0.19,0.18);",
+  "  v += W(p, 3.,2.,5.9,0.12,0.14);",
+  "  v += W(p, -3.,1.,1.8,-0.26,0.13);",
+] as const;
+
+export const MAX_WAVES = WAVE_LINES.length;
+
+/** Поле волн: столько слагаемых, сколько просит уровень качества. */
+export function fieldSource(waves: number): string {
+  const used = WAVE_LINES.slice(0, Math.max(1, Math.min(MAX_WAVES, waves)));
+  return `
 float W(vec2 p, float nx, float ny, float ph, float sp, float a){
   return a * sin(6.2831853 * (nx*p.x + ny*p.y) + ph + uT*sp*uSpeed);
 }
 float field(vec2 p){
   float v = 0.;
-  v += W(p, 1.,0.,0.7,0.30,0.95);
-  v += W(p, 0.,1.,2.1,-0.22,0.80);
-  v += W(p, 1.,1.,4.0,0.17,0.55);
-  v += W(p, 2.,-1.,1.2,-0.31,0.40);
-  v += W(p, -1.,2.,5.4,0.24,0.36);
-  v += W(p, 2.,2.,3.3,-0.14,0.26);
-  v += W(p, 3.,-1.,0.4,0.27,0.20);
-  v += W(p, -2.,3.,2.7,-0.19,0.18);
-  v += W(p, 3.,2.,5.9,0.12,0.14);
-  v += W(p, -3.,1.,1.8,-0.26,0.13);
+${used.join("\n")}
   return v;
 }`;
+}
 
-/** Общая часть main(): из поля — одна линия с мягкими краями. */
+/**
+ * Общая часть main(): из поля — одна линия с мягкими краями.
+ *
+ * g — расстояние до ближайшего уровня в единицах поля, а
+ * length(vec2(dFdx(v), dFdy(v))) — насколько поле меняется на одном пикселе
+ * экрана. Их частное d и есть расстояние до середины линии В ПИКСЕЛЯХ, одно
+ * и то же на пологом и на крутом участке. uW — полутолщина линии в пикселях;
+ * ±0.6 px по краям — мягкий край, он же не даёт тонкой линии проваливаться
+ * между пикселями и рассыпаться в пунктир.
+ *
+ * Делитель прижат снизу к 1e-5: на идеально ровном участке поле не меняется
+ * вовсе, и без этого было бы деление на ноль.
+ */
 const LINE = `
   vec2 p = (gl_FragCoord.xy + uOff) / uScale;
   float v = field(p) * 3.2;
   float g = abs(fract(v) - 0.5);
-  float w = fwidth(v);
-  float line = 1.0 - smoothstep(0.0, uW * w, g);`;
+  float d = g / max(length(vec2(dFdx(v), dFdy(v))), 1e-5);
+  float line = 1.0 - smoothstep(uW - 0.6, uW + 0.6, d);`;
 
 /** Альфа линии и цвет, домноженный на неё (premultiplied alpha).
  *  Так требует Safari на iOS: он складывает холст со страницей только
@@ -60,26 +87,30 @@ uniform vec3 uC;`;
 export const VERTEX_300 = `#version 300 es
 in vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }`;
 
-export const FRAGMENT_300 = `#version 300 es
+export function fragment300(waves: number): string {
+  return `#version 300 es
 precision highp float;${UNIFORMS}
 out vec4 o;
-${FIELD}
+${fieldSource(waves)}
 void main(){${LINE}
   ${PREMULTIPLIED}
   o = vec4(uC * a, a);
 }`;
+}
 
 /** Запасной WebGL1 (GLSL ES 1.00): та же формула, старый синтаксис.
- *  fwidth там — расширение, поэтому строка #extension сверху. */
+ *  dFdx/dFdy там — расширение, поэтому строка #extension сверху. */
 export const VERTEX_100 = `attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }`;
 
-export const FRAGMENT_100 = `#extension GL_OES_standard_derivatives : enable
+export function fragment100(waves: number): string {
+  return `#extension GL_OES_standard_derivatives : enable
 precision highp float;${UNIFORMS}
-${FIELD}
+${fieldSource(waves)}
 void main(){${LINE}
   ${PREMULTIPLIED}
   gl_FragColor = vec4(uC * a, a);
 }`;
+}
 
 /** Юниформы кадра — чистый расчёт, проверяется тестом.
  *  uScale (пикселей экрана на клетку узора) считается от ширины холста:
@@ -87,6 +118,8 @@ void main(){${LINE}
  *  телефоне он такой же плотный, как на компьютере. Пересчёт каждый кадр —
  *  значит поворот телефона и смена размера окна учтены сами собой.
  *  Сдвиг при прокрутке умножается на dpr: шейдер считает в пикселях холста.
+ *  Толщина — тоже: в настройках она в пикселях CSS, чтобы линия выглядела
+ *  одинаково на экранах с любой плотностью точек.
  *  Режим «не двигается» останавливает только время линий (uT = 0);
  *  сдвиг при прокрутке работает как обычно (решение архитектора). */
 export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
@@ -96,8 +129,8 @@ export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
     t: still ? 0 : frame.t,
     /** uScale */
     scale: (frame.width * frame.dpr) / settings.tilesAcross,
-    /** uW */
-    width: settings.width,
+    /** uW — полутолщина линии в пикселях холста */
+    width: settings.width * frame.dpr,
     /** uA */
     opacity: settings.opacity,
     /** uSpeed */
@@ -106,6 +139,8 @@ export function contoursUniforms(settings: BackgroundSettings, frame: Frame) {
     offY: -(frame.scroll * settings.parallax * frame.dpr),
     /** uC */
     rgb: RGB[settings.color],
+    /** Сколько волн в field() на этом уровне качества */
+    waves: WAVES_BY_QUALITY[frame.quality],
   };
 }
 
@@ -117,37 +152,63 @@ export interface ContoursLayer extends Layer {
 
 export const CONTOURS_LAYER_ID = "contours";
 
+/** Собранная программа под одно число волн. */
+interface Built {
+  program: WebGLProgram;
+  attrib: number;
+  u: Record<string, WebGLUniformLocation | null>;
+}
+
 export function createContoursLayer(
   initial: BackgroundSettings,
 ): ContoursLayer {
   let settings = initial;
-  let program: WebGLProgram | null = null;
   let buffer: WebGLBuffer | null = null;
-  let attrib = -1;
-  let u: Record<string, WebGLUniformLocation | null> = {};
+  // Программ столько, сколько уровней качества успело побывать: поле на
+  // каждом своё, а пересобирать шейдер на кадре нельзя
+  const built = new Map<number, Built | null>();
+
+  function build(gl: GL, waves: number): Built | null {
+    const cached = built.get(waves);
+    if (cached !== undefined) return cached;
+    const gl2 = isGL2(gl);
+    const program = createProgram(
+      gl,
+      gl2 ? VERTEX_300 : VERTEX_100,
+      gl2 ? fragment300(waves) : fragment100(waves),
+    );
+    if (!program) {
+      built.set(waves, null);
+      return null;
+    }
+    const u: Record<string, WebGLUniformLocation | null> = {};
+    for (const name of ["uT", "uScale", "uW", "uA", "uSpeed", "uOff", "uC"])
+      u[name] = gl.getUniformLocation(program, name);
+    const item: Built = {
+      program,
+      attrib: gl.getAttribLocation(program, "p"),
+      u,
+    };
+    built.set(waves, item);
+    return item;
+  }
 
   return {
     id: CONTOURS_LAYER_ID,
     zIndex: 0,
 
     init(gl: GL) {
-      const gl2 = isGL2(gl);
-      program = createProgram(
-        gl,
-        gl2 ? VERTEX_300 : VERTEX_100,
-        gl2 ? FRAGMENT_300 : FRAGMENT_100,
-      );
-      if (!program) return;
       buffer = createFullscreenTriangle(gl);
-      attrib = gl.getAttribLocation(program, "p");
-      u = {};
-      for (const name of ["uT", "uScale", "uW", "uA", "uSpeed", "uOff", "uC"])
-        u[name] = gl.getUniformLocation(program, name);
+      // Полное поле собираем сразу: первый кадр рисуется на первом уровне
+      build(gl, MAX_WAVES);
     },
 
     render(gl: GL, frame: Frame) {
-      if (!program || !buffer || attrib < 0) return;
+      if (!buffer) return;
       const v = contoursUniforms(settings, frame);
+      const current = build(gl, v.waves);
+      if (!current || current.attrib < 0) return;
+      const { program, attrib, u } = current;
       gl.useProgram(program);
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.enableVertexAttribArray(attrib);
@@ -169,11 +230,11 @@ export function createContoursLayer(
 
     dispose(gl: GL) {
       if (buffer) gl.deleteBuffer(buffer);
-      if (program) gl.deleteProgram(program);
+      for (const item of built.values()) {
+        if (item) gl.deleteProgram(item.program);
+      }
+      built.clear();
       buffer = null;
-      program = null;
-      attrib = -1;
-      u = {};
     },
 
     setSettings(next: BackgroundSettings) {

@@ -62,6 +62,7 @@ function frame(scrollY: number, dt = 16.67): Frame {
     dpr: 1,
     scroll: scrollY,
     scrollY,
+    quality: 1,
   };
 }
 
