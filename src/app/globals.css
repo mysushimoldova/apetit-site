@@ -488,8 +488,10 @@
    гаусс и подобран методом наименьших квадратов, среднее расхождение с
    filter: blur() — меньше одного уровня яркости из 255.
 
-   Прозрачность каждого слоя — отдельным свойством opacity (а не в цвете
-   градиента): её меняет и появление, и подъём при прокрутке. */
+   Оба слоя рисует ОДИН элемент двумя градиентами в одном background: на первом
+   экране это вдвое меньше элементов с отрисовкой, чем два отдельных.
+   Насыщенность слоёв запечена в сами градиенты (--sh-image), а не задана
+   свойством opacity: свободная opacity нужна подъёму при прокрутке. */
 .food-shadow {
   position: absolute;
   left: 0;
@@ -508,48 +510,45 @@
   transform-origin: 50% 100%;
 }
 
-.food-shadow-ambient,
-.food-shadow-contact {
+/* Ширина обеих теней задана в процентах от БЛОКА ФОТО, а элемент шире него —
+   в стороны растекается размытие. Поэтому у элемента поля по бокам (padding) и
+   отрицательные left/right на ту же величину: внутренняя коробка совпадает с
+   блоком фото, от неё и считаются проценты (background-origin: content-box),
+   а рисовать градиент можно и в поля (background-clip по умолчанию). */
+.food-shadow-layers {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 50%;
-}
-
-.food-shadow-ambient {
-  width: calc(var(--sh-aw) + 3 * var(--sh-ab));
-  height: calc(var(--sh-ah) + 3 * var(--sh-ab));
+  left: calc(-1.5 * var(--sh-ab));
+  right: calc(-1.5 * var(--sh-ab));
   bottom: calc(var(--sh-y) - 1.5 * var(--sh-ab));
-  opacity: var(--sh-aa);
-  background: radial-gradient(
-    closest-side,
-    rgb(var(--sh-tint) / 0.31) 0%,
-    rgb(var(--sh-tint) / 0.297) 15%,
-    rgb(var(--sh-tint) / 0.265) 30%,
-    rgb(var(--sh-tint) / 0.214) 45%,
-    rgb(var(--sh-tint) / 0.155) 60%,
-    rgb(var(--sh-tint) / 0.094) 75%,
-    rgb(var(--sh-tint) / 0.06) 90%,
-    rgb(var(--sh-tint) / 0) 100%
-  );
+  height: calc(var(--sh-ah) + 3 * var(--sh-ab));
+  padding-inline: calc(1.5 * var(--sh-ab));
+  background-origin: content-box;
+  background-repeat: no-repeat;
+  /* Контактная тень ниже широкой ровно на разницу их запасов под размытие */
+  background-position:
+    50% calc(100% - 1.5 * (var(--sh-ab) - var(--sh-cb))),
+    50% 50%;
+  background-size:
+    calc(var(--sh-cw) + 3 * var(--sh-cb)) calc(var(--sh-ch) + 3 * var(--sh-cb)),
+    calc(var(--sh-aw) + 3 * var(--sh-ab)) 100%;
 }
 
-.food-shadow-contact {
-  width: calc(var(--sh-cw) + 3 * var(--sh-cb));
-  height: calc(var(--sh-ch) + 3 * var(--sh-cb));
-  bottom: calc(var(--sh-y) - 1.5 * var(--sh-cb));
-  opacity: var(--sh-ca);
-  background: radial-gradient(
-    closest-side,
-    rgb(var(--sh-tint) / 0.511) 0%,
-    rgb(var(--sh-tint) / 0.494) 15%,
-    rgb(var(--sh-tint) / 0.449) 30%,
-    rgb(var(--sh-tint) / 0.38) 45%,
-    rgb(var(--sh-tint) / 0.295) 60%,
-    rgb(var(--sh-tint) / 0.188) 75%,
-    rgb(var(--sh-tint) / 0.107) 90%,
-    rgb(var(--sh-tint) / 0) 100%
-  );
+/* Две готовые «раскраски» одного и того же рисунка: в покое и на полном
+   подъёме (контактная тень почти ушла, широкая набрала). Подъём просто
+   перетекает из первой во вторую прозрачностью — градиенты при этом не
+   пересчитываются, всю работу делает композитор. Вторая при остановке
+   прозрачна, поэтому на первом экране она не рисуется вовсе.
+
+   Сами градиенты собраны в src/lib/product-style.ts и приходят сюда готовой
+   строкой: если расписывать стопы здесь через calc(var(...)), браузер считает
+   их заново для каждой из 47 плиток при разборе стилей. */
+.food-shadow-rest {
+  background-image: var(--sh-image);
+}
+
+.food-shadow-lifted {
+  background-image: var(--sh-image-lifted);
+  opacity: 0;
 }
 
 /* Фото: внешний слой занят появлением, внутренний — подъёмом при прокрутке.

@@ -80,8 +80,10 @@ export function createProductsLayer(settings: ProductsSettings): ProductsLayer {
       card.photo.style.willChange = "";
       card.shadow.style.transform = "";
       card.shadow.style.willChange = "";
-      card.ambient.style.opacity = "";
-      card.contact.style.opacity = "";
+      card.rest.style.opacity = "";
+      card.rest.style.willChange = "";
+      card.lifted.style.opacity = "";
+      card.lifted.style.willChange = "";
     }
   };
 
@@ -134,21 +136,26 @@ export function createProductsLayer(settings: ProductsSettings): ProductsLayer {
         return;
       }
       settled = false;
-      const values = liftFrame(state, lift, current.shadow);
-      const ambient = values.ambient.toFixed(3);
-      const contact = values.contact.toFixed(3);
+      const values = liftFrame(state, lift);
+      // Имена нарочно не rest/lifted: rest() выше — это снятие стилей
+      const liftedOpacity = values.mix.toFixed(3);
+      const restOpacity = (1 - values.mix).toFixed(3);
       for (const card of visible) {
         // will-change — обещание браузеру, а не значение: ставим один раз на
-        // движение и снимаем в покое (rest), а не переписываем каждый кадр
+        // движение и снимаем в покое (rest), а не переписываем каждый кадр.
+        // Тени обещают opacity: тогда перетекание одной в другую целиком
+        // достаётся композитору и градиенты не перерисовываются.
         if (!marked.has(card)) {
           marked.add(card);
           card.photo.style.willChange = "transform";
           card.shadow.style.willChange = "transform";
+          card.rest.style.willChange = "opacity";
+          card.lifted.style.willChange = "opacity";
         }
         card.photo.style.transform = values.photo;
         card.shadow.style.transform = values.shadow;
-        card.ambient.style.opacity = ambient;
-        card.contact.style.opacity = contact;
+        card.rest.style.opacity = restOpacity;
+        card.lifted.style.opacity = liftedOpacity;
       }
     },
 

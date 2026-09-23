@@ -14,10 +14,7 @@
 //      поэтому фото взлетает сразу, а садится спокойно. Затухание
 //      критическое (2·√жёсткости), поэтому не качается около нуля.
 import { smoothingFactor, SCROLL_FRAME_MS } from "./scroll";
-import type {
-  ProductLiftSettings,
-  ProductShadowSettings,
-} from "./config-schema";
+import type { ProductLiftSettings } from "./config-schema";
 
 /** Жёсткость пружины на подъёме. Вниз жёсткость берётся из настроек
  *  (settle) — она меньше, поэтому приземление медленнее взлёта. */
@@ -106,10 +103,12 @@ export interface LiftFrame {
   photo: string;
   /** transform группы теней. */
   shadow: string;
-  /** Прозрачность широкой тени. */
-  ambient: number;
-  /** Прозрачность контактной тени. */
-  contact: number;
+  /** Доля перехода от тени в покое к тени на полном подъёме, 0…1.
+   *  Обе тени нарисованы заранее (src/lib/product-style.ts), на кадре
+   *  меняется только их прозрачность: слой покоя получает 1 − mix,
+   *  поднятый — mix. Обе зависимости от подъёма линейные, поэтому такой
+   *  перетекание даёт ровно те же числа, что формулы из демо. */
+  mix: number;
 }
 
 /** Подъём в значениях для DOM. Только transform и opacity — раскладка не
@@ -117,7 +116,6 @@ export interface LiftFrame {
 export function liftFrame(
   state: LiftState,
   settings: ProductLiftSettings,
-  shadow: Pick<ProductShadowSettings, "aa" | "ca">,
 ): LiftFrame {
   const { lift } = state;
   const a = settings.amt;
@@ -128,7 +126,6 @@ export function liftFrame(
   return {
     photo: `translate3d(0, ${rise.toFixed(2)}px, 0) scale(${scale.toFixed(4)}) rotateX(${tilt.toFixed(2)}deg)`,
     shadow: `translate3d(0, ${(lift * 3 * h).toFixed(2)}px, 0) scaleX(${(1 + lift * 0.16 * h).toFixed(3)})`,
-    ambient: shadow.aa * (1 + lift * 0.4 * h),
-    contact: shadow.ca * Math.max(0, 1 - lift * 0.9 * h),
+    mix: Math.min(1, Math.max(0, lift / LIFT_MAX)),
   };
 }

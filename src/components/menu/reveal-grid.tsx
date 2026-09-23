@@ -13,15 +13,11 @@
 // Каждая карточка появляется один раз: после показа наблюдатель её отпускает.
 import { useEffect, useRef, type ReactNode } from "react";
 import { motionPauseReasons } from "@/motion/pause";
+import { revealDelay } from "@/motion/reveal";
 
 /** Причина паузы движка, под которой страница сама едет к категории
  *  (src/components/menu/category-chips.tsx). */
 const SCROLL_PAUSE = "scroll";
-
-/** Сколько колонок ждут своей очереди (docs/MOTION.md §2): на компьютере
- *  четвёртая карточка ряда появляется вместе с третьей — длинный каскад
- *  выглядит дёшево. */
-const MAX_DELAYED_COLUMNS = 2;
 
 /** Задержка между колонками, мс. Приходит из src/config/motion.json
  *  переменной CSS — панель /dev/motion меняет её на живой странице. */
@@ -56,11 +52,8 @@ export function RevealGrid({
         tile.setAttribute("data-visible", "");
         continue;
       }
-      const column = rect.width
-        ? Math.round((rect.left - gridLeft) / rect.width)
-        : 0;
-      const step = Math.min(column, MAX_DELAYED_COLUMNS);
-      tile.style.setProperty("--pv-delay", `${step * stagger}ms`);
+      const column = rect.width ? (rect.left - gridLeft) / rect.width : 0;
+      tile.style.setProperty("--pv-delay", `${revealDelay(column, stagger)}ms`);
       // Прятать — без перехода: иначе фото, которое ещё никто не видел,
       // сперва плавно погасло бы. Переход возвращаем через кадр.
       tile.setAttribute("data-instant", "");

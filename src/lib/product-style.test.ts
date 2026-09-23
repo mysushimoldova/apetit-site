@@ -42,9 +42,49 @@ describe("переменные CSS карточек блюд", () => {
     expect(vars["--sh-aw"]).toBe("93%");
     expect(vars["--sh-ah"]).toBe("29px");
     expect(vars["--sh-ab"]).toBe("34px");
-    expect(vars["--sh-aa"]).toBe("0.11");
     expect(vars["--sh-y"]).toBe("3px");
-    expect(vars["--sh-tint"]).toBe("43 30 21");
+  });
+
+  it("тень приходит готовой картинкой из двух градиентов", () => {
+    const image = productVars(SETTINGS)["--sh-image"];
+    // Сперва контактная (она сверху), потом широкая
+    expect(image.split("radial-gradient").length - 1).toBe(2);
+    expect(image).toContain("closest-side");
+    // Прозрачность в середине контактной: 0.29 × 0.511
+    expect(image).toContain("rgb(43 30 21 / 0.1482) 0%");
+    // …и широкой: 0.11 × 0.31
+    expect(image).toContain("rgb(43 30 21 / 0.0341) 0%");
+    // По краю обе прозрачны
+    expect(image.split("rgb(43 30 21 / 0) 100%").length - 1).toBe(2);
+  });
+
+  it("вторая картинка тени — как она выглядит на полном подъёме", () => {
+    const image = productVars(SETTINGS)["--sh-image-lifted"];
+    // shadowReact 0.7 × потолок подъёма 1.2 = 0.84
+    // широкая: 0.11 × (1 + 0.4×0.84) = 0.147, в середине × 0.31
+    expect(image).toContain("rgb(43 30 21 / 0.0456) 0%");
+    // контактная: 0.29 × (1 − 0.9×0.84) = 0.0708, в середине × 0.511
+    expect(image).toContain("rgb(43 30 21 / 0.0362) 0%");
+  });
+
+  it("контактная тень не уходит в отрицательную прозрачность", () => {
+    const image = productVars({
+      ...SETTINGS,
+      lift: { ...SETTINGS.lift, shadowReact: 2 },
+    })["--sh-image-lifted"];
+    // Контактной на подъёме не остаётся совсем — все её стопы прозрачны
+    expect(
+      image.startsWith("radial-gradient(closest-side, rgb(43 30 21 / 0) 0%"),
+    ).toBe(true);
+    expect(image).not.toContain("/ -");
+  });
+
+  it("выключенная реакция тени оставляет её как в покое", () => {
+    const vars = productVars({
+      ...SETTINGS,
+      lift: { ...SETTINGS.lift, shadowReact: 0 },
+    });
+    expect(vars["--sh-image-lifted"]).toBe(vars["--sh-image"]);
   });
 
   it("появление: откуда выезжает фото и тень", () => {

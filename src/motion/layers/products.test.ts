@@ -45,8 +45,8 @@ function card(name: string): ProductCard {
     box: { name } as unknown as Element,
     photo: el(),
     shadow: el(),
-    ambient: el(),
-    contact: el(),
+    rest: el(),
+    lifted: el(),
   };
 }
 
@@ -136,10 +136,12 @@ describe("слой карточек блюд", () => {
     expect(one.photo.style.transform).toContain("translate3d");
     expect(one.photo.style.willChange).toBe("transform");
     expect(one.shadow.style.transform).toContain("scaleX");
-    expect(Number(one.ambient.style.opacity)).toBeGreaterThan(
-      SETTINGS.shadow.aa,
-    );
-    expect(Number(one.contact.style.opacity)).toBeLessThan(SETTINGS.shadow.ca);
+    // Тень перетекает из покоя в поднятую: вместе прозрачности дают единицу
+    expect(one.rest.style.willChange).toBe("opacity");
+    expect(Number(one.lifted.style.opacity)).toBeGreaterThan(0);
+    expect(
+      Number(one.rest.style.opacity) + Number(one.lifted.style.opacity),
+    ).toBeCloseTo(1, 3);
     layer.dispose(gl);
   });
 
@@ -155,8 +157,9 @@ describe("слой карточек блюд", () => {
     expect(one.photo.style.transform).toBe("");
     expect(one.photo.style.willChange).toBe("");
     expect(one.shadow.style.transform).toBe("");
-    expect(one.ambient.style.opacity).toBe("");
-    expect(one.contact.style.opacity).toBe("");
+    expect(one.rest.style.opacity).toBe("");
+    expect(one.rest.style.willChange).toBe("");
+    expect(one.lifted.style.opacity).toBe("");
     layer.dispose(gl);
   });
 
@@ -198,7 +201,7 @@ describe("слой карточек блюд", () => {
     layer.init(gl);
     scroll(layer, 40, 20);
     expect(one.photo.style.transform).toBe("");
-    expect(one.contact.style.opacity).toBe("");
+    expect(one.lifted.style.opacity).toBe("");
     layer.dispose(gl);
   });
 

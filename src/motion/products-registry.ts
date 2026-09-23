@@ -16,14 +16,15 @@ export interface MotionStyleTarget {
   };
 }
 
-/** Одна карточка: блок фото (за ним следит наблюдатель видимости),
- *  само фото, группа теней и два её слоя. */
+/** Одна карточка: блок фото (за ним следит наблюдатель видимости), само фото,
+ *  группа теней и два её состояния — тень в покое и тень на полном подъёме.
+ *  Подъём перетекает из первой во вторую прозрачностью. */
 export interface ProductCard {
   box: Element;
   photo: MotionStyleTarget;
   shadow: MotionStyleTarget;
-  ambient: MotionStyleTarget;
-  contact: MotionStyleTarget;
+  rest: MotionStyleTarget;
+  lifted: MotionStyleTarget;
 }
 
 const cards = new Set<ProductCard>();

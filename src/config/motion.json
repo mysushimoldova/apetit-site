@@ -24,7 +24,7 @@
     },
     "reveal": {
       "type": "lift",
-      "dur": 360,
+      "dur": 320,
       "dist": 14,
       "stagger": 70,
       "shadowDelay": 100

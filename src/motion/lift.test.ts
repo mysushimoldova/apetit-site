@@ -23,8 +23,6 @@ const SETTINGS = {
   tilt: 1,
 };
 
-const SHADOW = { aa: 0.11, ca: 0.29 };
-
 /** Прокрутка на speed пикселей за кадр в течение frames кадров. */
 function scrollFor(
   state: LiftState,
@@ -141,18 +139,18 @@ describe("подъём при прокрутке (aterizare)", () => {
 
 describe("подъём в значениях для DOM", () => {
   it("нулевой подъём даёт тождественное преобразование", () => {
-    const frame = liftFrame(restLift(), SETTINGS, SHADOW);
+    const frame = liftFrame(restLift(), SETTINGS);
     expect(frame.photo).toBe(
       "translate3d(0, 0.00px, 0) scale(1.0000) rotateX(0.00deg)",
     );
     expect(frame.shadow).toBe("translate3d(0, 0.00px, 0) scaleX(1.000)");
-    expect(frame.ambient).toBeCloseTo(SHADOW.aa, 6);
-    expect(frame.contact).toBeCloseTo(SHADOW.ca, 6);
+    // Тень целиком в состоянии покоя
+    expect(frame.mix).toBe(0);
   });
 
-  it("на подъёме фото идёт вверх и растёт, тени меняются местами", () => {
+  it("на подъёме фото идёт вверх и растёт, тень перетекает", () => {
     const state: LiftState = { scroll: 0, vel: 40, lift: 1, liftV: 0 };
-    const frame = liftFrame(state, SETTINGS, SHADOW);
+    const frame = liftFrame(state, SETTINGS);
     // rise 7 × intensitate 0.9 = 6.3 px вверх
     expect(frame.photo).toContain("-6.30px");
     expect(frame.photo).toContain("scale(1.0135)");
@@ -160,36 +158,29 @@ describe("подъём в значениях для DOM", () => {
     expect(frame.photo).toContain("rotateX(-0.90deg)");
     expect(frame.shadow).toContain("2.10px");
     expect(frame.shadow).toContain("scaleX(1.112)");
-    // Широкая тень чуть темнее, контактная почти исчезла
-    expect(frame.ambient).toBeGreaterThan(SHADOW.aa);
-    expect(frame.contact).toBeLessThan(SHADOW.ca);
-    expect(frame.contact).toBeGreaterThanOrEqual(0);
+    expect(frame.mix).toBeCloseTo(1 / LIFT_MAX, 6);
+  });
+
+  it("доля перехода тени идёт от 0 до 1 и дальше не растёт", () => {
+    const at = (lift: number) =>
+      liftFrame({ scroll: 0, vel: 40, lift, liftV: 0 }, SETTINGS).mix;
+    expect(at(0)).toBe(0);
+    expect(at(LIFT_MAX / 2)).toBeCloseTo(0.5, 6);
+    expect(at(LIFT_MAX)).toBe(1);
+    // Пружина выше потолка не поднимается, но на всякий случай
+    expect(at(5)).toBe(1);
   });
 
   it("наклон следует за направлением прокрутки", () => {
-    const down = liftFrame(
-      { scroll: 0, vel: 20, lift: 1, liftV: 0 },
-      SETTINGS,
-      SHADOW,
-    );
-    const up = liftFrame(
-      { scroll: 0, vel: -20, lift: 1, liftV: 0 },
-      SETTINGS,
-      SHADOW,
-    );
+    const down = liftFrame({ scroll: 0, vel: 20, lift: 1, liftV: 0 }, SETTINGS);
+    const up = liftFrame({ scroll: 0, vel: -20, lift: 1, liftV: 0 }, SETTINGS);
     expect(down.photo).toContain("rotateX(-0.90deg)");
     expect(up.photo).toContain("rotateX(0.90deg)");
   });
 
-  it("контактная тень не уходит в отрицательную прозрачность", () => {
-    const state: LiftState = { scroll: 0, vel: 40, lift: LIFT_MAX, liftV: 0 };
-    const frame = liftFrame(state, { ...SETTINGS, shadowReact: 2 }, SHADOW);
-    expect(frame.contact).toBe(0);
-  });
-
   it("нулевая интенсивность — эффекта нет", () => {
     const state: LiftState = { scroll: 0, vel: 40, lift: 1, liftV: 0 };
-    const frame = liftFrame(state, { ...SETTINGS, amt: 0 }, SHADOW);
+    const frame = liftFrame(state, { ...SETTINGS, amt: 0 });
     expect(frame.photo).toBe(
       "translate3d(0, 0.00px, 0) scale(1.0000) rotateX(0.00deg)",
     );

@@ -64,32 +64,37 @@ test("карточки первого экрана показаны сразу, 
   expect(waiting[0].photoTransform).not.toBe("none");
 });
 
-test("под фото два слоя тени, обе без filter: blur", async ({ page }) => {
+test("обе тени рисует один элемент, без filter: blur", async ({ page }) => {
   await openMenu(page);
   const shadow = await page.evaluate(() => {
-    const ambient = document.querySelector(".food-shadow-ambient")!;
-    const contact = document.querySelector(".food-shadow-contact")!;
-    const read = (el: Element) => {
-      const style = getComputedStyle(el);
-      return {
-        width: Math.round(parseFloat(style.width)),
-        height: Math.round(parseFloat(style.height)),
-        opacity: style.opacity,
-        filter: style.filter,
-        image: style.backgroundImage.slice(0, 16),
-      };
+    const tile = document.querySelector("[data-reveal]")!;
+    const layers = tile.querySelectorAll(".food-shadow-layers");
+    const rest = tile.querySelector(".food-shadow-rest")!;
+    const lifted = tile.querySelector(".food-shadow-lifted")!;
+    const style = getComputedStyle(rest);
+    return {
+      // Два элемента: тень в покое и тень на полном подъёме…
+      count: layers.length,
+      // …но на первом экране рисуется только первый, второй прозрачен
+      liftedOpacity: getComputedStyle(lifted).opacity,
+      restOpacity: style.opacity,
+      // Оба градиента — в одном background
+      gradients: style.backgroundImage.split("radial-gradient").length - 1,
+      height: Math.round(parseFloat(style.height)),
+      filter: style.filter,
+      origin: style.backgroundOrigin,
     };
-    return { ambient: read(ambient), contact: read(contact) };
   });
+  expect(shadow.count).toBe(2);
+  expect(shadow.gradients).toBe(2);
+  expect(shadow.restOpacity).toBe("1");
+  expect(shadow.liftedOpacity).toBe("0");
   // Коробка градиента = эллипс + 1.5·размытие с каждой стороны
-  expect(shadow.ambient.height).toBe(29 + 3 * 34);
-  expect(shadow.contact.height).toBe(18 + 3 * 13);
-  expect(shadow.ambient.opacity).toBe("0.11");
-  expect(shadow.contact.opacity).toBe("0.29");
-  for (const layer of [shadow.ambient, shadow.contact]) {
-    expect(layer.filter).toBe("none");
-    expect(layer.image).toContain("radial-gradient");
-  }
+  expect(shadow.height).toBe(29 + 3 * 34);
+  expect(shadow.filter).toBe("none");
+  // Проценты ширины считаются от блока фото, а не от растёкшегося элемента
+  // По значению на каждый градиент — их два
+  expect(shadow.origin).toBe("content-box, content-box");
 });
 
 test("тень не создаёт горизонтальной прокрутки", async ({ page }) => {
@@ -106,7 +111,7 @@ test("после прокрутки нижние карточки появили
   await page.evaluate(() =>
     window.scrollTo({ top: 2400, behavior: "instant" }),
   );
-  // Появление — 360 мс плюс задержка колонок
+  // Появление — 320 мс плюс задержка колонок
   await expect
     .poll(async () => (await tiles(page)).filter((t) => t.onScreen).length)
     .toBeGreaterThan(0);
@@ -195,12 +200,17 @@ test("в листе блюда тень под фото есть", async ({ page
   await page.getByRole("button", { name: "Kebab Cheese", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Kebab Cheese" });
   await expect(sheet).toBeVisible();
-  const shadow = await sheet.locator(".food-shadow-ambient").evaluate((el) => {
+  const shadow = await sheet.locator(".food-shadow-layers").evaluate((el) => {
     const style = getComputedStyle(el);
-    return { opacity: style.opacity, image: style.backgroundImage };
+    return {
+      opacity: style.opacity,
+      gradients: style.backgroundImage.split("radial-gradient").length - 1,
+    };
   });
-  expect(shadow.opacity).toBe("0.11");
-  expect(shadow.image).toContain("radial-gradient");
+  expect(shadow.opacity).toBe("1");
+  expect(shadow.gradients).toBe(2);
+  // В листе подъёма нет, поэтому и второго слоя тени там нет
+  expect(await sheet.locator(".food-shadow-lifted").count()).toBe(0);
 });
 
 test("«уменьшить движение»: только проявление, без сдвигов", async ({
