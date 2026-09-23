@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORIES } from "@/data/menu/categories";
 import { PRODUCTS } from "@/data/menu/products";
-import {
-  SPLASH_VIDEOS,
-  splashVideoSrc,
-  splashVideosFor,
-} from "./catalog";
+import { SPLASH_VIDEOS, splashVideoSrc, splashVideosFor } from "./catalog";
 
 const ALL = new Set(Object.values(SPLASH_VIDEOS).flat());
 

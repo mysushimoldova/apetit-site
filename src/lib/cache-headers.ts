@@ -12,6 +12,9 @@ import type { Header } from "./security-headers";
 /** Год, неизменяемо. */
 export const IMMUTABLE = "public, max-age=31536000, immutable";
 
+/** Никакого кеша: ответы API у всех разные и устаревают мгновенно. */
+export const NO_STORE = "no-store";
+
 export interface HeaderRule {
   source: string;
   headers: Header[];
@@ -25,5 +28,12 @@ export function immutableCacheRules(): HeaderRule[] {
     // адресом не меняется (docs/motion/splash-prompt.md)
     { source: "/splash/:path*", headers },
     { source: "/_next/static/:path*", headers },
+    // Ответы API не кешируются ни браузером, ни промежуточными серверами:
+    // это заказы и служебные маршруты, общего у двух запросов там ничего
+    // нет (проверка insecure-defaults перед релизом).
+    {
+      source: "/api/:path*",
+      headers: [{ key: "Cache-Control", value: NO_STORE }],
+    },
   ];
 }

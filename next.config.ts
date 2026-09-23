@@ -10,6 +10,13 @@ const devOrigin = process.env.DEV_ORIGIN?.trim();
 const nextConfig: NextConfig = {
   allowedDevOrigins: devOrigin ? [devOrigin] : [],
 
+  // Своя страница «такого адреса нет» (src/app/global-not-found.tsx).
+  // Нужна именно она: у сайта два корневых layout (ro и ru), и обычный
+  // app/not-found.tsx Next в таком случае не показывает.
+  experimental: {
+    globalNotFound: true,
+  },
+
   images: {
     // Фото блюд отдаём готовыми WebP в трёх ширинах (scripts/prepare-images.py),
     // без оптимизатора Next — см. src/lib/image-loader.ts.

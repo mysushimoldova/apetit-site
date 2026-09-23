@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import nextConfig from "../../next.config";
-import { IMMUTABLE, immutableCacheRules } from "./cache-headers";
+import { IMMUTABLE, immutableCacheRules, NO_STORE } from "./cache-headers";
 
 describe("долгий кэш неизменяемых файлов", () => {
   it("год и immutable для /img, /splash и /_next/static", () => {
@@ -9,11 +9,11 @@ describe("долгий кэш неизменяемых файлов", () => {
       "/img/:path*",
       "/splash/:path*",
       "/_next/static/:path*",
+      "/api/:path*",
     ]);
     for (const rule of immutableCacheRules()) {
-      expect(rule.headers).toEqual([
-        { key: "Cache-Control", value: IMMUTABLE },
-      ]);
+      const value = rule.source.startsWith("/api") ? NO_STORE : IMMUTABLE;
+      expect(rule.headers).toEqual([{ key: "Cache-Control", value }]);
     }
   });
 
@@ -23,5 +23,6 @@ describe("долгий кэш неизменяемых файлов", () => {
     expect(sources).toContain("/img/:path*");
     expect(sources).toContain("/splash/:path*");
     expect(sources).toContain("/_next/static/:path*");
+    expect(sources).toContain("/api/:path*");
   });
 });

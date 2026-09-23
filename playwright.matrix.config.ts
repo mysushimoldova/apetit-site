@@ -119,6 +119,26 @@ export default defineConfig({
         viewport: { width: 1440, height: 900 },
       },
     },
+    // ---------- Доступность ----------
+    // axe-core по всем страницам сайта, два размера экрана. Живёт здесь,
+    // чтобы каждая сдача интерфейса проверялась сама (e2e/a11y).
+    {
+      name: "a11y-mobile",
+      testDir: "./e2e/a11y",
+      use: {
+        ...devices["Pixel 7"],
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+      },
+    },
+    {
+      name: "a11y-desktop",
+      testDir: "./e2e/a11y",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 900 },
+      },
+    },
   ],
   webServer: {
     command: "npm run dev",
