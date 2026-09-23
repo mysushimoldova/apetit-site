@@ -30,6 +30,8 @@ export function contentSecurityPolicy(isDev: boolean): string {
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:"],
     "font-src": ["'self'"],
+    // Ролики заставки категории лежат у нас же, в /splash
+    "media-src": ["'self'"],
     "connect-src": ["'self'"],
     // Боевой сайт не даёт вставлять себя в рамку. В разработке панель
     // /dev/motion показывает страницу меню в <iframe> своего же адреса,

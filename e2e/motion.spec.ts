@@ -30,8 +30,9 @@ async function waitForCanvas(page: Page) {
   await page.locator("canvas.motion-canvas[data-ready]").waitFor({
     state: "attached",
   });
+  // Слой заставки категории добавляется только на странице меню
   await expect
-    .poll(async () => (await stats(page))?.layers)
+    .poll(async () => (await stats(page))?.layers?.slice(0, 2))
     .toEqual(["contours", "products"]);
 }
 

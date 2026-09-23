@@ -12,8 +12,11 @@ export interface PanelMessage {
   /** Проверяются схемой на стороне страницы, поэтому здесь unknown. */
   background: unknown;
   products: unknown;
+  splash: unknown;
   page: unknown;
   reducedMotion: boolean;
+  /** Нажали «Проиграть» на вкладке заставки: сыграть её прямо сейчас. */
+  play?: "splash";
 }
 
 export interface StageStats {

@@ -41,6 +41,21 @@
       "tilt": 1
     }
   },
+  "splash": {
+    "enabled": true,
+    "hold": 1500,
+    "fade": 200,
+    "zoom": 0.83,
+    "wordY": -5,
+    "wordTop": true,
+    "word": true,
+    "disc": 0.62,
+    "lines": 0.35,
+    "count": 1,
+    "xfade": 180,
+    "exit": "lift",
+    "skip": true
+  },
   "page": {
     "background": "#F7F2EA"
   }

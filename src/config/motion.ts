@@ -14,6 +14,7 @@ import type {
   PageSettings,
   ProductRevealSettings,
   ProductsSettings,
+  SplashSettings,
 } from "@/motion/config-schema";
 import raw from "./motion.json";
 
@@ -35,6 +36,10 @@ export function asRevealType(value: string): ProductRevealSettings["type"] {
   return value === "scale" || value === "none" ? value : "lift";
 }
 
+export function asSplashExit(value: string): SplashSettings["exit"] {
+  return value === "fade" || value === "zoom" ? value : "lift";
+}
+
 const background: BackgroundSettings = {
   ...raw.background,
   mode: raw.background.mode === "static" ? "static" : "live",
@@ -49,14 +54,27 @@ const products: ProductsSettings = {
   },
 };
 
+const splash: SplashSettings = {
+  ...raw.splash,
+  exit: asSplashExit(raw.splash.exit),
+};
+
 const page: PageSettings = {
   background: asPageBackground(raw.page.background),
 };
 
-export const motionConfig: MotionConfig = { background, products, page };
+export const motionConfig: MotionConfig = {
+  background,
+  products,
+  splash,
+  page,
+};
 
 /** Настройки карточек блюд — тень, появление, подъём при прокрутке. */
 export const productsConfig = products;
+
+/** Настройки заставки категории (docs/motion/splash-prompt.md). */
+export const splashConfig = splash;
 
 /** Цвет фона страницы — отдельно: его берут корневые layout и <meta
  *  name="theme-color"> (src/routes/root.tsx). */

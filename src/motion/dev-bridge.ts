@@ -7,7 +7,12 @@
 // принимаются только со своего адреса и проверяются схемой zod.
 import { applyPageTheme } from "@/lib/page-theme";
 import type { BackgroundControl } from "./background";
-import { backgroundSchema, pageSchema, productsSchema } from "./config-schema";
+import {
+  backgroundSchema,
+  pageSchema,
+  productsSchema,
+  splashSchema,
+} from "./config-schema";
 import {
   PANEL_SOURCE,
   STAGE_SOURCE,
@@ -16,6 +21,13 @@ import {
 } from "./dev-messages";
 import { engine } from "./engine";
 import type { ProductsControl } from "./products";
+import type { SplashSettings } from "./config-schema";
+
+/** Что панель умеет делать с заставкой: менять настройки и проигрывать. */
+export interface SplashPanelControl {
+  apply(settings: SplashSettings): void;
+  play(): void;
+}
 
 /** Как часто страница сообщает панели кадры в секунду, мс. */
 const STATS_MS = 500;
@@ -23,6 +35,7 @@ const STATS_MS = 500;
 export function connectDevPanel(
   control: BackgroundControl,
   products: ProductsControl,
+  splash?: SplashPanelControl,
 ): () => void {
   const parent = window.parent;
   // Страница открыта сама по себе, не в панели — ничего не делаем
@@ -37,6 +50,9 @@ export function connectDevPanel(
     if (parsed.success) control.apply(parsed.data);
     const tiles = productsSchema.safeParse(data.products);
     if (tiles.success) products.apply(tiles.data);
+    const screen = splashSchema.safeParse(data.splash);
+    if (screen.success) splash?.apply(screen.data);
+    if (data.play === "splash") splash?.play();
     // Цвет фона страницы — не слой движка: это переменные CSS на <html>
     const page = pageSchema.safeParse(data.page);
     if (page.success) {

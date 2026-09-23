@@ -1,0 +1,14 @@
+{
+ "skip": {
+  "cola": 3,
+  "fanta": 3,
+  "gozleme-carne": 12
+ },
+ "reverse": [
+  "cheeseburger-dublu-vita",
+  "sandwich-salam",
+  "sandwich-sunca",
+  "sos-usturoi"
+ ],
+ "_note": "skip — сколько первых кадров выбросить (рамка фото / статичное начало); reverse — ролики, у которых Kling крутил в другую сторону"
+}

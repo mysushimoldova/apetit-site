@@ -1,0 +1,60 @@
+import { describe, expect, it } from "vitest";
+import { cubicBezier, easeIn, easeOut, mix, progress } from "./easing";
+
+describe("кривые движения", () => {
+  it("начало и конец закреплены", () => {
+    for (const curve of [easeIn, easeOut]) {
+      expect(curve(0)).toBe(0);
+      expect(curve(1)).toBe(1);
+      expect(curve(-1)).toBe(0);
+      expect(curve(2)).toBe(1);
+    }
+  });
+
+  it("кривая входа быстро стартует: к середине времени пройдено больше половины пути", () => {
+    expect(easeIn(0.5)).toBeGreaterThan(0.8);
+  });
+
+  it("кривая ухода тоже опережает время, но мягче кривой входа", () => {
+    expect(easeOut(0.5)).toBeGreaterThan(0.5);
+    expect(easeOut(0.5)).toBeLessThan(easeIn(0.5));
+  });
+
+  it("обе кривые только растут", () => {
+    for (const curve of [easeIn, easeOut]) {
+      let prev = -1;
+      for (let t = 0; t <= 1.0001; t += 0.05) {
+        const v = curve(t);
+        expect(v).toBeGreaterThanOrEqual(prev);
+        prev = v;
+      }
+    }
+  });
+
+  it("прямая линия равна самому времени", () => {
+    const linear = cubicBezier(1 / 3, 1 / 3, 2 / 3, 2 / 3);
+    for (const t of [0.15, 0.4, 0.73]) {
+      expect(linear(t)).toBeCloseTo(t, 4);
+    }
+  });
+});
+
+describe("доля времени", () => {
+  it("считается и зажимается", () => {
+    expect(progress(160, 320)).toBe(0.5);
+    expect(progress(400, 320)).toBe(1);
+    expect(progress(-5, 320)).toBe(0);
+  });
+
+  it("нулевая длительность — сразу конец", () => {
+    expect(progress(0, 0)).toBe(1);
+  });
+});
+
+describe("смешивание", () => {
+  it("идёт от начала к концу", () => {
+    expect(mix(0.9, 1, 0)).toBe(0.9);
+    expect(mix(0.9, 1, 1)).toBe(1);
+    expect(mix(0, 10, 0.25)).toBe(2.5);
+  });
+});

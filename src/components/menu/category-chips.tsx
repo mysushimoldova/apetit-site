@@ -16,6 +16,7 @@ import {
 import { CategoryIcon } from "@/components/icons/category-icon";
 import { watchProgrammaticScroll } from "@/lib/programmatic-scroll";
 import { pauseMotion, resumeMotion } from "@/motion/pause";
+import { requestSplash } from "@/motion/splash/request";
 
 /** Причина паузы движка на время прокрутки к категории. */
 const SCROLL_PAUSE = "scroll";
@@ -131,6 +132,20 @@ export function CategoryChips({
     if (!section) return; // без секции сработает обычный якорь
     event.preventDefault();
     spinIcon(event.currentTarget);
+
+    // Заставка категории (docs/motion/splash-prompt.md). Если она играет,
+    // страница переходит к категории мгновенно — под заставкой: когда та
+    // уйдёт, сетка уже на месте и ничего не «доезжает» на глазах.
+    // Заставки нет (нет роликов, слабый телефон, «уменьшить движение») —
+    // всё как раньше: плавный проезд и пауза движка на время него.
+    const word = items.find((item) => item.slug === slug)?.label ?? "";
+    if (requestSplash({ category: slug, word })) {
+      section.scrollIntoView({ behavior: "auto", block: "start" });
+      history.replaceState(null, "", `#${slug}`);
+      setActive(slug);
+      return;
+    }
+
     section.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "start",

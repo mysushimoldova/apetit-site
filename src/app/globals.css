@@ -269,6 +269,72 @@
   opacity: 1;
 }
 
+/* ---------- Заставка категории (docs/motion/splash-prompt.md) ----------
+   Три слоя друг над другом: кремовый экран (.splash, z-index 50), холст
+   движка с жёлтым кругом и блюдом (он поднимается сюда же, 51) и слово
+   категории (.splash-word) — поверх блюда или под ним, как выбрано в
+   настройках. Слово вынесено из .splash отдельным элементом: внутри него
+   оно не смогло бы оказаться выше холста.
+   Движение считает не CSS, а слой движка: переменные --splash-* пишутся
+   каждый кадр, поэтому экран, слово и блюдо уезжают вверх одинаково.
+   Пока заставка на экране, страница не прокручивается. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  background: var(--color-cream);
+  transform: translate3d(0, var(--splash-lift, 0%), 0);
+  opacity: var(--splash-screen-alpha, 1);
+}
+.splash[data-on] {
+  display: block;
+}
+.splash-word {
+  position: fixed;
+  inset-inline: 0;
+  top: 50%;
+  z-index: 49;
+  display: none;
+  transform: translate3d(
+    0,
+    calc(-50% + var(--splash-word-y, 0px) + var(--splash-lift-px, 0px)),
+    0
+  );
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(46px, 17vw, 86px);
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--color-ink);
+  opacity: var(--splash-word-alpha, 1);
+  pointer-events: none;
+}
+.splash-word[data-on] {
+  display: block;
+}
+.splash-word[data-word-top] {
+  z-index: 52;
+}
+/* Ролики нужны только видеокарте: на экране их нет */
+.splash-videos video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Холст движка на время заставки поднимается над страницей: круг и блюдо
+   рисует он же, своим слоем (src/motion/layers/splash.ts). */
+html[data-splash] .motion-stage {
+  z-index: 51;
+}
+
 /* ---------- Утилиты дизайн-системы ---------- */
 
 /* Контейнер страницы: 1200px по центру, 16px/40px по бокам */

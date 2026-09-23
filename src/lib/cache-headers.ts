@@ -21,6 +21,9 @@ export function immutableCacheRules(): HeaderRule[] {
   const headers: Header[] = [{ key: "Cache-Control", value: IMMUTABLE }];
   return [
     { source: "/img/:path*", headers },
+    // Ролики заставки категории: имя файла = слаг блюда, содержимое под этим
+    // адресом не меняется (docs/motion/splash-prompt.md)
+    { source: "/splash/:path*", headers },
     { source: "/_next/static/:path*", headers },
   ];
 }

@@ -15,9 +15,10 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { motionPauseReasons } from "@/motion/pause";
 import { revealDelay } from "@/motion/reveal";
 
-/** Причина паузы движка, под которой страница сама едет к категории
- *  (src/components/menu/category-chips.tsx). */
-const SCROLL_PAUSE = "scroll";
+/** Причины паузы движка, при которых карточки показываются сразу, без
+ *  появления: страница сама едет к категории (category-chips.tsx) или
+ *  играет заставка — движение там уже было (docs/MOTION.md §5). */
+const INSTANT_PAUSES = ["scroll", "splash"];
 
 /** Задержка между колонками, мс. Приходит из src/config/motion.json
  *  переменной CSS — панель /dev/motion меняет её на живой странице. */
@@ -69,7 +70,8 @@ export function RevealGrid({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const moving = motionPauseReasons().includes(SCROLL_PAUSE);
+        const reasons = motionPauseReasons();
+        const moving = INSTANT_PAUSES.some((r) => reasons.includes(r));
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           if (moving) entry.target.setAttribute("data-instant", "");

@@ -1,0 +1,567 @@
+<!-- ЭТАЛОН ПОВЕДЕНИЯ ЗАСТАВКИ КАТЕГОРИИ (splash) — меню Apetit. Версия 24.09.2026.
+     Это тот же файл, что хозяин смотрел в чате Claude («Ecran de categorie»), без вшитых медиа.
+     Видео подключены по относительным путям: ../../public/splash/<slug>.mp4 (объект VIDS внизу).
+     Открывать напрямую как файл смысла нет: браузер не отдаёт file://-видео в WebGL; живьём
+     заставку смотрят в чате Claude или уже на сайте после внедрения.
+
+     Логика — в <script> внизу: playSplash / endSplash / keyFrame / switchNext / layout.
+     Формат ролика: h264, 60 к/с, 1.5 с, 90 кадров; кадр = цвет сверху + маска снизу (высота двойная).
+     Маска считана нейросетью заранее (scripts/splash-video/make.py), фон и тень убраны,
+     внутри силуэта продукт сплошной, разгон-замедление вшиты, все ролики крутятся в одну сторону.
+     В цветной половине внизу слева два квадрата 16×16: чёрный (x 0..16) и белый (x 16..32) —
+     эталоны: шейдер (KFS) читает их texelFetch-ом и растягивает диапазон, потому что часть
+     браузеров отдаёт видео в WebGL сжатым (16..235). По маске — smoothstep(0.12, 0.94):
+     отсекает шум сжатия вокруг продукта.
+     Смена блюда (если их 2) — НЕ растворение (оно даёт просвечивание там, где силуэты не
+     совпадают), а непрозрачная подмена: второе поверх первого, первое уменьшается, второе растёт.
+     Тени под блюдом НЕТ — ни в видео, ни нарисованной. Значения по умолчанию — объект S. -->
+<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<title>Ecran de categorie</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=Manrope:wght@600;700&family=Montserrat:wght@400;500&display=swap">
+<style>
+:root{
+  --cream:#F7F2EA; --milk:#FFFDFA; --sand:#EAE2D5; --yellow:#FFBC0D;
+  --ink:#1A1714; --charcoal:#3D3733; --smoke:#6B625B; --ash:#A79E95;
+  --display:"Oswald",Impact,sans-serif;
+  --ui:"Manrope","Segoe UI",sans-serif;
+  --body:"Montserrat","Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--body);
+     -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 56px;padding-left:16px;padding-right:16px}
+h1{font-family:var(--display);font-weight:600;text-transform:uppercase;
+   font-size:clamp(28px,6vw,44px);line-height:1;margin:0 0 6px}
+.lead{font-size:14px;color:var(--charcoal);max-width:58ch;line-height:1.55;margin:0 0 24px}
+.cols{display:grid;grid-template-columns:1fr;gap:28px}
+@media(min-width:900px){.cols{grid-template-columns:340px 1fr;align-items:start}}
+
+.panel{background:var(--milk);border:1px solid var(--ink);border-radius:16px;padding:18px}
+.ctl{margin-bottom:16px}
+.ctl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.ctl-name{font-family:var(--ui);font-weight:600;font-size:13px}
+.ctl-val{font-family:var(--ui);font-weight:700;font-size:13px;color:var(--charcoal);
+         font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--yellow);height:22px}
+.row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--charcoal);margin:12px 0}
+.row input{accent-color:var(--yellow);width:18px;height:18px}
+.btn{width:100%;height:46px;border:0;border-radius:9999px;background:var(--yellow);color:var(--ink);
+     font-family:var(--ui);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px}
+.btn.ghost{background:transparent;border:1px solid var(--ink);height:40px;font-weight:600;font-size:14px}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.out{font-family:var(--ui);font-size:12px;color:var(--smoke);word-break:break-all;min-height:1.3em}
+.note{font-size:12px;color:var(--smoke);line-height:1.5;margin-top:14px}
+.segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.seg{font-family:var(--ui);font-weight:600;font-size:12px;padding:9px 4px;border:1px solid var(--ink);
+     border-radius:9999px;background:transparent;color:var(--ink);cursor:pointer;line-height:1.2}
+.seg[aria-pressed="true"]{background:var(--ink);color:var(--cream)}
+
+.stage{display:flex;flex-direction:column;align-items:center;gap:12px}
+.phone{width:100%;max-width:390px;height:min(76vh,720px);position:relative;overflow:hidden;
+       border:1px solid var(--ink);border-radius:24px;background:var(--cream)}
+.scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden}
+.hdr{position:sticky;top:0;z-index:4;height:52px;display:flex;align-items:center;
+     justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--ink);
+     background:rgba(247,242,234,.8);backdrop-filter:blur(16px) saturate(130%);
+     -webkit-backdrop-filter:blur(16px) saturate(130%)}
+.logo{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.06em}
+.hdr-r{font-family:var(--ui);font-weight:600;font-size:13px;color:var(--smoke)}
+.chips{position:sticky;top:52px;z-index:4;display:flex;gap:8px;padding:10px 16px;overflow-x:auto;
+       scrollbar-width:none;background:rgba(247,242,234,.8);backdrop-filter:blur(16px) saturate(130%);
+       -webkit-backdrop-filter:blur(16px) saturate(130%)}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;height:34px;display:flex;align-items:center;padding:0 14px;border:1px solid var(--ink);
+      border-radius:9999px;font-family:var(--ui);font-weight:600;font-size:14px;white-space:nowrap;
+      background:transparent;color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--cream)}
+
+.sec{padding:0 16px 40px}
+.rule{border-top:1px dotted rgba(26,23,20,.45);margin-top:14px}
+.billboard{font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:86px;
+           line-height:.9;margin:10px 0 0 -3px;color:transparent;-webkit-text-stroke:2px var(--ink);
+           white-space:nowrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;row-gap:26px;margin-top:6px}
+.tile img{display:block;width:100%;height:120px;object-fit:contain;margin-bottom:10px}
+.name{font-family:var(--ui);font-weight:700;font-size:16px;line-height:1.25}
+.ing{font-size:11px;line-height:1.45;color:var(--charcoal);margin-top:3px}
+.prow{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+.price{height:26px;padding:0 10px;border-radius:9999px;background:var(--yellow);
+       font-family:var(--ui);font-weight:700;font-size:14px;display:flex;align-items:center}
+.add{width:30px;height:30px;border-radius:50%;background:var(--yellow);display:flex;
+     align-items:center;justify-content:center;font-family:var(--ui);font-weight:700;font-size:17px}
+
+/* ---------- splash ---------- */
+.splash{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+        background:var(--cream);opacity:0;pointer-events:none}
+.splash.on{pointer-events:auto}
+.splash-lines{position:absolute;inset:-660px;background-repeat:repeat;opacity:.22;
+              will-change:transform;z-index:0}
+.splash-disc{position:absolute;border-radius:50%;background:var(--yellow);
+             z-index:1;will-change:transform,opacity}
+.splash-shadow{display:none;position:absolute;border-radius:50%;z-index:2;
+               background:radial-gradient(ellipse at center, rgba(26,23,20,.22), transparent 70%);
+               will-change:transform,opacity}
+.splash-word{position:absolute;left:0;right:0;text-align:center;z-index:3;
+             font-family:var(--display);font-weight:600;text-transform:uppercase;
+             font-size:clamp(46px,17vw,86px);line-height:.9;letter-spacing:.01em;
+             color:transparent;-webkit-text-stroke:2px var(--ink);white-space:nowrap;
+             will-change:transform,opacity}
+.splash-vid{position:relative;width:78%;max-width:320px;
+            z-index:4;will-change:transform,opacity}
+.splash-vid canvas{display:block;width:100%;height:auto}
+.splash-vid video{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.skip{position:absolute;left:0;right:0;bottom:24px;text-align:center;font-size:12px;
+      color:var(--smoke);font-family:var(--ui);font-weight:600;opacity:0}
+.hint{font-size:12px;color:var(--smoke);text-align:center;max-width:390px;line-height:1.5}
+</style>
+
+<div class="wrap">
+  <h1>Ecran de categorie</h1>
+  <p class="lead">Теперь с твоими настоящими видео: нажимай любую категорию внутри
+    телефона — играет заставка с двумя блюдами этой категории, потом открывается меню.
+    Крути ползунки, выбирай, «Копировать значения».</p>
+
+  <div class="cols">
+    <div class="panel">
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="hold">Длительность всей заставки</label>
+          <span class="ctl-val" id="v-hold">1500 мс</span></div>
+        <input type="range" id="hold" min="300" max="3500" step="50" value="1500">
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="zoom">Размер блюда</label>
+          <span class="ctl-val" id="v-zoom">0.83</span></div>
+        <input type="range" id="zoom" min="0.45" max="1" step="0.02" value="0.83">
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="wordY">Слово выше / ниже</label>
+          <span class="ctl-val" id="v-wordY">-5</span></div>
+        <input type="range" id="wordY" min="-220" max="220" step="5" value="-5">
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="fade">Появление и уход</label>
+          <span class="ctl-val" id="v-fade">200 мс</span></div>
+        <input type="range" id="fade" min="120" max="700" step="20" value="200">
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><span class="ctl-name">Уход заставки</span></div>
+        <div class="segs" role="group" aria-label="Уход">
+          <button class="seg" id="x-fade" aria-pressed="false">Затухание</button>
+          <button class="seg" id="x-lift" aria-pressed="true">Шторка вверх</button>
+          <button class="seg" id="x-zoom" aria-pressed="false">Уезжает в меню</button>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="discSize">Жёлтый круг</label>
+          <span class="ctl-val" id="v-discSize">0.62</span></div>
+        <input type="range" id="discSize" min="0" max="1.1" step="0.02" value="0.62">
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="linesOp">Линии на заставке</label>
+          <span class="ctl-val" id="v-linesOp">0.35</span></div>
+        <input type="range" id="linesOp" min="0" max="0.6" step="0.02" value="0.35">
+      </div>
+
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="count">Сколько блюд подряд</label>
+          <span class="ctl-val" id="v-count">1</span></div>
+        <input type="range" id="count" min="1" max="2" step="1" value="1">
+      </div>
+      <div class="ctl">
+        <div class="ctl-top"><label class="ctl-name" for="xfade">Смена блюда (если их 2)</label>
+          <span class="ctl-val" id="v-xfade">180 мс</span></div>
+        <input type="range" id="xfade" min="60" max="500" step="20" value="180">
+      </div>
+      <div class="ctl" hidden>
+        <input type="range" id="slow" min="0" max="1" step="0.05" value="0.8"><span id="v-slow"></span>
+      </div>
+      <label class="row"><input type="checkbox" id="wordTop" checked> Слово поверх блюда</label>
+      <label class="row"><input type="checkbox" id="word" checked> Показывать слово категории</label>
+      <label class="row"><input type="checkbox" id="skip" checked> Можно прервать касанием</label>
+      <label class="row"><input type="checkbox" id="reduce"> Проверить «уменьшить движение»</label>
+
+      <button class="btn" id="play">Проиграть заставку</button>
+      <button class="btn ghost" id="copy">Копировать значения</button>
+      <div class="out" id="out"></div>
+
+      <p class="note">17 твоих роликов: фон и тень убраны по контуру, тени под блюдом нет,
+        все крутятся в одну сторону, разгон и замедление вшиты, 60 кадров/с. По умолчанию одно
+        блюдо на категорию; при «2» второе сменяет первое без просвечивания. Пиццы нет
+        (делаем из фото), Menu и Crispy — без видео.</p>
+    </div>
+
+    <div class="stage">
+      <div class="phone">
+        <div class="scroller" id="scroller">
+          <header class="hdr">
+            <div class="logo">APETIT</div>
+            <div class="hdr-r">Soroca · RO</div>
+          </header>
+          <nav class="chips" id="chips"></nav>
+          <section class="sec">
+            <div class="rule"></div>
+            <h2 class="billboard" id="bb">Kebab</h2>
+            <div class="grid" id="grid"></div>
+          </section>
+        </div>
+
+        <div class="splash" id="splash">
+          <i class="splash-lines" id="lines"></i>
+          <i class="splash-disc" id="disc"></i>
+          <i class="splash-shadow" id="shadow"></i>
+          <div class="splash-word" id="sword">Burgers</div>
+          <div class="splash-vid" id="svid">
+            <canvas id="cv"></canvas>
+          </div>
+          <div class="skip" id="skiphint">atinge pentru a sări</div>
+        </div>
+      </div>
+      <p class="hint">Заставка играет каждый раз при выборе категории. Касание — и она уходит сразу.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const PATHS = "".split("|");
+const S = { hold: 1500, zoom: 0.83, wordY: -5, fade: 200, word: true, skip: true, reduce: false,
+            exit: "lift", discSize: 0.62, linesOp: 0.35, shadowOn: false, slow: 0.8, wordTop: true, count: 1, xfade: 180 };
+const $ = id => document.getElementById(id);
+const splash = $("splash"), sword = $("sword"), svid = $("svid"),
+      lines = $("lines"), skiphint = $("skiphint"), bb = $("bb"), scroller = $("scroller"),
+      disc = $("disc"), shadow = $("shadow");
+
+/* фон из тех же линий, что на сайте */
+(function(){
+  const d = PATHS.map(p => '<path d="M' + p + '"/>').join("");
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">'
+    + '<g fill="none" stroke="#A79E95" stroke-width="2.4" stroke-linecap="round">' + d + '</g></svg>';
+  lines.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
+  lines.style.backgroundSize = "620px 620px";
+})();
+
+let timers = [], running = false, lineT = 0, raf = 0, rateStart = 0;
+
+/* ---- ролики: 17 настоящих, по два на категорию ---- */
+const VIDS = {
+ "brinzoaice": "../../public/splash/brinzoaice.mp4",
+ "cheeseburger-dublu-vita": "../../public/splash/cheeseburger-dublu-vita.mp4",
+ "cola": "../../public/splash/cola.mp4",
+ "fanta": "../../public/splash/fanta.mp4",
+ "gozleme-carne": "../../public/splash/gozleme-carne.mp4",
+ "gozleme-mozzarella": "../../public/splash/gozleme-mozzarella.mp4",
+ "hamburger-dublu-vita": "../../public/splash/hamburger-dublu-vita.mp4",
+ "kebab-cheese": "../../public/splash/kebab-cheese.mp4",
+ "kebab-xl-xxl": "../../public/splash/kebab-xl-xxl.mp4",
+ "salata-cezar": "../../public/splash/salata-cezar.mp4",
+ "salata-greceasca": "../../public/splash/salata-greceasca.mp4",
+ "sandwich-salam": "../../public/splash/sandwich-salam.mp4",
+ "sandwich-sunca": "../../public/splash/sandwich-sunca.mp4",
+ "sos-ketchup": "../../public/splash/sos-ketchup.mp4",
+ "sos-usturoi": "../../public/splash/sos-usturoi.mp4",
+ "supa-bostan": "../../public/splash/supa-bostan.mp4",
+ "supa-spanac": "../../public/splash/supa-spanac.mp4"
+};
+const CATS = [
+  ["kebab","Kebab",["kebab-xl-xxl","kebab-cheese"],[["Kebab XL / XXL","lipie, maioneză, salată, roșii…","114 lei"],["Kebab Cheese","lipie, cașcaval, maioneză…","105 lei"]]],
+  ["burgers","Burgers",["cheeseburger-dublu-vita","hamburger-dublu-vita"],[["Cheeseburger Dublu","chiflă, carne, cașcaval, sos…","85 lei"],["Hamburger Dublu","chiflă, carne, sos, salată…","79 lei"]]],
+  ["gozleme","Gözleme",["gozleme-carne","gozleme-mozzarella"],[["Gözleme Carne de Pui","tortilla, sos, mozzarella, pui…","69 lei"],["Gözleme Mozzarella","tortilla, sos, mozzarella…","59 lei"]]],
+  ["sandwich","Sandwich",["sandwich-salam","sandwich-sunca"],[["Sandwich cu salam","chiflă, salam, salată…","45 lei"],["Sandwich cu șuncă","chiflă, șuncă, salată…","45 lei"]]],
+  ["salad","Salad",["salata-cezar","salata-greceasca"],[["Salată Cezar","pui crispy, parmezan, roșii…","75 lei"],["Salată Grecească","roșii, castraveți, feta, măsline…","69 lei"]]],
+  ["supe","Supe",["supa-bostan","supa-spanac"],[["Supă de bostan","bostan, brânză, semințe","39 lei"],["Supă de spanac","spanac, crutoane, parmezan","39 lei"]]],
+  ["drinks","Drinks",["cola","fanta"],[["Coca-Cola","0,5 l","22 lei"],["Fanta","0,5 l","22 lei"]]],
+  ["desert","Desert",["brinzoaice"],[["Brînzoaice","cu dulceață și smântână","35 lei"]]],
+  ["sosuri","Sosuri",["sos-ketchup","sos-usturoi"],[["Sos Ketchup","","8 lei"],["Sos de usturoi","","8 lei"]]],
+];
+let curCat = CATS[0];
+const vids = [0,1].map(() => { const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.setAttribute("playsinline","");
+  v.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"; svid.appendChild(v); return v; });
+const vid = vids[0];
+function loadCat(cat){
+  cat[2].forEach((name, i) => { if (vids[i] && vids[i].dataset.name !== name){ vids[i].src = VIDS[name]; vids[i].dataset.name = name; vids[i].load(); } });
+}
+function ready(v){ return new Promise(res => { if (v.readyState >= 2) return res(); const t = setTimeout(res, 400);
+  v.addEventListener("loadeddata", () => { clearTimeout(t); res(); }, { once: true }); }); }
+let cur = 0, nxt = -1, xfT0 = 0, seq = [], seqT0 = 0;
+
+/* ---- убираем белый фон и смешиваем два ролика на видеокарте ---- */
+const cv = $("cv");
+let gl = null, kprog = null, tex = [], uMix = null, uFlA = null, uFlB = null, uSA = null, uSB = null, kraf = 0;
+const FLIP = [0, 0];
+const KVS = `#version 300 es
+in vec2 p; out vec2 uv; void main(){ uv = vec2(p.x*.5+.5, .5-p.y*.5); gl_Position = vec4(p,0.,1.); }`;
+const KFS = `#version 300 es
+precision mediump float; in vec2 uv; uniform sampler2D tA, tB; uniform float mixv, flA, flB, sA, sB; out vec4 o;
+vec4 key(sampler2D t, vec2 u){
+  // калибровка по эталонным квадратам в самом ролике (чёрный и белый, где маска = 0):
+  // Safari отдаёт видео в WebGL со сжатым диапазоном (16..235) — растягиваем обратно
+  ivec2 sz = textureSize(t, 0); int hh = sz.y / 2;
+  float lo = texelFetch(t, ivec2(8,  hh - 8), 0).r;
+  float hi = texelFetch(t, ivec2(24, hh - 8), 0).r;
+  float k = 1.0 / max(hi - lo, 0.25);
+  vec3 c  = clamp((texture(t, vec2(u.x, u.y * 0.5)).rgb - lo) * k, 0.0, 1.0);        // верх — цвет
+  float a = clamp((texture(t, vec2(u.x, 0.5 + u.y * 0.5)).r - lo) * k, 0.0, 1.0);    // низ — маска
+  a = smoothstep(0.12, 0.94, a);   // отсечь шум сжатия вокруг продукта
+  return vec4(c * a, a);
+}
+vec4 scaled(sampler2D t, vec2 u, float s){
+  vec2 q = (u - 0.5) / max(s, 0.001) + 0.5;
+  if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) return vec4(0.0);
+  return key(t, q);
+}
+void main(){
+  vec4 A = scaled(tA, uv, sA);
+  if (mixv <= 0.0){ o = A; return; }
+  vec4 B = scaled(tB, uv, sB);
+  o = B + A * (1.0 - B.a);           // второе блюдо поверх первого, оба непрозрачные — без просветов
+}`;
+function ksh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+function mkTex(){ const x = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, x);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,255,255,255])); return x; }
+function keyInit(){
+  gl = cv.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
+  if (!gl) return false;
+  kprog = gl.createProgram();
+  gl.attachShader(kprog, ksh(gl.VERTEX_SHADER, KVS)); gl.attachShader(kprog, ksh(gl.FRAGMENT_SHADER, KFS));
+  gl.linkProgram(kprog); gl.useProgram(kprog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(kprog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  tex = [mkTex(), mkTex()];
+  gl.uniform1i(gl.getUniformLocation(kprog, "tA"), 0); gl.uniform1i(gl.getUniformLocation(kprog, "tB"), 1);
+  uMix = gl.getUniformLocation(kprog, "mixv");
+  uFlA = gl.getUniformLocation(kprog, "flA"); uFlB = gl.getUniformLocation(kprog, "flB");
+  uSA = gl.getUniformLocation(kprog, "sA"); uSB = gl.getUniformLocation(kprog, "sB");
+  return true;
+}
+function upload(unit, v){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex[unit]);
+  if (v && v.readyState >= 2 && v.videoWidth) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v); }
+function keyFrame(){
+  const now = performance.now();
+  if (running && rateStart){
+    // разгон и замедление вшиты в сам ролик (1.5 с); длительность заставки только растягивает его
+    const r = Math.max(0.5, Math.min(2, 1500 / S.hold));
+    vids.forEach(v => { if (v.playbackRate !== r){ try { v.playbackRate = r; } catch(e){} } });
+    // смена блюда по расписанию
+    if (seq.length && now - seqT0 >= seq[0]){ seq.shift(); switchNext(); }
+  }
+  const a = vids[cur], b = nxt >= 0 ? vids[nxt] : null;
+  let m = 0, sA = 1, sB = 1;
+  if (b){ m = Math.min(1, (now - xfT0) / S.xfade);
+    if (m >= 1){ try { a.pause(); } catch(e){} cur = nxt; nxt = -1; m = 0; }
+    else { sA = 1 - Math.pow(m, 1.6); sB = 0.86 + 0.14 * (1 - Math.pow(1 - m, 2)); } }
+  const ref = (b && m >= 0.5) ? b : a;
+  if (ref.videoWidth && cv.width !== ref.videoWidth){ cv.width = ref.videoWidth; cv.height = ref.videoHeight / 2; requestAnimationFrame(layout); }
+  if (cv.width > 1){
+    gl.viewport(0, 0, cv.width, cv.height);
+    upload(0, nxt >= 0 ? a : a); upload(1, nxt >= 0 ? vids[nxt] : a);
+    gl.uniform1f(uMix, nxt >= 0 ? m : 0);
+    gl.uniform1f(uSA, sA); gl.uniform1f(uSB, sB);
+    gl.uniform1f(uFlA, FLIP[cur]); gl.uniform1f(uFlB, FLIP[nxt >= 0 ? nxt : cur]);
+    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  kraf = requestAnimationFrame(keyFrame);
+}
+function switchNext(){
+  if (nxt >= 0) return;
+  const n = (cur + 1) % Math.max(1, Math.min(S.count, curCat[2].length));
+  if (n === cur) return;
+  nxt = n; xfT0 = performance.now();
+}
+function keyStart(){ if (!gl && !keyInit()) return; if (!kraf) kraf = requestAnimationFrame(keyFrame); }
+function keyStop(){ if (kraf){ cancelAnimationFrame(kraf); kraf = 0; } vids.forEach(v => { try { v.pause(); } catch(e){} }); }
+
+function drift(){
+  lineT += 0.35;
+  lines.style.transform = "translate3d(" + (lineT % 620).toFixed(1) + "px," + ((lineT * .4) % 620).toFixed(1) + "px,0)";
+  raf = requestAnimationFrame(drift);
+vids[0].addEventListener("loadedmetadata", () => { cv.width = vids[0].videoWidth; cv.height = vids[0].videoHeight / 2; layout(); });
+window.addEventListener("resize", layout);
+}
+raf = requestAnimationFrame(drift);
+
+function layout(){
+  const r = splash.getBoundingClientRect();
+  if (cv.width > 1){
+    const asp = cv.width / cv.height;
+    const w = Math.min(S.zoom * r.width, 0.60 * r.height * asp, 320);
+    svid.style.width = w + "px";
+  }
+  const vr = svid.getBoundingClientRect();
+  const size = Math.max(0, S.discSize) * r.width;
+  disc.style.width = disc.style.height = size + "px";
+  disc.style.left = (r.width - size) / 2 + "px";
+  disc.style.top = (vr.top - r.top + vr.height * 0.48) - size / 2 + "px";
+  disc.hidden = S.discSize <= 0.01;
+
+  const sw = vr.width * 0.72, sh = vr.height * 0.10;
+  shadow.style.width = sw + "px"; shadow.style.height = sh + "px";
+  shadow.style.left = (r.width - sw) / 2 + "px";
+  shadow.style.top = (vr.bottom - r.top - sh * 0.55) + "px";
+  shadow.hidden = !S.shadowOn;
+  lines.style.opacity = String(S.linesOp);
+}
+
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+function after(ms, fn){ timers.push(setTimeout(fn, ms)); }
+
+function endSplash(){
+  if (!running) return;
+  running = false;
+  clearTimers();
+  const f = S.reduce ? 0 : Math.max(180, S.fade * 1.6);
+  const E = "cubic-bezier(.65,0,.35,1)";
+  splash.classList.remove("on");
+  skiphint.style.opacity = "0";
+
+  if (S.exit === "lift"){
+    splash.style.transition = `transform ${f}ms ${E}, opacity ${f}ms ease ${f * .55}ms`;
+    splash.style.transform = "translateY(-101%)";
+    splash.style.opacity = "0";
+  } else if (S.exit === "zoom"){
+    splash.style.transition = `opacity ${f}ms ease ${f * .35}ms`;
+    splash.style.opacity = "0";
+    svid.style.transition = `transform ${f}ms ${E}, opacity ${f}ms ease`;
+    svid.style.transform = "translate(-22%, 42%) scale(.34)";
+    sword.style.transition = disc.style.transition = `transform ${f}ms ${E}, opacity ${f * .6}ms ease`;
+    sword.style.opacity = "0";
+    disc.style.transform = "scale(.2)"; disc.style.opacity = "0";
+    shadow.style.opacity = "0";
+  } else {
+    splash.style.transition = `opacity ${f}ms ease`;
+    splash.style.opacity = "0";
+    sword.style.transition = svid.style.transition = `transform ${f}ms ease, opacity ${f}ms ease`;
+    sword.style.transform = `translateY(${S.wordY - 24}px) scale(1.03)`;
+    svid.style.transform = "scale(1.05)";
+  }
+  after(f + 40, () => {
+    keyStop();
+    splash.style.transition = "none";
+    splash.style.transform = "";
+  });
+}
+
+function playSplash(){
+  clearTimers();
+  running = true;
+  const f = S.reduce ? 0 : S.fade;
+
+  sword.hidden = !S.word;
+  sword.style.zIndex = S.wordTop ? "6" : "3";
+  skiphint.style.opacity = S.skip ? ".9" : "0";
+  skiphint.style.transition = "opacity 300ms ease";
+
+  splash.classList.add("on");
+  splash.style.transition = "none";
+  splash.style.transform = "";
+  splash.style.opacity = "1";
+  sword.style.transition = svid.style.transition = disc.style.transition =
+    shadow.style.transition = "none";
+  sword.style.transform = `translateY(${S.wordY + 18}px) scale(.96)`;
+  sword.style.opacity = "0";
+  svid.style.transform = "scale(.9)";
+  svid.style.opacity = "0";
+  disc.style.transform = "scale(.55)"; disc.style.opacity = "0";
+  shadow.style.opacity = "0"; shadow.style.transform = "scaleX(.7)";
+  layout();
+
+  cur = 0; nxt = -1;
+  loadCat(curCat);
+  vids.forEach(v => { try { v.pause(); v.currentTime = 0; } catch(e){} });
+  Promise.all(vids.slice(0, Math.min(S.count, curCat[2].length)).map(ready)).then(() => { if (!running) return;
+    const r = Math.max(0.5, Math.min(2, 1500 / S.hold));
+    vids.slice(0, Math.min(S.count, curCat[2].length)).forEach(v => { try { v.currentTime = 0; v.playbackRate = r; v.play(); } catch(e){} });
+    if (vids[0].videoWidth){ cv.width = vids[0].videoWidth; cv.height = vids[0].videoHeight / 2; layout(); }
+    keyStart();
+    rateStart = performance.now(); seqT0 = rateStart;
+    const n = Math.max(1, Math.min(S.count, curCat[2].length));
+    seq = []; for (let i = 1; i < n; i++) seq.push(Math.round(S.hold * i / n));
+  });
+
+  requestAnimationFrame(() => {
+    const SP = "cubic-bezier(.2,.9,.25,1.06)";
+    disc.style.transition = `transform ${f * 1.5}ms ${SP}, opacity ${f}ms ease`;
+    disc.style.transform = "scale(1)"; disc.style.opacity = "1";
+    sword.style.transition = `transform ${f}ms ${SP} 40ms, opacity ${f}ms ease 40ms`;
+    svid.style.transition = `transform ${f * 1.25}ms ${SP} 60ms, opacity ${f}ms ease 60ms`;
+    shadow.style.transition = `transform ${f * 1.25}ms ${SP} 60ms, opacity ${f}ms ease 60ms`;
+    sword.style.transform = `translateY(${S.wordY}px) scale(1)`;
+    sword.style.opacity = "1";
+    svid.style.transform = "scale(1)";
+    svid.style.opacity = "1";
+    shadow.style.transform = "scaleX(1)"; shadow.style.opacity = "1";
+    layout();
+  });
+
+  after(S.reduce ? 600 : S.hold, endSplash);
+}
+
+splash.addEventListener("pointerdown", () => { if (S.skip) endSplash(); });
+
+/* категории */
+const chips = $("chips"), grid = $("grid");
+CATS.forEach(c => { const b = document.createElement("button"); b.className = "chip"; b.textContent = c[1];
+  b.setAttribute("aria-pressed", String(c === curCat)); b.addEventListener("click", () => setCat(c)); chips.appendChild(b); });
+function renderGrid(cat){
+  grid.innerHTML = cat[3].map(t => `<article class="tile"><img src="" alt=""><div class="name">${t[0]}</div><div class="ing">${t[1]}</div><div class="prow"><span class="price">${t[2]}</span><span class="add">+</span></div></article>`).join("");
+}
+function setCat(cat){
+  curCat = cat;
+  [...chips.children].forEach((b, i) => b.setAttribute("aria-pressed", String(CATS[i] === cat)));
+  bb.textContent = cat[1]; sword.textContent = cat[1];
+  renderGrid(cat);
+  scroller.scrollTop = 0;
+  playSplash();
+}
+renderGrid(curCat); loadCat(curCat);
+
+/* ползунки */
+function bind(id, fmt){
+  const el = $(id);
+  el.addEventListener("input", () => {
+    S[id] = parseFloat(el.value);
+    $("v-" + id).textContent = fmt(S[id]);
+  });
+}
+bind("hold", v => Math.round(v) + " мс");
+bind("zoom", v => v.toFixed(2));
+bind("wordY", v => Math.round(v));
+bind("fade", v => Math.round(v) + " мс");
+bind("discSize", v => v.toFixed(2));
+bind("linesOp", v => v.toFixed(2));
+bind("slow", v => v.toFixed(2));
+bind("count", v => String(Math.round(v)));
+bind("xfade", v => Math.round(v) + " мс");
+$("wordTop").addEventListener("change", e => { S.wordTop = e.target.checked; sword.style.zIndex = S.wordTop ? "6" : "3"; });
+["discSize","linesOp"].forEach(id => $(id).addEventListener("input", layout));
+const EX = { fade: "x-fade", lift: "x-lift", zoom: "x-zoom" };
+for (const k in EX){
+  $(EX[k]).addEventListener("click", () => {
+    S.exit = k;
+    for (const j in EX) $(EX[j]).setAttribute("aria-pressed", String(j === k));
+  });
+}
+$("word").addEventListener("change", e => { S.word = e.target.checked; });
+$("skip").addEventListener("change", e => { S.skip = e.target.checked; });
+$("reduce").addEventListener("change", e => { S.reduce = e.target.checked; });
+$("play").addEventListener("click", () => { sword.textContent = curCat[1]; playSplash(); });
+$("copy").addEventListener("click", () => {
+  const line = `hold=${S.hold} zoom=${S.zoom} wordY=${S.wordY} fade=${S.fade} exit=${S.exit} count=${S.count} xfade=${S.xfade} slow=${S.slow} wordTop=${S.wordTop} disc=${S.discSize} lines=${S.linesOp} shadow=${S.shadowOn} word=${S.word} skip=${S.skip}`;
+  $("out").textContent = line;
+  try { navigator.clipboard.writeText(line); $("copy").textContent = "Скопировано"; } catch(e){}
+  setTimeout(() => { $("copy").textContent = "Копировать значения"; }, 1500);
+});
+
+if (matchMedia("(prefers-reduced-motion: reduce)").matches){ S.reduce = true; $("reduce").checked = true; }
+</script>
+
+</body></html>

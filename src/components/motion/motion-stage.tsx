@@ -28,8 +28,13 @@ function afterFirstPaint(callback: () => void): () => void {
   };
 }
 
-export function MotionStage() {
+export function MotionStage({
+  splashProducts,
+}: {
+  /** Блюда этой страницы — нужны заставке категории (только меню). */
+  splashProducts?: readonly string[];
+}) {
   const [load, setLoad] = useState(false);
   useEffect(() => afterFirstPaint(() => setLoad(true)), []);
-  return load ? <MotionRuntime /> : null;
+  return load ? <MotionRuntime splashProducts={splashProducts} /> : null;
 }

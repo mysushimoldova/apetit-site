@@ -1,0 +1,70 @@
+// Ролики заставки: загрузка по требованию и хранение на время визита.
+//
+// Правило из задания: при открытии сайта не грузится ничего. Первое нажатие
+// на категорию заставки не показывает (переход обычный), но ставит ролики
+// этой категории в загрузку — со второго раза заставка уже играет. Никаких
+// <link rel="preload">: ролики не должны соперничать за сеть с главной
+// картинкой страницы.
+//
+// Элементы <video> живут в DOM размером 1×1 и невидимыми: часть браузеров
+// не отдаёт кадры в WebGL у элемента, которого нет на странице.
+import { splashVideoSrc } from "./catalog";
+
+/** Ролик готов отдавать кадры (HAVE_CURRENT_DATA и выше). */
+const READY = 2;
+
+export interface SplashVideoPool {
+  /**
+   * Готовые ролики для этих слагов. Если хоть один ещё не готов — null,
+   * и загрузка запускается (или продолжается) в фоне.
+   */
+  take(slugs: readonly string[]): HTMLVideoElement[] | null;
+  /** Поставить в загрузку, ничего не ожидая. */
+  warm(slugs: readonly string[]): void;
+  dispose(): void;
+}
+
+export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
+  const pool = new Map<string, HTMLVideoElement>();
+
+  function element(slug: string): HTMLVideoElement {
+    const existing = pool.get(slug);
+    if (existing) return existing;
+    const video = document.createElement("video");
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("aria-hidden", "true");
+    video.preload = "auto";
+    video.loop = false;
+    video.src = splashVideoSrc(slug);
+    video.load();
+    host.appendChild(video);
+    pool.set(slug, video);
+    return video;
+  }
+
+  return {
+    take(slugs) {
+      if (slugs.length === 0) return null;
+      const videos = slugs.map(element);
+      if (videos.some((v) => v.readyState < READY)) return null;
+      return videos;
+    },
+
+    warm(slugs) {
+      for (const slug of slugs) element(slug);
+    },
+
+    dispose() {
+      for (const video of pool.values()) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+        video.remove();
+      }
+      pool.clear();
+    },
+  };
+}

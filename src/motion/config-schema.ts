@@ -153,6 +153,52 @@ export const productsSchema = z.strictObject({
   lift: productLiftSchema,
 });
 
+/** Границы ползунков вкладки «Ecran categorie». Значения и шаги — как в
+ *  эталоне docs/motion/splash-demo.html (панель слева). */
+export const SPLASH_RANGES = {
+  hold: [300, 3500, 50],
+  fade: [120, 700, 20],
+  zoom: [0.45, 1, 0.02],
+  wordY: [-220, 220, 5],
+  disc: [0, 1.1, 0.02],
+  lines: [0, 0.6, 0.02],
+  count: [1, 2, 1],
+  xfade: [60, 500, 20],
+} as const;
+
+const splashRange = (key: keyof typeof SPLASH_RANGES) =>
+  z.number().min(SPLASH_RANGES[key][0]).max(SPLASH_RANGES[key][1]);
+
+/** Заставка категории (docs/motion/splash-prompt.md). Все числа берутся
+ *  отсюда: в коде заставки нет ни одного своего значения. */
+export const splashSchema = z.strictObject({
+  enabled: z.boolean(),
+  /** Сколько заставка держится до ухода, мс (уход считается от неё). */
+  hold: splashRange("hold"),
+  /** Появление круга, блюда и слова, мс. */
+  fade: splashRange("fade"),
+  /** Размер блюда: доля ширины экрана. */
+  zoom: splashRange("zoom"),
+  /** Слово категории выше (−) или ниже (+) середины, px. */
+  wordY: splashRange("wordY"),
+  /** Слово поверх блюда или под ним. */
+  wordTop: z.boolean(),
+  /** Показывать слово категории вообще. */
+  word: z.boolean(),
+  /** Диаметр жёлтого круга: доля ширины экрана. 0 — круга нет. */
+  disc: splashRange("disc"),
+  /** Насыщенность линий фона на заставке. */
+  lines: splashRange("lines"),
+  /** Сколько блюд показать подряд: 1 или 2. */
+  count: splashRange("count"),
+  /** Смена блюда, мс (когда их два). */
+  xfade: splashRange("xfade"),
+  /** Как заставка уходит: шторкой вверх, затуханием или в меню. */
+  exit: z.enum(["lift", "fade", "zoom"]),
+  /** Можно прервать касанием. */
+  skip: z.boolean(),
+});
+
 export const pageSchema = z.strictObject({
   /** Цвет фона всех страниц; от него же берут цвет стеклянные поверхности. */
   background: z.enum(
@@ -163,6 +209,7 @@ export const pageSchema = z.strictObject({
 export const motionConfigSchema = z.strictObject({
   background: backgroundSchema,
   products: productsSchema,
+  splash: splashSchema,
   page: pageSchema,
 });
 
@@ -171,5 +218,6 @@ export type ProductShadowSettings = z.infer<typeof productShadowSchema>;
 export type ProductRevealSettings = z.infer<typeof productRevealSchema>;
 export type ProductLiftSettings = z.infer<typeof productLiftSchema>;
 export type ProductsSettings = z.infer<typeof productsSchema>;
+export type SplashSettings = z.infer<typeof splashSchema>;
 export type PageSettings = z.infer<typeof pageSchema>;
 export type MotionConfig = z.infer<typeof motionConfigSchema>;

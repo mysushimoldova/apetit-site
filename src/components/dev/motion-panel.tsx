@@ -15,6 +15,7 @@ import {
   CONTOUR_COLORS,
   PAGE_BACKGROUNDS,
   PRODUCTS_RANGES,
+  SPLASH_RANGES,
   type BackgroundSettings,
   type ContourColor,
   type MotionConfig,
@@ -22,6 +23,7 @@ import {
   type ProductLiftSettings,
   type ProductRevealSettings,
   type ProductShadowSettings,
+  type SplashSettings,
 } from "@/motion/config-schema";
 import {
   PANEL_SOURCE,
@@ -53,12 +55,30 @@ const REVEAL_NAMES: Record<ProductRevealSettings["type"], string> = {
   none: "Только проявление",
 };
 
-type Tab = "background" | "products";
+type Tab = "background" | "products" | "splash";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "background", label: "Фон" },
   { id: "products", label: "Produse" },
+  { id: "splash", label: "Ecran categorie" },
 ];
+
+const EXIT_NAMES: Record<SplashSettings["exit"], string> = {
+  lift: "Шторка вверх",
+  fade: "Затухание",
+  zoom: "Уезжает в меню",
+};
+
+/** Строка значений заставки — как кнопка «Copiază» в эталоне
+ *  docs/motion/splash-demo.html. */
+function splashLine(config: MotionConfig): string {
+  const s = config.splash;
+  return (
+    `hold=${s.hold} zoom=${s.zoom} wordY=${s.wordY} fade=${s.fade} exit=${s.exit}` +
+    ` count=${s.count} xfade=${s.xfade} wordTop=${s.wordTop} disc=${s.disc}` +
+    ` lines=${s.lines} word=${s.word} skip=${s.skip} enabled=${s.enabled}`
+  );
+}
 
 /** Строка значений для архитектора — тот же формат, что в демо
  *  docs/motion/produse-demo.html (кнопка «Copiază»). */
@@ -90,19 +110,24 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
   const dirty = JSON.stringify(file) !== JSON.stringify(value);
 
   // Отправить настройки в страницу. Адрес получателя — свой же.
-  const send = useCallback((config: MotionConfig, reducedMotion: boolean) => {
-    const message: PanelMessage = {
-      source: PANEL_SOURCE,
-      background: config.background,
-      products: config.products,
-      page: config.page,
-      reducedMotion,
-    };
-    frameRef.current?.contentWindow?.postMessage(
-      message,
-      window.location.origin,
-    );
-  }, []);
+  const send = useCallback(
+    (config: MotionConfig, reducedMotion: boolean, play?: "splash") => {
+      const message: PanelMessage = {
+        source: PANEL_SOURCE,
+        background: config.background,
+        products: config.products,
+        splash: config.splash,
+        page: config.page,
+        reducedMotion,
+        play,
+      };
+      frameRef.current?.contentWindow?.postMessage(
+        message,
+        window.location.origin,
+      );
+    },
+    [],
+  );
 
   // Ответы страницы: «я подключилась» (шлём ей текущие значения) и кадры
   useEffect(() => {
@@ -167,11 +192,20 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
       },
     }));
 
+  const setSplash = <K extends keyof SplashSettings>(
+    key: K,
+    next: SplashSettings[K],
+  ) =>
+    setValue((current) => ({
+      ...current,
+      splash: { ...current.splash, [key]: next },
+    }));
+
   const setPageBackground = (background: PageBackground) =>
     setValue((current) => ({ ...current, page: { background } }));
 
   const copyLine = async () => {
-    const line = productsLine(value);
+    const line = tab === "splash" ? splashLine(value) : productsLine(value);
     try {
       await navigator.clipboard.writeText(line);
     } catch {
@@ -241,7 +275,120 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
         </header>
 
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
-          {tab === "background" ? (
+          {tab === "splash" ? (
+            <>
+              <Toggle
+                label="Заставка включена"
+                checked={value.splash.enabled}
+                onChange={(next) => setSplash("enabled", next)}
+              />
+              <Slider
+                label="Длительность всей заставки"
+                hint="мс, от нажатия до ухода"
+                range={SPLASH_RANGES.hold}
+                value={value.splash.hold}
+                digits={0}
+                onChange={(next) => setSplash("hold", next)}
+              />
+              <Slider
+                label="Появление и уход"
+                hint="мс"
+                range={SPLASH_RANGES.fade}
+                value={value.splash.fade}
+                digits={0}
+                onChange={(next) => setSplash("fade", next)}
+              />
+              <Slider
+                label="Размер блюда"
+                hint="доля ширины экрана"
+                range={SPLASH_RANGES.zoom}
+                value={value.splash.zoom}
+                digits={2}
+                onChange={(next) => setSplash("zoom", next)}
+              />
+              <Slider
+                label="Слово выше / ниже"
+                hint="px"
+                range={SPLASH_RANGES.wordY}
+                value={value.splash.wordY}
+                digits={0}
+                onChange={(next) => setSplash("wordY", next)}
+              />
+              <Slider
+                label="Жёлтый круг"
+                hint="доля ширины экрана, 0 — круга нет"
+                range={SPLASH_RANGES.disc}
+                value={value.splash.disc}
+                digits={2}
+                onChange={(next) => setSplash("disc", next)}
+              />
+              <Slider
+                label="Линии на заставке"
+                range={SPLASH_RANGES.lines}
+                value={value.splash.lines}
+                digits={2}
+                onChange={(next) => setSplash("lines", next)}
+              />
+              <Slider
+                label="Сколько блюд подряд"
+                range={SPLASH_RANGES.count}
+                value={value.splash.count}
+                digits={0}
+                onChange={(next) => setSplash("count", next)}
+              />
+              <Slider
+                label="Смена блюда"
+                hint="мс, когда блюд два"
+                range={SPLASH_RANGES.xfade}
+                value={value.splash.xfade}
+                digits={0}
+                onChange={(next) => setSplash("xfade", next)}
+              />
+              <Choice
+                label="Уход заставки"
+                value={value.splash.exit}
+                options={(
+                  Object.keys(EXIT_NAMES) as SplashSettings["exit"][]
+                ).map((id) => ({ id, label: EXIT_NAMES[id] }))}
+                onChange={(exit) => setSplash("exit", exit)}
+              />
+              <Toggle
+                label="Слово поверх блюда"
+                checked={value.splash.wordTop}
+                onChange={(next) => setSplash("wordTop", next)}
+              />
+              <Toggle
+                label="Показывать слово категории"
+                checked={value.splash.word}
+                onChange={(next) => setSplash("word", next)}
+              />
+              <Toggle
+                label="Можно прервать касанием"
+                checked={value.splash.skip}
+                onChange={(next) => setSplash("skip", next)}
+              />
+
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => send(value, reduced, "splash")}
+                  className="h-10 rounded-pill bg-yellow px-4 font-ui text-label transition-transform duration-150 ease-out active:scale-[0.97]"
+                >
+                  Проиграть
+                </button>
+                <button
+                  type="button"
+                  onClick={copyLine}
+                  className="h-10 rounded-pill border border-ink px-4 font-ui text-label transition-transform duration-150 ease-out active:scale-[0.97]"
+                >
+                  {copied ? "Скопировано" : "Copiază"}
+                </button>
+                <p className="font-mono text-[11px] leading-relaxed break-all text-smoke select-all">
+                  {splashLine(value)}
+                </p>
+              </div>
+            </>
+          ) : tab === "background" ? (
             <>
               <Choice
                 label="Фон страницы"
@@ -709,5 +856,28 @@ function Choice<T extends string>({
         })}
       </div>
     </fieldset>
+  );
+}
+
+/** Галочка «да / нет» — для настроек заставки. */
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 font-ui text-label">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-4 accent-yellow"
+      />
+      {label}
+    </label>
   );
 }

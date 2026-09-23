@@ -92,7 +92,12 @@ export async function CityMenuPage({
           ...points.map((p) => restaurantSchema(p, locale)),
         ]}
       />
-      <MotionStage />
+      {/* Блюда этого города — по ним заставка категории выбирает ролик */}
+      <MotionStage
+        splashProducts={menu.flatMap((section) =>
+          section.products.map((product) => product.slug),
+        )}
+      />
       <RememberCity slug={city.slug} />
       <CartProvider
         city={city.slug}
