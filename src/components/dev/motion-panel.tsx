@@ -14,10 +14,14 @@ import {
   BACKGROUND_RANGES,
   CONTOUR_COLORS,
   PAGE_BACKGROUNDS,
+  PRODUCTS_RANGES,
   type BackgroundSettings,
   type ContourColor,
   type MotionConfig,
   type PageBackground,
+  type ProductLiftSettings,
+  type ProductRevealSettings,
+  type ProductShadowSettings,
 } from "@/motion/config-schema";
 import {
   PANEL_SOURCE,
@@ -43,12 +47,43 @@ const COLOR_NAMES: Record<ContourColor, string> = {
   sand: "Sand",
 };
 
+const REVEAL_NAMES: Record<ProductRevealSettings["type"], string> = {
+  lift: "Выезжает",
+  scale: "Подрастает",
+  none: "Только проявление",
+};
+
+type Tab = "background" | "products";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "background", label: "Фон" },
+  { id: "products", label: "Produse" },
+];
+
+/** Строка значений для архитектора — тот же формат, что в демо
+ *  docs/motion/produse-demo.html (кнопка «Copiază»). */
+function productsLine(config: MotionConfig): string {
+  const { shadow, reveal, lift } = config.products;
+  const effect = lift.enabled
+    ? `efect=land intensitate=${lift.amt} netezime=${lift.smooth} umbraReactie=${lift.shadowReact} ridicare=${lift.rise} sensibilitate=${lift.sensitivity} coborare=${lift.settle} marire=${lift.grow} inclinare=${lift.tilt}`
+    : "efect=none";
+  return (
+    `${effect} || aparitie=${reveal.type} dur=${reveal.dur} dist=${reveal.dist}` +
+    ` stagger=${reveal.stagger} shadowDelay=${reveal.shadowDelay}` +
+    ` || umbra: aw=${shadow.aw} ah=${shadow.ah} ab=${shadow.ab} aa=${shadow.aa}` +
+    ` cw=${shadow.cw} ch=${shadow.ch} cb=${shadow.cb} ca=${shadow.ca}` +
+    ` y=${shadow.y} tint=${shadow.tint}`
+  );
+}
+
 export function MotionPanel({ saved }: { saved: MotionConfig }) {
   const [file, setFile] = useState(saved);
   const [value, setValue] = useState(saved);
+  const [tab, setTab] = useState<Tab>("background");
   const [reduced, setReduced] = useState(false);
   const [stats, setStats] = useState<StageStats | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
 
@@ -59,6 +94,7 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
     const message: PanelMessage = {
       source: PANEL_SOURCE,
       background: config.background,
+      products: config.products,
       page: config.page,
       reducedMotion,
     };
@@ -95,8 +131,55 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
       background: { ...current.background, [key]: next },
     }));
 
+  const setShadow = <K extends keyof ProductShadowSettings>(
+    key: K,
+    next: ProductShadowSettings[K],
+  ) =>
+    setValue((current) => ({
+      ...current,
+      products: {
+        ...current.products,
+        shadow: { ...current.products.shadow, [key]: next },
+      },
+    }));
+
+  const setReveal = <K extends keyof ProductRevealSettings>(
+    key: K,
+    next: ProductRevealSettings[K],
+  ) =>
+    setValue((current) => ({
+      ...current,
+      products: {
+        ...current.products,
+        reveal: { ...current.products.reveal, [key]: next },
+      },
+    }));
+
+  const setLift = <K extends keyof ProductLiftSettings>(
+    key: K,
+    next: ProductLiftSettings[K],
+  ) =>
+    setValue((current) => ({
+      ...current,
+      products: {
+        ...current.products,
+        lift: { ...current.products.lift, [key]: next },
+      },
+    }));
+
   const setPageBackground = (background: PageBackground) =>
     setValue((current) => ({ ...current, page: { background } }));
+
+  const copyLine = async () => {
+    const line = productsLine(value);
+    try {
+      await navigator.clipboard.writeText(line);
+    } catch {
+      // Буфер закрыт настройками браузера — строку видно и так, ниже
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -134,99 +217,313 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
             Настройки эффектов сайта. Видно сразу, сохраняются в файл проекта.
           </p>
 
-          {/* Вкладки по разделам src/config/motion.json. Сейчас раздел один —
-              следующие эффекты добавят сюда свои. */}
+          {/* Вкладки по разделам src/config/motion.json */}
           <nav aria-label="Разделы" className="mt-4">
             <ul className="flex gap-2">
-              <li>
-                <span
-                  aria-current="true"
-                  className="inline-flex h-8 items-center rounded-pill bg-ink px-3 font-ui text-chip text-cream"
-                >
-                  Фон
-                </span>
-              </li>
+              {TABS.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    aria-current={tab === item.id ? "true" : undefined}
+                    onClick={() => setTab(item.id)}
+                    className={`inline-flex h-8 items-center rounded-pill px-3 font-ui text-chip transition-colors duration-150 ease-out ${
+                      tab === item.id
+                        ? "bg-ink text-cream"
+                        : "border border-ink text-ink"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              ))}
             </ul>
           </nav>
         </header>
 
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
-          <Choice
-            label="Фон страницы"
-            value={value.page.background}
-            options={(Object.keys(PAGE_BACKGROUNDS) as PageBackground[]).map(
-              (id) => ({
-                id,
-                label: `${PAGE_BACKGROUNDS[id]} ${id}`,
-                swatch: id,
-              }),
-            )}
-            onChange={setPageBackground}
-          />
-          <Choice
-            label="Режим"
-            value={value.background.mode}
-            options={[
-              { id: "live", label: "Живые линии" },
-              { id: "static", label: "Не двигается" },
-            ]}
-            onChange={(mode) => set("mode", mode)}
-          />
+          {tab === "background" ? (
+            <>
+              <Choice
+                label="Фон страницы"
+                value={value.page.background}
+                options={(
+                  Object.keys(PAGE_BACKGROUNDS) as PageBackground[]
+                ).map((id) => ({
+                  id,
+                  label: `${PAGE_BACKGROUNDS[id]} ${id}`,
+                  swatch: id,
+                }))}
+                onChange={setPageBackground}
+              />
+              <Choice
+                label="Режим"
+                value={value.background.mode}
+                options={[
+                  { id: "live", label: "Живые линии" },
+                  { id: "static", label: "Не двигается" },
+                ]}
+                onChange={(mode) => set("mode", mode)}
+              />
 
-          <Slider
-            label="Плотность рисунка"
-            hint="сколько раз рисунок помещается по ширине экрана"
-            field="tilesAcross"
-            value={value.background.tilesAcross}
-            digits={2}
-            onChange={(next) => set("tilesAcross", next)}
-          />
-          <Slider
-            label="Толщина"
-            field="width"
-            value={value.background.width}
-            digits={2}
-            onChange={(next) => set("width", next)}
-          />
-          <Slider
-            label="Насыщенность"
-            field="opacity"
-            value={value.background.opacity}
-            digits={2}
-            onChange={(next) => set("opacity", next)}
-          />
-          <Slider
-            label="Скорость"
-            field="speed"
-            value={value.background.speed}
-            digits={2}
-            onChange={(next) => set("speed", next)}
-          />
-          <Slider
-            label="Сдвиг при прокрутке"
-            field="parallax"
-            value={value.background.parallax}
-            digits={2}
-            onChange={(next) => set("parallax", next)}
-          />
-          <Slider
-            label="Инертность"
-            field="ease"
-            value={value.background.ease}
-            digits={2}
-            onChange={(next) => set("ease", next)}
-          />
+              <Slider
+                label="Плотность рисунка"
+                hint="сколько раз рисунок помещается по ширине экрана"
+                range={BACKGROUND_RANGES.tilesAcross}
+                value={value.background.tilesAcross}
+                digits={2}
+                onChange={(next) => set("tilesAcross", next)}
+              />
+              <Slider
+                label="Толщина"
+                range={BACKGROUND_RANGES.width}
+                value={value.background.width}
+                digits={2}
+                onChange={(next) => set("width", next)}
+              />
+              <Slider
+                label="Насыщенность"
+                range={BACKGROUND_RANGES.opacity}
+                value={value.background.opacity}
+                digits={2}
+                onChange={(next) => set("opacity", next)}
+              />
+              <Slider
+                label="Скорость"
+                range={BACKGROUND_RANGES.speed}
+                value={value.background.speed}
+                digits={2}
+                onChange={(next) => set("speed", next)}
+              />
+              <Slider
+                label="Сдвиг при прокрутке"
+                range={BACKGROUND_RANGES.parallax}
+                value={value.background.parallax}
+                digits={2}
+                onChange={(next) => set("parallax", next)}
+              />
+              <Slider
+                label="Инертность"
+                range={BACKGROUND_RANGES.ease}
+                value={value.background.ease}
+                digits={2}
+                onChange={(next) => set("ease", next)}
+              />
 
-          <Choice
-            label="Цвет линий"
-            value={value.background.color}
-            options={(Object.keys(COLOR_NAMES) as ContourColor[]).map((id) => ({
-              id,
-              label: COLOR_NAMES[id],
-              swatch: CONTOUR_COLORS[id],
-            }))}
-            onChange={(color) => set("color", color)}
-          />
+              <Choice
+                label="Цвет линий"
+                value={value.background.color}
+                options={(Object.keys(COLOR_NAMES) as ContourColor[]).map(
+                  (id) => ({
+                    id,
+                    label: COLOR_NAMES[id],
+                    swatch: CONTOUR_COLORS[id],
+                  }),
+                )}
+                onChange={(color) => set("color", color)}
+              />
+            </>
+          ) : (
+            <>
+              <Group title="Тень под фото">
+                <Slider
+                  label="Широкая: ширина %"
+                  range={PRODUCTS_RANGES.aw}
+                  value={value.products.shadow.aw}
+                  digits={0}
+                  onChange={(next) => setShadow("aw", next)}
+                />
+                <Slider
+                  label="Широкая: высота px"
+                  range={PRODUCTS_RANGES.ah}
+                  value={value.products.shadow.ah}
+                  digits={0}
+                  onChange={(next) => setShadow("ah", next)}
+                />
+                <Slider
+                  label="Широкая: размытие px"
+                  range={PRODUCTS_RANGES.ab}
+                  value={value.products.shadow.ab}
+                  digits={0}
+                  onChange={(next) => setShadow("ab", next)}
+                />
+                <Slider
+                  label="Широкая: прозрачность"
+                  range={PRODUCTS_RANGES.aa}
+                  value={value.products.shadow.aa}
+                  digits={2}
+                  onChange={(next) => setShadow("aa", next)}
+                />
+                <Slider
+                  label="Контактная: ширина %"
+                  range={PRODUCTS_RANGES.cw}
+                  value={value.products.shadow.cw}
+                  digits={0}
+                  onChange={(next) => setShadow("cw", next)}
+                />
+                <Slider
+                  label="Контактная: высота px"
+                  range={PRODUCTS_RANGES.ch}
+                  value={value.products.shadow.ch}
+                  digits={0}
+                  onChange={(next) => setShadow("ch", next)}
+                />
+                <Slider
+                  label="Контактная: размытие px"
+                  range={PRODUCTS_RANGES.cb}
+                  value={value.products.shadow.cb}
+                  digits={0}
+                  onChange={(next) => setShadow("cb", next)}
+                />
+                <Slider
+                  label="Контактная: прозрачность"
+                  range={PRODUCTS_RANGES.ca}
+                  value={value.products.shadow.ca}
+                  digits={2}
+                  onChange={(next) => setShadow("ca", next)}
+                />
+                <Slider
+                  label="Положение по высоте px"
+                  hint="на сколько выше низа фото"
+                  range={PRODUCTS_RANGES.y}
+                  value={value.products.shadow.y}
+                  digits={0}
+                  onChange={(next) => setShadow("y", next)}
+                />
+                <Slider
+                  label="Теплота цвета"
+                  hint="0 — тёплый чёрный, 1 — рыжий"
+                  range={PRODUCTS_RANGES.tint}
+                  value={value.products.shadow.tint}
+                  digits={2}
+                  onChange={(next) => setShadow("tint", next)}
+                />
+              </Group>
+
+              <Group title="Появление (один раз, при въезде в экран)">
+                <Choice
+                  label="Как появляется"
+                  value={value.products.reveal.type}
+                  options={(
+                    Object.keys(REVEAL_NAMES) as ProductRevealSettings["type"][]
+                  ).map((id) => ({ id, label: REVEAL_NAMES[id] }))}
+                  onChange={(type) => setReveal("type", type)}
+                />
+                <Slider
+                  label="Длительность мс"
+                  range={PRODUCTS_RANGES.dur}
+                  value={value.products.reveal.dur}
+                  digits={0}
+                  onChange={(next) => setReveal("dur", next)}
+                />
+                <Slider
+                  label="Расстояние px"
+                  range={PRODUCTS_RANGES.dist}
+                  value={value.products.reveal.dist}
+                  digits={0}
+                  onChange={(next) => setReveal("dist", next)}
+                />
+                <Slider
+                  label="Задержка колонок мс"
+                  range={PRODUCTS_RANGES.stagger}
+                  value={value.products.reveal.stagger}
+                  digits={0}
+                  onChange={(next) => setReveal("stagger", next)}
+                />
+                <Slider
+                  label="Тень позже на мс"
+                  range={PRODUCTS_RANGES.shadowDelay}
+                  value={value.products.reveal.shadowDelay}
+                  digits={0}
+                  onChange={(next) => setReveal("shadowDelay", next)}
+                />
+              </Group>
+
+              <Group title="Подъём при прокрутке (aterizare)">
+                <label className="flex items-center gap-3 font-ui text-label">
+                  <input
+                    type="checkbox"
+                    checked={value.products.lift.enabled}
+                    onChange={(event) =>
+                      setLift("enabled", event.target.checked)
+                    }
+                    className="size-4 accent-yellow"
+                  />
+                  Включён
+                </label>
+                <Slider
+                  label="Интенсивность"
+                  range={PRODUCTS_RANGES.amt}
+                  value={value.products.lift.amt}
+                  digits={2}
+                  onChange={(next) => setLift("amt", next)}
+                />
+                <Slider
+                  label="Плавность"
+                  range={PRODUCTS_RANGES.smooth}
+                  value={value.products.lift.smooth}
+                  digits={2}
+                  onChange={(next) => setLift("smooth", next)}
+                />
+                <Slider
+                  label="Отклик тени"
+                  range={PRODUCTS_RANGES.shadowReact}
+                  value={value.products.lift.shadowReact}
+                  digits={2}
+                  onChange={(next) => setLift("shadowReact", next)}
+                />
+                <Slider
+                  label="Подъём px"
+                  range={PRODUCTS_RANGES.rise}
+                  value={value.products.lift.rise}
+                  digits={0}
+                  onChange={(next) => setLift("rise", next)}
+                />
+                <Slider
+                  label="Чувствительность"
+                  hint="при какой скорости подъём полный"
+                  range={PRODUCTS_RANGES.sensitivity}
+                  value={value.products.lift.sensitivity}
+                  digits={0}
+                  onChange={(next) => setLift("sensitivity", next)}
+                />
+                <Slider
+                  label="Приземление"
+                  hint="меньше — дольше опускается"
+                  range={PRODUCTS_RANGES.settle}
+                  value={value.products.lift.settle}
+                  digits={0}
+                  onChange={(next) => setLift("settle", next)}
+                />
+                <Slider
+                  label="Увеличение %"
+                  range={PRODUCTS_RANGES.grow}
+                  value={value.products.lift.grow}
+                  digits={1}
+                  onChange={(next) => setLift("grow", next)}
+                />
+                <Slider
+                  label="Наклон °"
+                  range={PRODUCTS_RANGES.tilt}
+                  value={value.products.lift.tilt}
+                  digits={1}
+                  onChange={(next) => setLift("tilt", next)}
+                />
+              </Group>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={copyLine}
+                  className="h-10 rounded-pill border border-ink px-4 font-ui text-label transition-transform duration-150 ease-out active:scale-[0.97]"
+                >
+                  {copied ? "Скопировано" : "Copiază"}
+                </button>
+                <p className="mt-2 font-mono text-[11px] leading-relaxed break-all text-smoke select-all">
+                  {productsLine(value)}
+                </p>
+              </div>
+            </>
+          )}
 
           <label className="flex items-center gap-3 font-ui text-label">
             <input
@@ -303,11 +600,29 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
   );
 }
 
+/** Подпись над группой ползунков: настроек во вкладке «Produse» много. */
+function Group({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <h2 className="font-display text-[15px] tracking-[0.1em] uppercase text-smoke">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 /** Ползунок с границами из схемы настроек (src/motion/config-schema.ts). */
 function Slider({
   label,
   hint,
-  field,
+  range,
   value,
   digits,
   onChange,
@@ -315,12 +630,12 @@ function Slider({
   label: string;
   /** Подпись под названием — когда по названию не очевидно, что это. */
   hint?: string;
-  field: keyof typeof BACKGROUND_RANGES;
+  range: readonly [number, number, number];
   value: number;
   digits: number;
   onChange: (value: number) => void;
 }) {
-  const [min, max, step] = BACKGROUND_RANGES[field];
+  const [min, max, step] = range;
   return (
     <label className="block">
       <span className="flex items-baseline justify-between font-ui text-label">

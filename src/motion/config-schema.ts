@@ -61,6 +61,96 @@ export const backgroundSchema = z.strictObject({
   color: z.enum(["ash", "smoke", "sand"]),
 });
 
+/** Границы ползунков вкладки «Produse». Значения и шаги — как в демо
+ *  docs/motion/produse-demo.html (панель внизу файла). */
+export const PRODUCTS_RANGES = {
+  // Тень: «mare» — широкая мягкая (ambient), «mică» — контактная (contact)
+  aw: [30, 120, 1],
+  ah: [4, 48, 1],
+  ab: [0, 48, 1],
+  aa: [0, 0.6, 0.01],
+  cw: [0, 90, 1],
+  ch: [2, 28, 1],
+  cb: [0, 24, 1],
+  ca: [0, 0.7, 0.01],
+  y: [-24, 30, 1],
+  tint: [0, 1, 0.05],
+  // Появление
+  dur: [120, 800, 10],
+  dist: [0, 40, 1],
+  stagger: [0, 200, 5],
+  shadowDelay: [0, 400, 10],
+  // Подъём при прокрутке
+  amt: [0, 2, 0.05],
+  smooth: [0.03, 0.3, 0.01],
+  shadowReact: [0, 2, 0.05],
+  rise: [2, 18, 1],
+  sensitivity: [4, 40, 1],
+  settle: [20, 240, 5],
+  grow: [0, 4, 0.1],
+  tilt: [0, 3, 0.1],
+} as const;
+
+const productRange = (key: keyof typeof PRODUCTS_RANGES) =>
+  z.number().min(PRODUCTS_RANGES[key][0]).max(PRODUCTS_RANGES[key][1]);
+
+/** Тень под фото блюда: два слоя, оба — эллипс под низом блока фото.
+ *  Ширина в процентах от блока, высота и размытие в пикселях. */
+export const productShadowSchema = z.strictObject({
+  /** Широкая мягкая тень: ширина %, высота px, размытие px, прозрачность. */
+  aw: productRange("aw"),
+  ah: productRange("ah"),
+  ab: productRange("ab"),
+  aa: productRange("aa"),
+  /** Контактная тень — та же четвёрка, но меньше и темнее. */
+  cw: productRange("cw"),
+  ch: productRange("ch"),
+  cb: productRange("cb"),
+  ca: productRange("ca"),
+  /** Низ тени: на сколько пикселей выше низа блока фото. */
+  y: productRange("y"),
+  /** Теплота цвета: 0 — тёплый чёрный #1A1714, 1 — рыжий rgb(92,52,22). */
+  tint: productRange("tint"),
+});
+
+export const productRevealSchema = z.strictObject({
+  /** lift — фото выезжает снизу, scale — подрастает, none — только проявление. */
+  type: z.enum(["lift", "scale", "none"]),
+  dur: productRange("dur"),
+  /** Насколько ниже начинает фото при type: "lift", px. */
+  dist: productRange("dist"),
+  /** Задержка между колонками слева направо, мс. */
+  stagger: productRange("stagger"),
+  /** Насколько тень отстаёт от фото, мс. */
+  shadowDelay: productRange("shadowDelay"),
+});
+
+export const productLiftSchema = z.strictObject({
+  enabled: z.boolean(),
+  /** Общая интенсивность подъёма. */
+  amt: productRange("amt"),
+  /** Инертность своего сглаживания прокрутки (слой считает скорость сам). */
+  smooth: productRange("smooth"),
+  /** Насколько сильно на подъём отзывается тень. */
+  shadowReact: productRange("shadowReact"),
+  /** На сколько пикселей фото поднимается на полном ходу. */
+  rise: productRange("rise"),
+  /** При какой скорости (px/кадр) подъём почти полный. */
+  sensitivity: productRange("sensitivity"),
+  /** Жёсткость пружины на приземлении: меньше — дольше опускается. */
+  settle: productRange("settle"),
+  /** На сколько процентов фото подрастает на полном ходу. */
+  grow: productRange("grow"),
+  /** Наклон фото по ходу движения, градусы. */
+  tilt: productRange("tilt"),
+});
+
+export const productsSchema = z.strictObject({
+  shadow: productShadowSchema,
+  reveal: productRevealSchema,
+  lift: productLiftSchema,
+});
+
 export const pageSchema = z.strictObject({
   /** Цвет фона всех страниц; от него же берут цвет стеклянные поверхности. */
   background: z.enum(
@@ -70,9 +160,14 @@ export const pageSchema = z.strictObject({
 
 export const motionConfigSchema = z.strictObject({
   background: backgroundSchema,
+  products: productsSchema,
   page: pageSchema,
 });
 
 export type BackgroundSettings = z.infer<typeof backgroundSchema>;
+export type ProductShadowSettings = z.infer<typeof productShadowSchema>;
+export type ProductRevealSettings = z.infer<typeof productRevealSchema>;
+export type ProductLiftSettings = z.infer<typeof productLiftSchema>;
+export type ProductsSettings = z.infer<typeof productsSchema>;
 export type PageSettings = z.infer<typeof pageSchema>;
 export type MotionConfig = z.infer<typeof motionConfigSchema>;

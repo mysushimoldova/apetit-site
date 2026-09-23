@@ -4,10 +4,11 @@
 // страницы. Оба layout импортируют globals.css, зовут RootHtml и берут отсюда
 // viewport и метаданные.
 import type { Viewport } from "next";
-import { pageBackground } from "@/config/motion";
+import { pageBackground, productsConfig } from "@/config/motion";
 import type { Locale } from "@/data/points";
 import { fontVariables } from "@/lib/fonts";
 import { pageThemeStyle } from "@/lib/page-theme";
+import { productStyle } from "@/lib/product-style";
 
 export { rootMetadata } from "@/lib/seo";
 
@@ -32,7 +33,10 @@ export function RootHtml({
     <html
       lang={locale}
       className={fontVariables}
-      style={pageThemeStyle(pageBackground)}
+      style={{
+        ...pageThemeStyle(pageBackground),
+        ...productStyle(productsConfig),
+      }}
     >
       {/* suppressHydrationWarning: расширения браузера дописывают в <body>
           свои атрибуты, и без этого Next ругается на несовпадение HTML. */}

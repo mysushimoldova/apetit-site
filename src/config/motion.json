@@ -9,6 +9,38 @@
     "ease": 0.12,
     "color": "ash"
   },
+  "products": {
+    "shadow": {
+      "aw": 93,
+      "ah": 29,
+      "ab": 34,
+      "aa": 0.11,
+      "cw": 82,
+      "ch": 18,
+      "cb": 13,
+      "ca": 0.29,
+      "y": 3,
+      "tint": 0.25
+    },
+    "reveal": {
+      "type": "lift",
+      "dur": 360,
+      "dist": 14,
+      "stagger": 70,
+      "shadowDelay": 100
+    },
+    "lift": {
+      "enabled": true,
+      "amt": 0.9,
+      "smooth": 0.13,
+      "shadowReact": 0.7,
+      "rise": 7,
+      "sensitivity": 12,
+      "settle": 130,
+      "grow": 1.5,
+      "tilt": 1
+    }
+  },
   "page": {
     "background": "#F7F2EA"
   }

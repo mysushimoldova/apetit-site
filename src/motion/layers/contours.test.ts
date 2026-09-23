@@ -27,6 +27,7 @@ const frame: Frame = {
   height: 844,
   dpr: 2,
   scroll: 500,
+  scrollY: 500,
 };
 
 describe("юниформы слоя фона", () => {

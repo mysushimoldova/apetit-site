@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Движок анимаций (src/motion/engine.ts) и первый его слой — живой фон
-// из фирменных контурных линий (DESIGN.md → Background).
+// Движок анимаций (src/motion/engine.ts) и его слои: живой фон из фирменных
+// контурных линий (DESIGN.md → Background) и карточки блюд, которые
+// приподнимаются при прокрутке (см. e2e/products.spec.ts).
 //
 // В разработке движок отдаёт свои показания через window.__apetitMotion():
 // кадры, уровень качества, причины пауз. На боевой сборке этого нет.
@@ -31,7 +32,7 @@ async function waitForCanvas(page: Page) {
   });
   await expect
     .poll(async () => (await stats(page))?.layers)
-    .toEqual(["contours"]);
+    .toEqual(["contours", "products"]);
 }
 
 /** Непустая корзина: с пустой страница оформления уводит в меню. */

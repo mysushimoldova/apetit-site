@@ -1,0 +1,294 @@
+<!-- Демо-референс для задачи «умбра + эффекты при прокрутке» (меню Apetit).
+     Картинки заменены заглушками: подставь любые фото из public/. Логика (JS внизу) — эталон поведения.
+     Выбранные значения: efect=land intensitate=0.9 netezime=0.13 umbraReactie=0.7 ridicare=7 sensibilitate=12
+     coborare=130 marire=1.5 inclinare=1 || aparitie=lift dur=360 dist=14 stagger=70 shadowDelay=100 ||
+     umbra: aw=93 ah=29 ab=34 aa=0.11 cw=82 ch=18 cb=13 ca=0.29 y=3 tint=0.25 -->
+<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<title>Umbra produselor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=Manrope:wght@700;800&family=Montserrat:wght@400;500;600&display=swap">
+<style>
+:root{
+  --cream:#F7F2EA; --ink:#1A1714; --yellow:#FFBC0D; --smoke:#6B625B; --ash:#A79E95;
+  --panel:#1A1714; --panel-2:#26221E; --panel-text:#F7F2EA; --panel-muted:#A79E95;
+  --aw:80; --ah:26; --ab:14; --aa:.26;  --cw:48; --ch:11; --cb:4; --ca:.34;  --sy:6; --tint:#1A1714;
+  --dur:320ms; --dist:14px; --sdel:90ms; --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:Montserrat,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.page{max-width:390px;margin:0 auto;padding:0 16px 320px}
+@media(min-width:900px){.page{margin:0 0 0 max(24px,calc(50vw - 195px - 180px));padding-bottom:120px}}
+.hd{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px;position:sticky;top:env(safe-area-inset-top,0px);background:linear-gradient(var(--cream) 70%,rgba(247,242,234,0));z-index:2}
+.logo{font-family:Oswald,Impact,sans-serif;font-weight:600;font-size:22px;letter-spacing:.02em}
+.hd small{font-family:Manrope,sans-serif;font-weight:700;font-size:12px;color:var(--smoke)}
+.chips{display:flex;gap:8px;overflow:auto;padding:4px 0 14px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:1.5px solid var(--ink);border-radius:999px;padding:6px 12px;font:600 12px Manrope,sans-serif}
+.chip.on{background:var(--ink);color:var(--cream)}
+.word{font-family:Oswald,Impact,sans-serif;font-weight:600;font-size:118px;line-height:.9;letter-spacing:-.01em;color:transparent;-webkit-text-stroke:1.5px var(--ink);margin:6px 0 -34px -4px;user-select:none}
+.grid{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;row-gap:26px}
+.ph{position:relative;aspect-ratio:1/1;width:100%;perspective:700px}
+.rv{position:absolute;inset:0;z-index:1;transition:transform var(--dur) var(--ease),opacity var(--dur) var(--ease)}
+.prod{position:absolute;inset:0;display:grid;place-items:center;will-change:transform;transform-style:preserve-3d}
+.prod img{width:96%;height:96%;object-fit:contain;display:block}
+.shr{position:absolute;left:0;right:0;bottom:0;height:60%;transition:transform var(--dur) var(--ease),opacity var(--dur) var(--ease);transition-delay:var(--sdel);transform-origin:50% 100%}
+.shg{position:absolute;inset:0;will-change:transform,opacity;transform-origin:50% 100%}
+.sh{position:absolute;left:50%;bottom:calc(var(--sy)*1px);transform:translateX(-50%);border-radius:50%;pointer-events:none;background:var(--tint)}
+.sh.a{width:calc(var(--aw)*1%);height:calc(var(--ah)*1px);opacity:var(--aa);filter:blur(calc(var(--ab)*1px))}
+.sh.c{width:calc(var(--cw)*1%);height:calc(var(--ch)*1px);opacity:var(--ca);filter:blur(calc(var(--cb)*1px))}
+.nm{font:800 15px/1.2 Manrope,sans-serif;margin-top:10px}
+.ds{font:400 11.5px/1.35 Montserrat,sans-serif;color:var(--smoke);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wt{font:500 11px Montserrat,sans-serif;color:var(--ash);margin-top:4px;min-height:14px}
+.row{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+.price{background:var(--yellow);border-radius:999px;padding:6px 11px;font:800 13px Manrope,sans-serif}
+.plus{width:34px;height:34px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;font:800 18px Manrope,sans-serif}
+/* apariție (o dată) */
+.tile.pre .rv{opacity:0}.tile.pre .shr{opacity:0}
+.tile.pre.lift .rv{transform:translateY(var(--dist))}.tile.pre.lift .shr{transform:scaleX(.8)}
+.tile.pre.scale .rv{transform:scale(.94)}.tile.pre.scale .shr{transform:scaleX(.7)}
+body.rm .rv,body.rm .shr{transition-duration:180ms!important;transition-delay:0ms!important;transform:none!important}
+@media(prefers-reduced-motion:reduce){.rv,.shr{transition-duration:180ms!important;transition-delay:0ms!important;transform:none!important}}
+/* panel */
+.panel{position:fixed;left:0;right:0;bottom:0;background:var(--panel);color:var(--panel-text);z-index:10;border-radius:18px 18px 0 0;max-height:64vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(26,23,20,.25);padding-bottom:env(safe-area-inset-bottom,0px)}
+.panel.min .pb{display:none}
+.pt{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.pt b{font:600 14px Oswald,sans-serif;letter-spacing:.06em;text-transform:uppercase;flex:1}
+.btn{background:var(--panel-2);color:var(--panel-text);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 12px;font:700 12px Manrope,sans-serif;cursor:pointer}
+.btn.y{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
+.btn:focus-visible,.chipp:focus-visible,input:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.pb{overflow:auto;padding:10px 14px 16px}
+.sec{margin-bottom:12px}
+.sec h4{margin:8px 0 6px;font:600 12px Oswald,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--panel-muted)}
+.hint{font:500 11.5px/1.4 Montserrat,sans-serif;color:var(--panel-muted);margin:-2px 0 8px}
+.pr{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chipp{background:var(--panel-2);color:var(--panel-text);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:5px 10px;font:600 11.5px Manrope,sans-serif;cursor:pointer}
+.chipp.on{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
+.sl{display:grid;grid-template-columns:100px 1fr 44px;align-items:center;gap:8px;font:500 12px Montserrat,sans-serif;padding:3px 0}
+.sl span:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--panel-muted)}
+.sl input[type=range]{width:100%;accent-color:var(--yellow);margin:0}
+.tg{display:flex;gap:14px;flex-wrap:wrap;font:500 12px Montserrat,sans-serif;padding:4px 0}
+.tg label{display:flex;align-items:center;gap:6px}.tg input{accent-color:var(--yellow)}
+.copyline{font:500 11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:var(--panel-2);border-radius:8px;padding:8px;word-break:break-all;color:var(--panel-muted);margin-top:8px;user-select:all}
+@media(min-width:900px){
+  .panel{left:auto;right:0;top:0;bottom:0;width:360px;max-height:none;border-radius:0;box-shadow:-10px 0 40px rgba(26,23,20,.18)}
+  .panel.min .pb{display:block}#tgl{display:none}
+}
+</style>
+
+<div class="page">
+  <div class="hd"><span class="logo">APETIT</span><small>Soroca ⌄ &nbsp;&nbsp; RO / RU</small></div>
+  <div class="chips"><span class="chip on">Kebab</span><span class="chip">Menu</span><span class="chip">Burgers</span><span class="chip">Gözleme</span><span class="chip">Crispy</span><span class="chip">Salad</span></div>
+  <div class="word">KEBAB</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="panel min" id="panel">
+  <div class="pt">
+    <b>Efecte la scroll</b>
+    <button class="btn" id="replay">↻ Din nou</button>
+    <button class="btn y" id="copy">Copiază</button>
+    <button class="btn" id="tgl">Setări</button>
+  </div>
+  <div class="pb">
+    <div class="sec">
+      <h4>Efect continuu (în timp ce derulezi)</h4>
+      <div class="pr" id="fx">
+        <button class="chipp on" data-f="float">Plutire</button>
+        <button class="chipp" data-f="land">Aterizare</button>
+        <button class="chipp" data-f="depth">Adâncime</button>
+        <button class="chipp" data-f="none">fără</button>
+      </div>
+      <div class="hint" id="fxhint"></div>
+      <div class="sl"><span>intensitate</span><input type="range" id="amt" min="0" max="2" step=".05"><span></span></div>
+      <div class="sl"><span>netezime</span><input type="range" id="smooth" min=".03" max=".3" step=".01"><span></span></div>
+      <div class="sl"><span>umbra reacț.</span><input type="range" id="shr" min="0" max="2" step=".05"><span></span></div>
+      <div id="landbox">
+      <div class="sl"><span>ridicare px</span><input type="range" id="mlift" min="2" max="18" step="1"><span></span></div>
+      <div class="sl"><span>sensibilitate</span><input type="range" id="sens" min="4" max="40" step="1"><span></span></div>
+      <div class="sl"><span>coborâre (arc)</span><input type="range" id="settle" min="20" max="240" step="5"><span></span></div>
+      <div class="sl"><span>mărire %</span><input type="range" id="grow" min="0" max="4" step=".1"><span></span></div>
+      <div class="sl"><span>înclinare °</span><input type="range" id="tilt" min="0" max="3" step=".1"><span></span></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Apariție (prima dată când intră în ecran)</h4>
+      <div class="pr" id="types">
+        <button class="chipp on" data-t="lift">urcă</button>
+        <button class="chipp" data-t="scale">crește</button>
+        <button class="chipp" data-t="none">fără</button>
+      </div>
+      <div class="sl"><span>durată ms</span><input type="range" id="dur" min="120" max="800" step="10"><span></span></div>
+      <div class="sl"><span>distanță px</span><input type="range" id="dist" min="0" max="40" step="1"><span></span></div>
+      <div class="sl"><span>decalaj col. ms</span><input type="range" id="stag" min="0" max="200" step="5"><span></span></div>
+      <div class="sl"><span>umbra după ms</span><input type="range" id="sdel" min="0" max="400" step="10"><span></span></div>
+    </div>
+    <div class="sec">
+      <h4>Umbră</h4>
+      <div class="pr" id="presets">
+        <button class="chipp" data-p="acum">Ca acum</button>
+        <button class="chipp on" data-p="moale">Moale</button>
+        <button class="chipp" data-p="aer">Aer</button>
+        <button class="chipp" data-p="contact">Contact</button>
+      </div>
+      <div class="sl"><span>mare: lățime %</span><input type="range" id="aw" min="30" max="120" step="1"><span></span></div>
+      <div class="sl"><span>mare: înălț. px</span><input type="range" id="ah" min="4" max="48" step="1"><span></span></div>
+      <div class="sl"><span>mare: blur px</span><input type="range" id="ab" min="0" max="48" step="1"><span></span></div>
+      <div class="sl"><span>mare: opacit.</span><input type="range" id="aa" min="0" max=".6" step=".01"><span></span></div>
+      <div class="sl"><span>mică: lățime %</span><input type="range" id="cw" min="0" max="90" step="1"><span></span></div>
+      <div class="sl"><span>mică: înălț. px</span><input type="range" id="ch" min="2" max="28" step="1"><span></span></div>
+      <div class="sl"><span>mică: blur px</span><input type="range" id="cb" min="0" max="24" step="1"><span></span></div>
+      <div class="sl"><span>mică: opacit.</span><input type="range" id="ca" min="0" max=".7" step=".01"><span></span></div>
+      <div class="sl"><span>poziție Y px</span><input type="range" id="sy" min="-24" max="30" step="1"><span></span></div>
+      <div class="sl"><span>culoare caldă</span><input type="range" id="tint" min="0" max="1" step=".05"><span></span></div>
+      <div class="tg"><label><input type="checkbox" id="rm"> reduce motion (test)</label></div>
+    </div>
+    <div class="copyline" id="line"></div>
+  </div>
+</div>
+
+<script>
+const IMG={kc:"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",kp:"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",cb:"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"};
+const items=[
+ ["kp","Kebab Philly Beef","lipie, vită, cașcaval, maioneză, salată iceberg/varză, roșii","360 g","94 lei"],
+ ["kc","Kebab Cheese","lipie, cașcaval, maioneză, salată iceberg/varză, roșii, castraveți murați","440 g","105 lei"],
+ ["cb","Cheeseburger Crispy","chiflă, pui crispy, cașcaval, salată, roșii, sos","",""],
+ ["kc","Kebab XL / XXL","lipie, maioneză, salată iceberg/varză, roșii, castraveți murați, sos kebab","340 / 430 g","114 lei"],
+ ["kp","Kebab Philly Beef","lipie, vită, cașcaval, maioneză, salată iceberg/varză, roșii","360 g","94 lei"],
+ ["cb","Cheeseburger Crispy","chiflă, pui crispy, cașcaval, salată, roșii, sos","",""],
+ ["kc","Kebab Cheese","lipie, cașcaval, maioneză, salată iceberg/varză, roșii, castraveți murați","440 g","105 lei"],
+ ["kp","Kebab Philly Beef","lipie, vită, cașcaval, maioneză, salată iceberg/varză, roșii","360 g","94 lei"],
+ ["kc","Kebab XL / XXL","lipie, maioneză, salată iceberg/varză, roșii, castraveți murați, sos kebab","340 / 430 g","114 lei"],
+ ["cb","Cheeseburger Crispy","chiflă, pui crispy, cașcaval, salată, roșii, sos","",""],
+ ["kp","Kebab Philly Beef","lipie, vită, cașcaval, maioneză, salată iceberg/varză, roșii","360 g","94 lei"],
+ ["kc","Kebab Cheese","lipie, cașcaval, maioneză, salată iceberg/varză, roșii, castraveți murați","440 g","105 lei"],
+];
+const grid=document.getElementById('grid');
+grid.innerHTML=items.map(([k,n,d,w,p],i)=>`<div class="tile" data-i="${i}">
+  <div class="ph"><div class="shr"><div class="shg"><div class="sh a"></div><div class="sh c"></div></div></div><div class="rv"><div class="prod"><img src="${IMG[k]}" alt="${n}"></div></div></div>
+  <div class="nm">${n}</div><div class="ds">${d}</div><div class="wt">${w}</div>
+  <div class="row">${p?`<span class="price">${p}</span>`:'<span></span>'}<span class="plus">+</span></div>
+</div>`).join('');
+
+const R=document.documentElement.style;
+const S={fx:'land',amt:1,smooth:.10,shr:1, mlift:8,sens:14,settle:70,grow:1.5,tilt:1, type:'lift',dur:360,dist:14,stag:70,sdel:100, aw:80,ah:26,ab:14,aa:.26,cw:48,ch:11,cb:4,ca:.34,sy:6,tint:.35, rm:false};
+const presets={
+  acum:{aw:0,ah:4,ab:0,aa:0,cw:56,ch:12,cb:1,ca:.16,sy:4,tint:0},
+  moale:{aw:80,ah:26,ab:14,aa:.26,cw:48,ch:11,cb:4,ca:.34,sy:6,tint:.35},
+  aer:{aw:96,ah:30,ab:30,aa:.18,cw:30,ch:8,cb:8,ca:.16,sy:2,tint:.25},
+  contact:{aw:60,ah:14,ab:10,aa:.14,cw:52,ch:9,cb:3,ca:.42,sy:8,tint:.5},
+};
+const hints={
+  float:'Produsul plutește deasupra paginii: se mișcă puțin mai repede decât textul, umbra rămâne pe „masă”. Adâncime reală, fără să sară.',
+  land:'Ca la Apple: cât derulezi, produsul se ridică rapid și crește puțin, umbra de contact dispare și rămâne una largă, moale. Te oprești — coboară lent, cu arc, și umbra se strânge la loc.',
+  depth:'Produsele intră în ecran ușor înclinate și se îndreaptă spre mijloc; umbra e cea mai clară exact la mijloc.',
+  none:'Nimic în timpul derulării — doar apariția și umbra.'
+};
+function mix(t){const a=[26,23,20],b=[92,52,22];return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')})`;}
+const num=['amt','smooth','shr','mlift','sens','settle','grow','tilt','dur','dist','stag','sdel','aw','ah','ab','aa','cw','ch','cb','ca','sy','tint'];
+const tiles=[...document.querySelectorAll('.tile')];
+function apply(){
+  for(const k of ['aw','ah','ab','aa','cw','ch','cb','ca','sy']) R.setProperty('--'+k,S[k]);
+  R.setProperty('--tint',mix(S.tint));
+  R.setProperty('--dur',S.dur+'ms'); R.setProperty('--dist',S.dist+'px'); R.setProperty('--sdel',S.sdel+'ms');
+  document.body.classList.toggle('rm',S.rm);
+  tiles.forEach(t=>{t.classList.remove('lift','scale','none');t.classList.add(S.type);
+    const col=+t.dataset.i%2;
+    t.querySelector('.rv').style.transitionDelay=(col*S.stag)+'ms';
+    t.querySelector('.shr').style.transitionDelay=(col*S.stag+S.sdel)+'ms';});
+  num.forEach(k=>{const el=document.getElementById(k); el.value=S[k]; el.nextElementSibling.textContent=S[k];});
+  document.querySelectorAll('#types .chipp').forEach(b=>b.classList.toggle('on',b.dataset.t===S.type));
+  document.querySelectorAll('#fx .chipp').forEach(b=>b.classList.toggle('on',b.dataset.f===S.fx));
+  document.getElementById('fxhint').textContent=hints[S.fx];
+  document.getElementById('landbox').hidden=S.fx!=='land';
+  document.getElementById('rm').checked=S.rm;
+  document.getElementById('line').textContent=
+   `efect=${S.fx} intensitate=${S.amt} netezime=${S.smooth} umbraReactie=${S.shr}${S.fx==='land'?` ridicare=${S.mlift} sensibilitate=${S.sens} coborare=${S.settle} marire=${S.grow} inclinare=${S.tilt}`:''} || aparitie=${S.type} dur=${S.dur} dist=${S.dist} stagger=${S.stag} shadowDelay=${S.sdel} || umbra: aw=${S.aw} ah=${S.ah} ab=${S.ab} aa=${S.aa} cw=${S.cw} ch=${S.ch} cb=${S.cb} ca=${S.ca} y=${S.sy} tint=${S.tint}`;
+  kick();
+}
+num.forEach(k=>document.getElementById(k).addEventListener('input',e=>{S[k]=+e.target.value;apply();}));
+document.getElementById('rm').addEventListener('change',e=>{S.rm=e.target.checked;apply();});
+document.querySelectorAll('#types .chipp').forEach(b=>b.addEventListener('click',()=>{S.type=b.dataset.t;apply();replay();}));
+document.querySelectorAll('#fx .chipp').forEach(b=>b.addEventListener('click',()=>{S.fx=b.dataset.f;apply();}));
+document.querySelectorAll('#presets .chipp').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#presets .chipp').forEach(x=>x.classList.toggle('on',x===b));
+  Object.assign(S,presets[b.dataset.p]);apply();}));
+document.getElementById('tgl').addEventListener('click',()=>document.getElementById('panel').classList.toggle('min'));
+document.getElementById('copy').addEventListener('click',async()=>{const t=document.getElementById('line').textContent;const c=document.getElementById('copy');
+  try{await navigator.clipboard.writeText(t);c.textContent='Copiat ✓';}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('line'));getSelection().removeAllRanges();getSelection().addRange(r);}
+  setTimeout(()=>c.textContent='Copiază',1200);});
+
+/* apariție o singură dată */
+let first=true;
+const io=new IntersectionObserver(es=>{
+  es.forEach(en=>{const t=en.target;
+    if(first){ if(!en.isIntersecting) t.classList.add('pre'); return; }
+    if(en.isIntersecting){ t.classList.remove('pre'); io.unobserve(t); }});
+  first=false;
+},{threshold:.18,rootMargin:'0px 0px -6% 0px'});
+tiles.forEach(t=>io.observe(t));
+function replay(){
+  tiles.forEach(t=>io.unobserve(t));
+  window.scrollTo({top:0,behavior:'auto'});
+  tiles.forEach(t=>{t.classList.add('pre'); t.querySelectorAll('.rv,.shr').forEach(e=>e.style.transition='none');});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    tiles.forEach(t=>t.querySelectorAll('.rv,.shr').forEach(e=>e.style.transition=''));
+    first=false; tiles.forEach(t=>io.observe(t));
+  }));
+}
+document.getElementById('replay').addEventListener('click',replay);
+
+/* efect continuu — scroll netezit + viteză */
+const prods=tiles.map(t=>t.querySelector('.prod')), shgs=tiles.map(t=>t.querySelector('.shg')), phs=tiles.map(t=>t.querySelector('.ph')), shA=tiles.map(t=>t.querySelector('.sh.a')), shC=tiles.map(t=>t.querySelector('.sh.c'));
+let sy=window.scrollY, ty=sy, vel=0, lift=0, liftV=0, raf=0, last=0, idle=0;
+const reduce=()=>S.rm||matchMedia('(prefers-reduced-motion:reduce)').matches;
+function kick(){ if(!raf){ last=performance.now(); raf=requestAnimationFrame(loop);} idle=0; }
+addEventListener('scroll',kick,{passive:true});
+function loop(now){
+  const dt=Math.min(48,now-last); last=now;
+  ty=window.scrollY;
+  const k=1-Math.pow(1-S.smooth,dt/16.67);
+  const prev=sy; sy+=(ty-sy)*k;
+  const v=(sy-prev)/Math.max(1,dt)*16.67;           // px per frame (netezit)
+  vel+=(v-vel)*0.3;
+  // arc (spring) — se ridică repede, coboară lent, fără să tremure
+  const targetLift=1-Math.exp(-Math.abs(vel)/S.sens);
+  const stiff=targetLift>lift?320:S.settle, damp=2*Math.sqrt(stiff), dts=dt/1000;
+  liftV+=(stiff*(targetLift-lift)-damp*liftV)*dts; lift=Math.max(0,Math.min(1.2,lift+liftV*dts));
+  const vh=innerHeight, mid=vh/2, off=ty-sy;        // off = cât rămâne în urmă scrollul netezit
+  for(let i=0;i<tiles.length;i++){
+    const r=phs[i].getBoundingClientRect();
+    if(r.bottom<-200||r.top>vh+200) continue;
+    const p=Math.max(-1,Math.min(1,((r.top+r.height/2)-mid)/mid)); // -1 sus … 1 jos
+    let pt='',st='',so=1;
+    if(!reduce()){
+      const A=S.amt, H=S.shr;
+      if(S.fx==='float'){
+        const y=p*10*A + Math.max(-40,Math.min(40,off))*0.3*A;                 // mai rapid decât pagina + lag fin
+        pt=`translate3d(0,${y.toFixed(2)}px,0)`;
+        st=`translate3d(0,${(-p*3*A).toFixed(2)}px,0) scaleX(${(1-Math.abs(p)*0.08*H).toFixed(3)})`;
+        so=1-Math.abs(p)*0.25*H;
+      }else if(S.fx==='land'){
+        const l=lift*S.mlift*A, tl=-Math.sign(vel)*lift*S.tilt*A;
+        pt=`translate3d(0,${(-l).toFixed(2)}px,0) scale(${(1+lift*S.grow/100*A).toFixed(4)}) rotateX(${tl.toFixed(2)}deg)`;
+        st=`translate3d(0,${(lift*3*H).toFixed(2)}px,0) scaleX(${(1+lift*0.16*H).toFixed(3)})`;
+        so=1;
+        shA[i].style.opacity=(S.aa*(1+lift*0.4*H)).toFixed(3);
+        shC[i].style.opacity=(S.ca*Math.max(0,1-lift*0.9*H)).toFixed(3);
+      }else if(S.fx==='depth'){
+        const ang=p*7*A, sc=1-Math.abs(p)*0.035*A;
+        pt=`rotateX(${ang.toFixed(2)}deg) scale(${sc.toFixed(3)}) translate3d(0,${(p*4*A).toFixed(2)}px,0)`;
+        st=`scaleX(${(1-Math.abs(p)*0.22*H).toFixed(3)})`;
+        so=1-Math.abs(p)*0.5*H;
+      }
+    }
+    prods[i].style.transform=pt; shgs[i].style.transform=st; shgs[i].style.opacity=so.toFixed(3);
+    if(S.fx!=='land'){shA[i].style.opacity='';shC[i].style.opacity='';}
+  }
+  const still=Math.abs(ty-sy)<0.05 && Math.abs(vel)<0.05 && lift<0.003 && Math.abs(liftV)<0.003;
+  idle = still ? idle+dt : 0;
+  if(idle>400){ raf=0; return; }
+  raf=requestAnimationFrame(loop);
+}
+apply();
+</script>
+
+</body></html>

@@ -7,7 +7,7 @@
 // принимаются только со своего адреса и проверяются схемой zod.
 import { applyPageTheme } from "@/lib/page-theme";
 import type { BackgroundControl } from "./background";
-import { backgroundSchema, pageSchema } from "./config-schema";
+import { backgroundSchema, pageSchema, productsSchema } from "./config-schema";
 import {
   PANEL_SOURCE,
   STAGE_SOURCE,
@@ -15,11 +15,15 @@ import {
   type StageMessage,
 } from "./dev-messages";
 import { engine } from "./engine";
+import type { ProductsControl } from "./products";
 
 /** Как часто страница сообщает панели кадры в секунду, мс. */
 const STATS_MS = 500;
 
-export function connectDevPanel(control: BackgroundControl): () => void {
+export function connectDevPanel(
+  control: BackgroundControl,
+  products: ProductsControl,
+): () => void {
   const parent = window.parent;
   // Страница открыта сама по себе, не в панели — ничего не делаем
   if (!parent || parent === window) return () => {};
@@ -31,6 +35,8 @@ export function connectDevPanel(control: BackgroundControl): () => void {
     if (!data || data.source !== PANEL_SOURCE) return;
     const parsed = backgroundSchema.safeParse(data.background);
     if (parsed.success) control.apply(parsed.data);
+    const tiles = productsSchema.safeParse(data.products);
+    if (tiles.success) products.apply(tiles.data);
     // Цвет фона страницы — не слой движка: это переменные CSS на <html>
     const page = pageSchema.safeParse(data.page);
     if (page.success) {

@@ -381,13 +381,15 @@ class MotionEngine {
     this.syncSize();
     const reduced = this.isReduced();
     if (!reduced) this.elapsed += dt;
+    const scrollY = window.scrollY;
     const frame: Frame = {
       t: reduced ? 0 : this.elapsed / 1000,
       dt,
       width: this.cssWidth,
       height: this.cssHeight,
       dpr: this.dpr,
-      scroll: reduced ? 0 : this.scroll.update(window.scrollY, dt),
+      scroll: reduced ? 0 : this.scroll.update(scrollY, dt),
+      scrollY,
     };
     const gl = ctx.gl;
     gl.clearColor(0, 0, 0, 0);

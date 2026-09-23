@@ -21,6 +21,10 @@
   --dur-base: 240ms; /* появление плиток, чипы, лист */
   --dur-slow: 420ms; /* экран городов, переход в меню */
 
+  /* Появление карточек блюд: быстрый старт, длинный мягкий выход. Своя кривая,
+     а не --ease-out: так в эталонном демо docs/motion/produse-demo.html */
+  --ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* Линии — вместо теней (DESIGN.md → Lines) */
   --rule: 1px solid var(--color-ink); /* рамки, граница шапки, активный чип */
   --rule-dotted: 1px dotted rgba(26, 23, 20, 0.45); /* разделители категорий, строк корзины */
@@ -193,6 +197,17 @@
   ::selection {
     background-color: var(--color-yellow);
     color: var(--color-ink);
+  }
+}
+
+/* Страховка для браузеров без overflow: clip (Safari до 16): там сетка
+   плиток не обрезает мягкую тень, и она вылезает за край окна. Обрезаем
+   окном. Правило на <html>, а не на <body>: так оно достаётся окну и не
+   делает из body отдельную область прокрутки — липкая шапка и лента чипов
+   продолжают работать. */
+@supports not (overflow-x: clip) {
+  html {
+    overflow-x: hidden;
   }
 }
 
@@ -412,21 +427,37 @@
 }
 
 /* Сетка плиток: первая строка наезжает на нижнюю четверть слова, фото — перед буквами */
+/* Меню обрезает по своей ширине мягкую тень под фото: у крайних колонок она
+   шире плитки и вылезала бы за страницу. На телефоне ширина <main> — это
+   ширина окна, поэтому обрезку видно быть не может; на компьютере она
+   приходится на пустое поле, где тень уже слабее половины уровня яркости.
+   clip, а не hidden: hidden сделал бы из <main> область прокрутки и обрезал
+   бы тень заодно снизу, где она как раз и нужна. */
+@utility menu-main {
+  overflow-x: clip;
+}
+
 @utility tiles {
   position: relative;
   z-index: 1;
   margin-top: calc(var(--billboard-size, var(--text-billboard)) * -0.22);
 }
 
-/* Фото блюда: 150px в плитке (280px в листе, 56px в корзине — через --food-h),
-   под ним «лужица» — единственная тень еды */
+/* Фото блюда: 150px в плитке (280px в листе, 56px в корзине — через --food-h).
+   Тень под фото — отдельные слои (.food-shadow ниже), кроме миниатюр корзины:
+   там осталась прежняя плоская «лужица» (.food-puddle). */
 @utility food {
   position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   height: var(--food-h, var(--size-food-tile));
+  /* Наклон фото при прокрутке считается в перспективе (см. .food-reveal) */
+  perspective: 700px;
+}
 
+/* «Лужица» — миниатюра блюда в строке корзины */
+@utility food-puddle {
   &::before {
     content: "";
     position: absolute;
@@ -441,6 +472,103 @@
   & > * {
     position: relative;
   }
+}
+
+/* ---------- Тень под фото блюда (DESIGN.md → Food Image) ----------
+
+   Два слоя: широкая мягкая (ambient) и маленькая контактная (contact). Оба —
+   эллипс по центру фото, низом у нижнего края блока фото.
+
+   Почему не filter: blur(). На странице меню 47 плиток, у каждой два слоя —
+   полсотни размытий на кадр телефон не вытянет, а тень ещё и двигается при
+   прокрутке. Вместо размытия — эллиптический градиент: коробка градиента
+   больше самого эллипса на 1.5·размытие с каждой стороны (дальше хвост уже
+   незаметен, а лишняя площадь — лишняя работа при отрисовке), а стопы
+   повторяют профиль размытого эллипса. Числа не на глаз: посчитан настоящий
+   гаусс и подобран методом наименьших квадратов, среднее расхождение с
+   filter: blur() — меньше одного уровня яркости из 255.
+
+   Прозрачность каждого слоя — отдельным свойством opacity (а не в цвете
+   градиента): её меняет и появление, и подъём при прокрутке. */
+.food-shadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60%;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
+/* Внутренняя группа — её двигает слой движка (src/motion/layers/products.ts);
+   внешняя занята появлением. Два элемента, чтобы преобразования не спорили. */
+.food-shadow-lift {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+}
+
+.food-shadow-ambient,
+.food-shadow-contact {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+}
+
+.food-shadow-ambient {
+  width: calc(var(--sh-aw) + 3 * var(--sh-ab));
+  height: calc(var(--sh-ah) + 3 * var(--sh-ab));
+  bottom: calc(var(--sh-y) - 1.5 * var(--sh-ab));
+  opacity: var(--sh-aa);
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--sh-tint) / 0.31) 0%,
+    rgb(var(--sh-tint) / 0.297) 15%,
+    rgb(var(--sh-tint) / 0.265) 30%,
+    rgb(var(--sh-tint) / 0.214) 45%,
+    rgb(var(--sh-tint) / 0.155) 60%,
+    rgb(var(--sh-tint) / 0.094) 75%,
+    rgb(var(--sh-tint) / 0.06) 90%,
+    rgb(var(--sh-tint) / 0) 100%
+  );
+}
+
+.food-shadow-contact {
+  width: calc(var(--sh-cw) + 3 * var(--sh-cb));
+  height: calc(var(--sh-ch) + 3 * var(--sh-cb));
+  bottom: calc(var(--sh-y) - 1.5 * var(--sh-cb));
+  opacity: var(--sh-ca);
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--sh-tint) / 0.511) 0%,
+    rgb(var(--sh-tint) / 0.494) 15%,
+    rgb(var(--sh-tint) / 0.449) 30%,
+    rgb(var(--sh-tint) / 0.38) 45%,
+    rgb(var(--sh-tint) / 0.295) 60%,
+    rgb(var(--sh-tint) / 0.188) 75%,
+    rgb(var(--sh-tint) / 0.107) 90%,
+    rgb(var(--sh-tint) / 0) 100%
+  );
+}
+
+/* Фото: внешний слой занят появлением, внутренний — подъёмом при прокрутке.
+   preserve-3d нужен, чтобы перспектива блока фото дошла до наклона. */
+.food-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transform-style: preserve-3d;
+}
+
+.food-lift {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  max-width: 100%;
+  height: 100%;
 }
 
 /* Ценник: Yellow, Ink, Manrope 700 15px, 28px, pill */
@@ -494,17 +622,54 @@
   }
 }
 
-/* Появление плиток при скролле (DESIGN.md → Motion фаза 1): y 12→0 + opacity,
-   один раз. Скрываются только те, что ниже экрана, и только когда есть JS. */
-[data-reveal-ready] [data-reveal]:not([data-visible]) {
+/* Появление карточек блюд при прокрутке (DESIGN.md → Motion фаза 1): фото
+   выезжает снизу и проявляется, тень догоняет его чуть позже и разъезжается
+   из сжатой. Один раз на карточку. Скрываются только те, что ниже экрана, и
+   только когда есть JS (data-reveal-ready ставит RevealGrid).
+
+   Двигаются только фото и тень — название, состав и цена стоят на месте:
+   так в эталонном демо docs/motion/produse-demo.html, и так текст не пляшет.
+   data-instant — карточка доехала, пока страница сама ехала к категории:
+   такие показываем без анимации, иначе меню моргает на каждом чипе. */
+[data-reveal-ready] [data-reveal]:not([data-visible]) .food-reveal {
   opacity: 0;
-  transform: translateY(12px);
+  transform: var(--pv-photo-from);
 }
 
-[data-reveal] {
+[data-reveal-ready] [data-reveal]:not([data-visible]) .food-shadow {
+  opacity: 0;
+  transform: var(--pv-shadow-from);
+}
+
+.food-reveal,
+.food-shadow {
   transition:
-    opacity var(--dur-base) var(--ease-out),
-    transform var(--dur-base) var(--ease-out);
+    opacity var(--pv-dur) var(--ease-reveal),
+    transform var(--pv-dur) var(--ease-reveal);
+  transition-delay: var(--pv-delay, 0ms);
+}
+
+.food-shadow {
+  transition-delay: calc(var(--pv-delay, 0ms) + var(--pv-shadow-delay));
+}
+
+[data-reveal][data-instant] .food-reveal,
+[data-reveal][data-instant] .food-shadow {
+  transition: none;
+}
+
+/* «Уменьшить движение»: остаётся только проявление, 180 мс, без сдвигов */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal-ready] [data-reveal]:not([data-visible]) .food-reveal,
+  [data-reveal-ready] [data-reveal]:not([data-visible]) .food-shadow {
+    transform: none;
+  }
+
+  .food-reveal,
+  .food-shadow {
+    transition-duration: 180ms;
+    transition-delay: 0ms;
+  }
 }
 
 @keyframes confirm-pop {

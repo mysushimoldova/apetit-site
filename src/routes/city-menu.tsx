@@ -104,7 +104,7 @@ export async function CityMenuPage({
         <SiteHeader city={city} locale={locale} t={t} cart />
         <CategoryChips items={chips} label={t.header.categories} />
 
-        <main className="page pt-4">
+        <main className="page menu-main pt-4">
           {/* Заголовок страницы для скринридеров: бренд + город, без нового текста */}
           <h1 className="sr-only" translate="no">
             Apetit {city.name}

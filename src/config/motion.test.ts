@@ -8,8 +8,10 @@ import {
 import {
   asColor,
   asPageBackground,
+  asRevealType,
   motionConfig,
   pageBackground,
+  productsConfig,
 } from "./motion";
 
 const raw = JSON.parse(
@@ -42,6 +44,78 @@ describe("src/config/motion.json", () => {
     ]);
     expect(raw.background.mode).toBe("live");
     expect(raw.background.color).toBe("ash");
+  });
+
+  // Карточки блюд: тень, появление, подъём при прокрутке (задача 14).
+  // Числа Амян тоже подбирает в панели, поэтому сторожим набор полей и то,
+  // что решено архитектором: эффект включён, появление — «выезжает».
+  it("набор настроек карточек тот же", () => {
+    expect(Object.keys(raw.products).sort()).toEqual([
+      "lift",
+      "reveal",
+      "shadow",
+    ]);
+    expect(Object.keys(raw.products.shadow).sort()).toEqual([
+      "aa",
+      "ab",
+      "ah",
+      "aw",
+      "ca",
+      "cb",
+      "ch",
+      "cw",
+      "tint",
+      "y",
+    ]);
+    expect(Object.keys(raw.products.reveal).sort()).toEqual([
+      "dist",
+      "dur",
+      "shadowDelay",
+      "stagger",
+      "type",
+    ]);
+    expect(Object.keys(raw.products.lift).sort()).toEqual([
+      "amt",
+      "enabled",
+      "grow",
+      "rise",
+      "sensitivity",
+      "settle",
+      "shadowReact",
+      "smooth",
+      "tilt",
+    ]);
+    expect(raw.products.reveal.type).toBe("lift");
+    expect(raw.products.lift.enabled).toBe(true);
+    expect(productsConfig).toEqual(raw.products);
+  });
+
+  it("вид появления — один из трёх", () => {
+    for (const type of ["lift", "scale", "none"]) {
+      expect(asRevealType(type)).toBe(type);
+    }
+    expect(asRevealType("кувырком")).toBe("lift");
+  });
+
+  it("настройки карточек вне границ схему не проходят", () => {
+    const badBlur = {
+      ...raw,
+      products: {
+        ...raw.products,
+        shadow: { ...raw.products.shadow, ab: 999 },
+      },
+    };
+    expect(motionConfigSchema.safeParse(badBlur).success).toBe(false);
+    const badType = {
+      ...raw,
+      products: {
+        ...raw.products,
+        reveal: { ...raw.products.reveal, type: "кувырок" },
+      },
+    };
+    expect(motionConfigSchema.safeParse(badType).success).toBe(false);
+    const noProducts = { background: raw.background, page: raw.page };
+    expect(motionConfigSchema.safeParse(noProducts).success).toBe(false);
   });
 
   it("цвет фона страницы — один из четырёх вариантов", () => {

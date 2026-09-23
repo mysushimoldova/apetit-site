@@ -12,6 +12,8 @@ import type {
   MotionConfig,
   PageBackground,
   PageSettings,
+  ProductRevealSettings,
+  ProductsSettings,
 } from "@/motion/config-schema";
 import raw from "./motion.json";
 
@@ -29,17 +31,32 @@ export function asPageBackground(value: string): PageBackground {
     : "#F7F2EA";
 }
 
+export function asRevealType(value: string): ProductRevealSettings["type"] {
+  return value === "scale" || value === "none" ? value : "lift";
+}
+
 const background: BackgroundSettings = {
   ...raw.background,
   mode: raw.background.mode === "static" ? "static" : "live",
   color: asColor(raw.background.color),
 };
 
+const products: ProductsSettings = {
+  ...raw.products,
+  reveal: {
+    ...raw.products.reveal,
+    type: asRevealType(raw.products.reveal.type),
+  },
+};
+
 const page: PageSettings = {
   background: asPageBackground(raw.page.background),
 };
 
-export const motionConfig: MotionConfig = { background, page };
+export const motionConfig: MotionConfig = { background, products, page };
+
+/** Настройки карточек блюд — тень, появление, подъём при прокрутке. */
+export const productsConfig = products;
 
 /** Цвет фона страницы — отдельно: его берут корневые layout и <meta
  *  name="theme-color"> (src/routes/root.tsx). */
