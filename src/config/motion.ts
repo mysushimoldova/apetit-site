@@ -37,7 +37,7 @@ export function asRevealType(value: string): ProductRevealSettings["type"] {
 }
 
 export function asSplashExit(value: string): SplashSettings["exit"] {
-  return value === "fade" || value === "zoom" ? value : "lift";
+  return value === "lift" || value === "zoom" ? value : "fade";
 }
 
 const background: BackgroundSettings = {

@@ -1,253 +1,220 @@
-<!-- ЭТАЛОН ПОВЕДЕНИЯ ЗАСТАВКИ КАТЕГОРИИ (splash) — меню Apetit. Версия 24.09.2026.
-     Это тот же файл, что хозяин смотрел в чате Claude («Ecran de categorie»), без вшитых медиа.
-     Видео подключены по относительным путям: ../../public/splash/<slug>.mp4 (объект VIDS внизу).
-     Открывать напрямую как файл смысла нет: браузер не отдаёт file://-видео в WebGL; живьём
-     заставку смотрят в чате Claude или уже на сайте после внедрения.
+<!-- ЭТАЛОН ЗАСТАВКИ КАТЕГОРИИ — версия 24.09.2026, вечер. Значения подобраны хозяином (объект S ниже),
+     они же — значения по умолчанию для motion.json → splash. Одно блюдо на категорию (two=false), всегда.
 
-     Логика — в <script> внизу: playSplash / endSplash / keyFrame / switchNext / layout.
-     Формат ролика: h264, 60 к/с, 1.5 с, 90 кадров; кадр = цвет сверху + маска снизу (высота двойная).
-     Маска считана нейросетью заранее (scripts/splash-video/make.py), фон и тень убраны,
-     внутри силуэта продукт сплошной, разгон-замедление вшиты, все ролики крутятся в одну сторону.
-     В цветной половине внизу слева два квадрата 16×16: чёрный (x 0..16) и белый (x 16..32) —
-     эталоны: шейдер (KFS) читает их texelFetch-ом и растягивает диапазон, потому что часть
-     браузеров отдаёт видео в WebGL сжатым (16..235). По маске — smoothstep(0.12, 0.94):
-     отсекает шум сжатия вокруг продукта.
-     Смена блюда (если их 2) — НЕ растворение (оно даёт просвечивание там, где силуэты не
-     совпадают), а непрозрачная подмена: второе поверх первого, первое уменьшается, второе растёт.
-     Тени под блюдом НЕТ — ни в видео, ни нарисованной. Значения по умолчанию — объект S. -->
+     РОЛИКИ public/splash/<slug>.mp4: 60 к/с, ровно 1.0 с (60 кадров), h264. Кадр = цвет сверху + маска снизу
+     (высота файла двойная). КРИВАЯ ПОВОРОТА УЖЕ ВШИТА В ФАЙЛ (плавный старт 0.8, замедление 0.15, кадры 0→89):
+     на сайте ролик просто играет с playbackRate = 1000 / hold (при hold=1000 — ровно 1x). Никакой перемотки и
+     подгонки скорости на лету — это и есть отличие от этой страницы, где кривая считалась в JS ради подбора.
+
+     ЧТО СЧИТАЕТСЯ В JS НА САЙТЕ каждый кадр (p = прошедшее время / hold, 0..1):
+       ease(p)  = (1-(1-p)^b)^a,  a = 1+2.2*start, b = 1+2.6*soft            — кривая блюда (start=0.8, soft=0.15)
+       размер блюда  z = z0 + (z1-z0)*ease(p)          (1.32 → 0.96, transform: scale)
+       высота блюда  y = y0 + (y1-y0)*ease(p)          (20px → 10px, transform: translateY)
+       easeD(q) = та же формула с dstart=1, dsoft=0.15; q = max(0,(p-ddelay)/(1-ddelay)), ddelay=0.20
+       круг     d = d0 + (d1-d0)*easeD(q)              (0.54 → 0.12 ширины экрана; круг рисуется базой 1.4*ширины
+                                                        и масштабируется transform: scale(d/1.4) — без layout)
+       слово: translateY(wordY=-220px), поверх блюда, статично.
+     ПОЯВЛЕНИЕ fin=400 мс: круг/слово/блюдо по opacity, кривая входа cubic-bezier(.22,1,.36,1); блюдо с первого кадра.
+     УХОД exit="fade", fout=500 мс: вся заставка по opacity (без сдвига), кривая ухода cubic-bezier(.32,.72,0,1).
+     Прерывание касанием → сразу уход.
+
+     ШЕЙДЕР (KFS): цвет из верхней половины, маска из нижней; калибровка lo/hi — ОДИН РАЗ на ролик пре-проходом
+     (CFS: среднее по 10×10 внутри чёрного и белого эталонов внизу слева цветной половины), не каждый кадр —
+     иначе сжатие даёт мерцание яркости. Маска: smoothstep(0.12, 0.94). Вывод премультиплицированный.
+
+     Открывать этот файл напрямую смысла нет (file://-видео не идёт в WebGL); живьём — в чате Claude или на сайте. -->
 <!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
-<title>Ecran de categorie</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=Manrope:wght@600;700&family=Montserrat:wght@400;500&display=swap">
+<title>Reglaj Kebab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=Manrope:wght@600;700;800&family=Montserrat:wght@400;500&display=swap">
 <style>
 :root{
-  --cream:#F7F2EA; --milk:#FFFDFA; --sand:#EAE2D5; --yellow:#FFBC0D;
-  --ink:#1A1714; --charcoal:#3D3733; --smoke:#6B625B; --ash:#A79E95;
-  --display:"Oswald",Impact,sans-serif;
-  --ui:"Manrope","Segoe UI",sans-serif;
-  --body:"Montserrat","Segoe UI",sans-serif;
+  --cream:#F7F2EA; --milk:#FFFDFA; --yellow:#FFBC0D; --ink:#1A1714; --charcoal:#3D3733;
+  --smoke:#6B625B; --ash:#A79E95; --line:rgba(26,23,20,.14);
+  --display:"Oswald",Impact,sans-serif; --ui:"Manrope","Segoe UI",sans-serif; --body:"Montserrat","Segoe UI",sans-serif;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--body);
-     -webkit-font-smoothing:antialiased}
-.wrap{max-width:1180px;margin:0 auto;padding-block:24px 56px;padding-left:16px;padding-right:16px}
-h1{font-family:var(--display);font-weight:600;text-transform:uppercase;
-   font-size:clamp(28px,6vw,44px);line-height:1;margin:0 0 6px}
-.lead{font-size:14px;color:var(--charcoal);max-width:58ch;line-height:1.55;margin:0 0 24px}
-.cols{display:grid;grid-template-columns:1fr;gap:28px}
-@media(min-width:900px){.cols{grid-template-columns:340px 1fr;align-items:start}}
-
-.panel{background:var(--milk);border:1px solid var(--ink);border-radius:16px;padding:18px}
-.ctl{margin-bottom:16px}
-.ctl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
-.ctl-name{font-family:var(--ui);font-weight:600;font-size:13px}
-.ctl-val{font-family:var(--ui);font-weight:700;font-size:13px;color:var(--charcoal);
-         font-variant-numeric:tabular-nums}
-input[type=range]{width:100%;accent-color:var(--yellow);height:22px}
-.row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--charcoal);margin:12px 0}
-.row input{accent-color:var(--yellow);width:18px;height:18px}
-.btn{width:100%;height:46px;border:0;border-radius:9999px;background:var(--yellow);color:var(--ink);
-     font-family:var(--ui);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px}
-.btn.ghost{background:transparent;border:1px solid var(--ink);height:40px;font-weight:600;font-size:14px}
-.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.out{font-family:var(--ui);font-size:12px;color:var(--smoke);word-break:break-all;min-height:1.3em}
-.note{font-size:12px;color:var(--smoke);line-height:1.5;margin-top:14px}
-.segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-.seg{font-family:var(--ui);font-weight:600;font-size:12px;padding:9px 4px;border:1px solid var(--ink);
-     border-radius:9999px;background:transparent;color:var(--ink);cursor:pointer;line-height:1.2}
-.seg[aria-pressed="true"]{background:var(--ink);color:var(--cream)}
-
-.stage{display:flex;flex-direction:column;align-items:center;gap:12px}
-.phone{width:100%;max-width:390px;height:min(76vh,720px);position:relative;overflow:hidden;
-       border:1px solid var(--ink);border-radius:24px;background:var(--cream)}
+html{scroll-behavior:auto}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:14px 16px 80px}
+.top{display:flex;align-items:baseline;gap:16px;margin-bottom:10px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:28px;line-height:1;margin:0}
+.lead{font-size:12.5px;color:var(--charcoal);line-height:1.5;margin:0;max-width:70ch}
+.cols{display:grid;grid-template-columns:1fr;gap:20px}
+@media(min-width:900px){.cols{grid-template-columns:420px 1fr;align-items:start}}
+.stage{position:sticky;top:12px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.phone{width:390px;max-width:100%;height:min(720px,calc(100vh - 90px));position:relative;overflow:hidden;border:1px solid var(--ink);border-radius:26px;background:var(--cream)}
 .scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden}
-.hdr{position:sticky;top:0;z-index:4;height:52px;display:flex;align-items:center;
-     justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--ink);
-     background:rgba(247,242,234,.8);backdrop-filter:blur(16px) saturate(130%);
-     -webkit-backdrop-filter:blur(16px) saturate(130%)}
+.hdr{position:sticky;top:0;z-index:4;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line);background:rgba(247,242,234,.82);backdrop-filter:blur(16px)}
 .logo{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.06em}
 .hdr-r{font-family:var(--ui);font-weight:600;font-size:13px;color:var(--smoke)}
-.chips{position:sticky;top:52px;z-index:4;display:flex;gap:8px;padding:10px 16px;overflow-x:auto;
-       scrollbar-width:none;background:rgba(247,242,234,.8);backdrop-filter:blur(16px) saturate(130%);
-       -webkit-backdrop-filter:blur(16px) saturate(130%)}
+.chips{position:sticky;top:52px;z-index:4;display:flex;gap:8px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;background:rgba(247,242,234,.82);backdrop-filter:blur(16px)}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;height:34px;display:flex;align-items:center;padding:0 14px;border:1px solid var(--ink);
-      border-radius:9999px;font-family:var(--ui);font-weight:600;font-size:14px;white-space:nowrap;
-      background:transparent;color:var(--ink);cursor:pointer}
+.chip{flex:0 0 auto;height:34px;display:flex;align-items:center;padding:0 14px;border:1px solid var(--ink);border-radius:9999px;font-family:var(--ui);font-weight:600;font-size:14px;white-space:nowrap;background:transparent;color:var(--ink);cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--cream)}
-
 .sec{padding:0 16px 40px}
-.rule{border-top:1px dotted rgba(26,23,20,.45);margin-top:14px}
-.billboard{font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:86px;
-           line-height:.9;margin:10px 0 0 -3px;color:transparent;-webkit-text-stroke:2px var(--ink);
-           white-space:nowrap}
+.rule{border-top:1px dotted rgba(26,23,20,.4);margin-top:14px}
+.billboard{font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:86px;line-height:.9;margin:10px 0 0 -3px;color:transparent;-webkit-text-stroke:2px var(--ink);white-space:nowrap}
 .grid{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;row-gap:26px;margin-top:6px}
 .tile img{display:block;width:100%;height:120px;object-fit:contain;margin-bottom:10px}
 .name{font-family:var(--ui);font-weight:700;font-size:16px;line-height:1.25}
 .ing{font-size:11px;line-height:1.45;color:var(--charcoal);margin-top:3px}
 .prow{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
-.price{height:26px;padding:0 10px;border-radius:9999px;background:var(--yellow);
-       font-family:var(--ui);font-weight:700;font-size:14px;display:flex;align-items:center}
-.add{width:30px;height:30px;border-radius:50%;background:var(--yellow);display:flex;
-     align-items:center;justify-content:center;font-family:var(--ui);font-weight:700;font-size:17px}
-
-/* ---------- splash ---------- */
-.splash{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
-        background:var(--cream);opacity:0;pointer-events:none}
+.price{height:26px;padding:0 10px;border-radius:9999px;background:var(--yellow);font-family:var(--ui);font-weight:700;font-size:14px;display:flex;align-items:center}
+.add{width:30px;height:30px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center;font-family:var(--ui);font-weight:700;font-size:17px}
+/* splash */
+.splash{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:var(--cream);opacity:0;pointer-events:none}
 .splash.on{pointer-events:auto}
-.splash-lines{position:absolute;inset:-660px;background-repeat:repeat;opacity:.22;
-              will-change:transform;z-index:0}
-.splash-disc{position:absolute;border-radius:50%;background:var(--yellow);
-             z-index:1;will-change:transform,opacity}
-.splash-shadow{display:none;position:absolute;border-radius:50%;z-index:2;
-               background:radial-gradient(ellipse at center, rgba(26,23,20,.22), transparent 70%);
-               will-change:transform,opacity}
-.splash-word{position:absolute;left:0;right:0;text-align:center;z-index:3;
-             font-family:var(--display);font-weight:600;text-transform:uppercase;
-             font-size:clamp(46px,17vw,86px);line-height:.9;letter-spacing:.01em;
-             color:transparent;-webkit-text-stroke:2px var(--ink);white-space:nowrap;
-             will-change:transform,opacity}
-.splash-vid{position:relative;width:78%;max-width:320px;
-            z-index:4;will-change:transform,opacity}
+.splash-lines{position:absolute;inset:-660px;background-repeat:repeat;opacity:.22;z-index:0}
+.splash-disc{position:absolute;border-radius:50%;background:var(--yellow);z-index:1;will-change:transform,opacity}
+.splash-word{position:absolute;left:0;right:0;text-align:center;z-index:3;font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:clamp(46px,17vw,86px);line-height:.9;color:transparent;-webkit-text-stroke:2px var(--ink);white-space:nowrap;will-change:transform,opacity}
+.splash-vid{position:relative;z-index:4;will-change:transform,opacity;transform-origin:50% 50%}
 .splash-vid canvas{display:block;width:100%;height:auto}
 .splash-vid video{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.skip{position:absolute;left:0;right:0;bottom:24px;text-align:center;font-size:12px;
-      color:var(--smoke);font-family:var(--ui);font-weight:600;opacity:0}
-.hint{font-size:12px;color:var(--smoke);text-align:center;max-width:390px;line-height:1.5}
+.skip{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:12px;color:var(--smoke);font-family:var(--ui);font-weight:600;opacity:0}
+.fr{position:absolute;top:14px;right:16px;z-index:9;font:700 12px var(--ui);color:var(--smoke);background:rgba(255,253,250,.85);border-radius:999px;padding:4px 10px;pointer-events:none}
+/* panel */
+.panel{background:var(--milk);border:1px solid var(--ink);border-radius:16px}
+.bar{position:sticky;top:0;z-index:5;background:var(--milk);border-bottom:1px solid var(--line);border-radius:16px 16px 0 0;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;box-shadow:0 8px 16px -12px rgba(26,23,20,.35)}
+.bar .row{grid-column:1/-1;margin:2px 0 0}
+.btn{height:42px;border:0;border-radius:9999px;background:var(--yellow);color:var(--ink);font-family:var(--ui);font-weight:800;font-size:14px;cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid var(--ink);font-weight:600}
+.btn:focus-visible,.seg:focus-visible,input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.body{padding:6px 14px 14px}
+.grp{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.grp:first-child{border-top:0;margin-top:0}
+.grp h3{font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--smoke);margin:0 0 8px}
+.two{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+.ctl{margin-bottom:8px}
+.ctl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;gap:10px}
+.ctl-name{font-family:var(--ui);font-weight:600;font-size:12px}
+.ctl-val{font-family:var(--ui);font-weight:700;font-size:12px;color:var(--charcoal);font-variant-numeric:tabular-nums;white-space:nowrap}
+input[type=range]{width:100%;accent-color:var(--yellow);height:20px;margin:0}
+.row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--charcoal);margin:6px 0}
+.row input{accent-color:var(--yellow);width:16px;height:16px}
+.segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px}
+.seg{font-family:var(--ui);font-weight:600;font-size:11.5px;padding:7px 4px;border:1px solid var(--ink);border-radius:9999px;background:transparent;color:var(--ink);cursor:pointer;line-height:1.2}
+.seg[aria-pressed="true"]{background:var(--ink);color:var(--cream)}
+.out{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;line-height:1.45;color:var(--smoke);word-break:break-all;background:rgba(26,23,20,.04);border-radius:8px;padding:7px;user-select:all;grid-column:1/-1}
+.note{font-size:11px;color:var(--smoke);line-height:1.45;margin:2px 0 6px}
+.frames{display:flex;gap:3px;margin:4px 0 4px;border-radius:6px}
+.frames canvas{flex:1 1 0;min-width:0;height:50px;background:#fff;cursor:pointer;border-radius:4px}
+.frames canvas[data-on="1"]{outline:2px solid var(--yellow);outline-offset:-2px}
 </style>
 
 <div class="wrap">
-  <h1>Ecran de categorie</h1>
-  <p class="lead">Теперь с твоими настоящими видео: нажимай любую категорию внутри
-    телефона — играет заставка с двумя блюдами этой категории, потом открывается меню.
-    Крути ползунки, выбирай, «Копировать значения».</p>
+  <div class="top"><h1>Reglaj Kebab</h1>
+    <p class="lead">Телефон не уезжает при прокрутке, кнопки всегда сверху. Любое изменение сразу проигрывается — смотри и крути.</p></div>
 
   <div class="cols">
-    <div class="panel">
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="hold">Длительность всей заставки</label>
-          <span class="ctl-val" id="v-hold">1500 мс</span></div>
-        <input type="range" id="hold" min="300" max="3500" step="50" value="1500">
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="zoom">Размер блюда</label>
-          <span class="ctl-val" id="v-zoom">0.83</span></div>
-        <input type="range" id="zoom" min="0.45" max="1" step="0.02" value="0.83">
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="wordY">Слово выше / ниже</label>
-          <span class="ctl-val" id="v-wordY">-5</span></div>
-        <input type="range" id="wordY" min="-220" max="220" step="5" value="-5">
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="fade">Появление и уход</label>
-          <span class="ctl-val" id="v-fade">200 мс</span></div>
-        <input type="range" id="fade" min="120" max="700" step="20" value="200">
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><span class="ctl-name">Уход заставки</span></div>
-        <div class="segs" role="group" aria-label="Уход">
-          <button class="seg" id="x-fade" aria-pressed="false">Затухание</button>
-          <button class="seg" id="x-lift" aria-pressed="true">Шторка вверх</button>
-          <button class="seg" id="x-zoom" aria-pressed="false">Уезжает в меню</button>
-        </div>
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="discSize">Жёлтый круг</label>
-          <span class="ctl-val" id="v-discSize">0.62</span></div>
-        <input type="range" id="discSize" min="0" max="1.1" step="0.02" value="0.62">
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="linesOp">Линии на заставке</label>
-          <span class="ctl-val" id="v-linesOp">0.35</span></div>
-        <input type="range" id="linesOp" min="0" max="0.6" step="0.02" value="0.35">
-      </div>
-
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="count">Сколько блюд подряд</label>
-          <span class="ctl-val" id="v-count">1</span></div>
-        <input type="range" id="count" min="1" max="2" step="1" value="1">
-      </div>
-      <div class="ctl">
-        <div class="ctl-top"><label class="ctl-name" for="xfade">Смена блюда (если их 2)</label>
-          <span class="ctl-val" id="v-xfade">180 мс</span></div>
-        <input type="range" id="xfade" min="60" max="500" step="20" value="180">
-      </div>
-      <div class="ctl" hidden>
-        <input type="range" id="slow" min="0" max="1" step="0.05" value="0.8"><span id="v-slow"></span>
-      </div>
-      <label class="row"><input type="checkbox" id="wordTop" checked> Слово поверх блюда</label>
-      <label class="row"><input type="checkbox" id="word" checked> Показывать слово категории</label>
-      <label class="row"><input type="checkbox" id="skip" checked> Можно прервать касанием</label>
-      <label class="row"><input type="checkbox" id="reduce"> Проверить «уменьшить движение»</label>
-
-      <button class="btn" id="play">Проиграть заставку</button>
-      <button class="btn ghost" id="copy">Копировать значения</button>
-      <div class="out" id="out"></div>
-
-      <p class="note">17 твоих роликов: фон и тень убраны по контуру, тени под блюдом нет,
-        все крутятся в одну сторону, разгон и замедление вшиты, 60 кадров/с. По умолчанию одно
-        блюдо на категорию; при «2» второе сменяет первое без просвечивания. Пиццы нет
-        (делаем из фото), Menu и Crispy — без видео.</p>
-    </div>
-
     <div class="stage">
       <div class="phone">
         <div class="scroller" id="scroller">
-          <header class="hdr">
-            <div class="logo">APETIT</div>
-            <div class="hdr-r">Soroca · RO</div>
-          </header>
-          <nav class="chips" id="chips"></nav>
-          <section class="sec">
-            <div class="rule"></div>
-            <h2 class="billboard" id="bb">Kebab</h2>
-            <div class="grid" id="grid"></div>
-          </section>
+          <header class="hdr"><div class="logo">APETIT</div><div class="hdr-r">Soroca · RO</div></header>
+          <nav class="chips"><button class="chip" id="c-kebab" aria-pressed="true">Kebab</button><button class="chip" id="c-other" aria-pressed="false">Burgers</button></nav>
+          <section class="sec"><div class="rule"></div><h2 class="billboard">Kebab</h2><div class="grid" id="grid"></div></section>
         </div>
-
         <div class="splash" id="splash">
           <i class="splash-lines" id="lines"></i>
           <i class="splash-disc" id="disc"></i>
-          <i class="splash-shadow" id="shadow"></i>
-          <div class="splash-word" id="sword">Burgers</div>
-          <div class="splash-vid" id="svid">
-            <canvas id="cv"></canvas>
-          </div>
+          <div class="splash-word" id="sword">Kebab</div>
+          <div class="splash-vid" id="svid"><canvas id="cv"></canvas></div>
           <div class="skip" id="skiphint">atinge pentru a sări</div>
+          <div class="fr" id="fr"></div>
         </div>
       </div>
-      <p class="hint">Заставка играет каждый раз при выборе категории. Касание — и она уходит сразу.</p>
+    </div>
+
+    <div class="panel">
+      <div class="bar">
+        <button class="btn" id="play">▶ Проиграть</button>
+        <button class="btn ghost" id="copy">Скопировать значения</button>
+        <label class="row"><input type="checkbox" id="auto" checked> Проигрывать при каждом изменении</label>
+        <div class="out" id="out"></div>
+      </div>
+      <div class="body">
+
+      <div class="grp">
+        <h3>Прокрутить вручную</h3>
+        <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="scrub">Момент времени</label><span class="ctl-val" id="v-scrub">0 %</span></div>
+          <input type="range" id="scrub" min="0" max="100" step="0.5" value="0"></div>
+        <p class="note">Тяни медленно: видно разгон, замедление, уменьшение и смену блюда. В углу телефона — кадр и процент.</p>
+      </div>
+
+      <div class="grp">
+        <h3>Кадры — с какого угла и до какого</h3>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="f0">Первый кадр</label><span class="ctl-val" id="v-f0">0</span></div><input type="range" id="f0" min="0" max="80" step="1" value="0"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="f1">Последний кадр</label><span class="ctl-val" id="v-f1">89</span></div><input type="range" id="f1" min="9" max="89" step="1" value="89"></div>
+        </div>
+        <div class="frames" id="strip"></div>
+        <div class="segs"><button class="seg" id="show0" aria-pressed="true">Показать первый</button><button class="seg" id="showMid">Середину</button><button class="seg" id="show1">Показать последний</button></div>
+      </div>
+
+      <div class="grp">
+        <h3>Размер — в начале большой, в конце меньше</h3>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="z0">Размер в начале</label><span class="ctl-val" id="v-z0">1.10</span></div><input type="range" id="z0" min="0.4" max="1.6" step="0.01" value="1.10"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="z1">Размер в конце</label><span class="ctl-val" id="v-z1">0.80</span></div><input type="range" id="z1" min="0.4" max="1.6" step="0.01" value="0.80"></div>
+        </div>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="y0">Высота в начале</label><span class="ctl-val" id="v-y0">0</span></div><input type="range" id="y0" min="-160" max="160" step="2" value="0"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="y1">Высота в конце</label><span class="ctl-val" id="v-y1">0</span></div><input type="range" id="y1" min="-160" max="160" step="2" value="0"></div>
+        </div>
+        <p class="note">Размер и высота меняются по той же кривой, что и поворот — всё едет как одно движение.</p>
+      </div>
+
+      <div class="grp">
+        <h3>Время и мягкость</h3>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="hold">Длительность</label><span class="ctl-val" id="v-hold">1500 мс</span></div><input type="range" id="hold" min="400" max="4000" step="50" value="1500"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="soft">Замедление к концу</label><span class="ctl-val" id="v-soft">0.60</span></div><input type="range" id="soft" min="0" max="1" step="0.05" value="0.6"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="start">Плавный старт</label><span class="ctl-val" id="v-start">0.25</span></div><input type="range" id="start" min="0" max="1" step="0.05" value="0.25"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="fin">Появление</label><span class="ctl-val" id="v-fin">200 мс</span></div><input type="range" id="fin" min="0" max="600" step="20" value="200"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="fout">Уход</label><span class="ctl-val" id="v-fout">320 мс</span></div><input type="range" id="fout" min="120" max="900" step="20" value="320"></div>
+        </div>
+        <div class="segs"><button class="seg" id="x-fade">Уход: затухание</button><button class="seg" id="x-lift" aria-pressed="true">Уход: шторка вверх</button><button class="seg" id="x-zoom">Уход: в меню</button></div>
+      </div>
+
+      <div class="grp">
+        <h3>Второе блюдо</h3>
+        <label class="row"><input type="checkbox" id="two"> Показывать два блюда (Kebab XL → Kebab Cheese)</label>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="swapAt">Когда меняется</label><span class="ctl-val" id="v-swapAt">50 %</span></div><input type="range" id="swapAt" min="15" max="85" step="5" value="50"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="swapMs">Сколько длится смена</label><span class="ctl-val" id="v-swapMs">240 мс</span></div><input type="range" id="swapMs" min="80" max="800" step="20" value="240"></div>
+        </div>
+        <div class="segs"><button class="seg" id="s-swap" aria-pressed="true">Подмена</button><button class="seg" id="s-scale">Масштабом</button><button class="seg" id="s-fade">Растворение</button></div>
+      </div>
+
+      <div class="grp">
+        <h3>Жёлтый круг — большой в начале, меньше в конце, свой разгон</h3>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="d0">Круг в начале</label><span class="ctl-val" id="v-d0">0.80</span></div><input type="range" id="d0" min="0" max="1.4" step="0.01" value="0.80"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="d1">Круг в конце</label><span class="ctl-val" id="v-d1">0.58</span></div><input type="range" id="d1" min="0" max="1.4" step="0.01" value="0.58"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="dsoft">Круг: замедление к концу</label><span class="ctl-val" id="v-dsoft">0.70</span></div><input type="range" id="dsoft" min="0" max="1" step="0.05" value="0.7"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="dstart">Круг: плавный старт</label><span class="ctl-val" id="v-dstart">0.20</span></div><input type="range" id="dstart" min="0" max="1" step="0.05" value="0.2"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="ddelay">Круг: начинает позже</label><span class="ctl-val" id="v-ddelay">0 %</span></div><input type="range" id="ddelay" min="0" max="60" step="5" value="0"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="discY">Круг выше / ниже</label><span class="ctl-val" id="v-discY">0</span></div><input type="range" id="discY" min="-160" max="160" step="2" value="0"></div>
+        </div>
+        <p class="note">Круг едет по своей кривой, независимо от блюда — можно сделать, чтобы он «сжимался» раньше или позже блюда.</p>
+      </div>
+
+      <div class="grp">
+        <h3>Сцена</h3>
+        <div class="two">
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="wordY">Слово выше / ниже</label><span class="ctl-val" id="v-wordY">-5</span></div><input type="range" id="wordY" min="-220" max="220" step="5" value="-5"></div>
+          <div class="ctl"><div class="ctl-top"><label class="ctl-name" for="lines">Линии</label><span class="ctl-val" id="v-lines">0.35</span></div><input type="range" id="lines" min="0" max="0.7" step="0.02" value="0.35"></div>
+        </div>
+        <label class="row"><input type="checkbox" id="wordTop" checked> Слово поверх блюда</label>
+        <label class="row"><input type="checkbox" id="word" checked> Показывать слово</label>
+        <label class="row"><input type="checkbox" id="skip" checked> Можно прервать касанием</label>
+      </div>
+
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-const PATHS = "".split("|");
-const S = { hold: 1500, zoom: 0.83, wordY: -5, fade: 200, word: true, skip: true, reduce: false,
-            exit: "lift", discSize: 0.62, linesOp: 0.35, shadowOn: false, slow: 0.8, wordTop: true, count: 1, xfade: 180 };
-const $ = id => document.getElementById(id);
-const splash = $("splash"), sword = $("sword"), svid = $("svid"),
-      lines = $("lines"), skiphint = $("skiphint"), bb = $("bb"), scroller = $("scroller"),
-      disc = $("disc"), shadow = $("shadow");
-
-/* фон из тех же линий, что на сайте */
-(function(){
-  const d = PATHS.map(p => '<path d="M' + p + '"/>').join("");
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">'
-    + '<g fill="none" stroke="#A79E95" stroke-width="2.4" stroke-linecap="round">' + d + '</g></svg>';
-  lines.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
-  lines.style.backgroundSize = "620px 620px";
-})();
-
-let timers = [], running = false, lineT = 0, raf = 0, rateStart = 0;
-
-/* ---- ролики: 17 настоящих, по два на категорию ---- */
 const VIDS = {
  "brinzoaice": "../../public/splash/brinzoaice.mp4",
  "cheeseburger-dublu-vita": "../../public/splash/cheeseburger-dublu-vita.mp4",
@@ -267,301 +234,222 @@ const VIDS = {
  "supa-bostan": "../../public/splash/supa-bostan.mp4",
  "supa-spanac": "../../public/splash/supa-spanac.mp4"
 };
-const CATS = [
-  ["kebab","Kebab",["kebab-xl-xxl","kebab-cheese"],[["Kebab XL / XXL","lipie, maioneză, salată, roșii…","114 lei"],["Kebab Cheese","lipie, cașcaval, maioneză…","105 lei"]]],
-  ["burgers","Burgers",["cheeseburger-dublu-vita","hamburger-dublu-vita"],[["Cheeseburger Dublu","chiflă, carne, cașcaval, sos…","85 lei"],["Hamburger Dublu","chiflă, carne, sos, salată…","79 lei"]]],
-  ["gozleme","Gözleme",["gozleme-carne","gozleme-mozzarella"],[["Gözleme Carne de Pui","tortilla, sos, mozzarella, pui…","69 lei"],["Gözleme Mozzarella","tortilla, sos, mozzarella…","59 lei"]]],
-  ["sandwich","Sandwich",["sandwich-salam","sandwich-sunca"],[["Sandwich cu salam","chiflă, salam, salată…","45 lei"],["Sandwich cu șuncă","chiflă, șuncă, salată…","45 lei"]]],
-  ["salad","Salad",["salata-cezar","salata-greceasca"],[["Salată Cezar","pui crispy, parmezan, roșii…","75 lei"],["Salată Grecească","roșii, castraveți, feta, măsline…","69 lei"]]],
-  ["supe","Supe",["supa-bostan","supa-spanac"],[["Supă de bostan","bostan, brânză, semințe","39 lei"],["Supă de spanac","spanac, crutoane, parmezan","39 lei"]]],
-  ["drinks","Drinks",["cola","fanta"],[["Coca-Cola","0,5 l","22 lei"],["Fanta","0,5 l","22 lei"]]],
-  ["desert","Desert",["brinzoaice"],[["Brînzoaice","cu dulceață și smântână","35 lei"]]],
-  ["sosuri","Sosuri",["sos-ketchup","sos-usturoi"],[["Sos Ketchup","","8 lei"],["Sos de usturoi","","8 lei"]]],
+const PATHS = "".split("|");
+const IMG = "";
+const DISHES = [
+  {slug:"kebab-xl-xxl", name:"Kebab XL / XXL", ing:"lipie, maioneză, salată iceberg/varză, roșii…", price:"114 lei"},
+  {slug:"kebab-cheese", name:"Kebab Cheese",  ing:"lipie, cașcaval, maioneză, salată iceberg…", price:"105 lei"},
 ];
-let curCat = CATS[0];
-const vids = [0,1].map(() => { const v = document.createElement("video");
-  v.muted = true; v.playsInline = true; v.preload = "auto"; v.setAttribute("playsinline","");
-  v.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"; svid.appendChild(v); return v; });
-const vid = vids[0];
-function loadCat(cat){
-  cat[2].forEach((name, i) => { if (vids[i] && vids[i].dataset.name !== name){ vids[i].src = VIDS[name]; vids[i].dataset.name = name; vids[i].load(); } });
-}
-function ready(v){ return new Promise(res => { if (v.readyState >= 2) return res(); const t = setTimeout(res, 400);
-  v.addEventListener("loadeddata", () => { clearTimeout(t); res(); }, { once: true }); }); }
-let cur = 0, nxt = -1, xfT0 = 0, seq = [], seqT0 = 0;
+const $ = id => document.getElementById(id);
+const splash=$("splash"), sword=$("sword"), svid=$("svid"), lines=$("lines"), skiphint=$("skiphint"), disc=$("disc"), cv=$("cv");
+$("grid").innerHTML = DISHES.map(d=>`<article class="tile"><img src="${IMG}" alt=""><div class="name">${d.name}</div><div class="ing">${d.ing}</div><div class="prow"><span class="price">${d.price}</span><span class="add">+</span></div></article>`).join("");
 
-/* ---- убираем белый фон и смешиваем два ролика на видеокарте ---- */
-const cv = $("cv");
-let gl = null, kprog = null, tex = [], uMix = null, uFlA = null, uFlB = null, uSA = null, uSB = null, kraf = 0;
-const FLIP = [0, 0];
-const KVS = `#version 300 es
-in vec2 p; out vec2 uv; void main(){ uv = vec2(p.x*.5+.5, .5-p.y*.5); gl_Position = vec4(p,0.,1.); }`;
-const KFS = `#version 300 es
-precision mediump float; in vec2 uv; uniform sampler2D tA, tB; uniform float mixv, flA, flB, sA, sB; out vec4 o;
-vec4 key(sampler2D t, vec2 u){
-  // калибровка по эталонным квадратам в самом ролике (чёрный и белый, где маска = 0):
-  // Safari отдаёт видео в WebGL со сжатым диапазоном (16..235) — растягиваем обратно
-  ivec2 sz = textureSize(t, 0); int hh = sz.y / 2;
-  float lo = texelFetch(t, ivec2(8,  hh - 8), 0).r;
-  float hi = texelFetch(t, ivec2(24, hh - 8), 0).r;
-  float k = 1.0 / max(hi - lo, 0.25);
-  vec3 c  = clamp((texture(t, vec2(u.x, u.y * 0.5)).rgb - lo) * k, 0.0, 1.0);        // верх — цвет
-  float a = clamp((texture(t, vec2(u.x, 0.5 + u.y * 0.5)).r - lo) * k, 0.0, 1.0);    // низ — маска
-  a = smoothstep(0.12, 0.94, a);   // отсечь шум сжатия вокруг продукта
-  return vec4(c * a, a);
-}
-vec4 scaled(sampler2D t, vec2 u, float s){
-  vec2 q = (u - 0.5) / max(s, 0.001) + 0.5;
-  if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) return vec4(0.0);
-  return key(t, q);
-}
-void main(){
-  vec4 A = scaled(tA, uv, sA);
-  if (mixv <= 0.0){ o = A; return; }
-  vec4 B = scaled(tB, uv, sB);
-  o = B + A * (1.0 - B.a);           // второе блюдо поверх первого, оба непрозрачные — без просветов
-}`;
-function ksh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
-function mkTex(){ const x = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, x);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255,255,255,255])); return x; }
-function keyInit(){
-  gl = cv.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
-  if (!gl) return false;
-  kprog = gl.createProgram();
-  gl.attachShader(kprog, ksh(gl.VERTEX_SHADER, KVS)); gl.attachShader(kprog, ksh(gl.FRAGMENT_SHADER, KFS));
-  gl.linkProgram(kprog); gl.useProgram(kprog);
-  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(kprog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  tex = [mkTex(), mkTex()];
-  gl.uniform1i(gl.getUniformLocation(kprog, "tA"), 0); gl.uniform1i(gl.getUniformLocation(kprog, "tB"), 1);
-  uMix = gl.getUniformLocation(kprog, "mixv");
-  uFlA = gl.getUniformLocation(kprog, "flA"); uFlB = gl.getUniformLocation(kprog, "flB");
-  uSA = gl.getUniformLocation(kprog, "sA"); uSB = gl.getUniformLocation(kprog, "sB");
-  return true;
-}
-function upload(unit, v){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex[unit]);
-  if (v && v.readyState >= 2 && v.videoWidth) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v); }
-function keyFrame(){
-  const now = performance.now();
-  if (running && rateStart){
-    // разгон и замедление вшиты в сам ролик (1.5 с); длительность заставки только растягивает его
-    const r = Math.max(0.5, Math.min(2, 1500 / S.hold));
-    vids.forEach(v => { if (v.playbackRate !== r){ try { v.playbackRate = r; } catch(e){} } });
-    // смена блюда по расписанию
-    if (seq.length && now - seqT0 >= seq[0]){ seq.shift(); switchNext(); }
-  }
-  const a = vids[cur], b = nxt >= 0 ? vids[nxt] : null;
-  let m = 0, sA = 1, sB = 1;
-  if (b){ m = Math.min(1, (now - xfT0) / S.xfade);
-    if (m >= 1){ try { a.pause(); } catch(e){} cur = nxt; nxt = -1; m = 0; }
-    else { sA = 1 - Math.pow(m, 1.6); sB = 0.86 + 0.14 * (1 - Math.pow(1 - m, 2)); } }
-  const ref = (b && m >= 0.5) ? b : a;
-  if (ref.videoWidth && cv.width !== ref.videoWidth){ cv.width = ref.videoWidth; cv.height = ref.videoHeight / 2; requestAnimationFrame(layout); }
-  if (cv.width > 1){
-    gl.viewport(0, 0, cv.width, cv.height);
-    upload(0, nxt >= 0 ? a : a); upload(1, nxt >= 0 ? vids[nxt] : a);
-    gl.uniform1f(uMix, nxt >= 0 ? m : 0);
-    gl.uniform1f(uSA, sA); gl.uniform1f(uSB, sB);
-    gl.uniform1f(uFlA, FLIP[cur]); gl.uniform1f(uFlB, FLIP[nxt >= 0 ? nxt : cur]);
-    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-  kraf = requestAnimationFrame(keyFrame);
-}
-function switchNext(){
-  if (nxt >= 0) return;
-  const n = (cur + 1) % Math.max(1, Math.min(S.count, curCat[2].length));
-  if (n === cur) return;
-  nxt = n; xfT0 = performance.now();
-}
-function keyStart(){ if (!gl && !keyInit()) return; if (!kraf) kraf = requestAnimationFrame(keyFrame); }
-function keyStop(){ if (kraf){ cancelAnimationFrame(kraf); kraf = 0; } vids.forEach(v => { try { v.pause(); } catch(e){} }); }
+const S = {"f0": 0, "f1": 89, "z0": 1.32, "z1": 0.96, "y0": 20, "y1": 10, "hold": 1000, "soft": 0.15, "start": 0.8, "fin": 400, "fout": 500, "exit": "fade", "two": false, "swapAt": 50, "swapMs": 240, "swapMode": "swap", "d0": 0.54, "d1": 0.12, "dsoft": 0.15, "dstart": 1, "ddelay": 20, "discY": 0, "wordY": -220, "lines": 0.35, "wordTop": true, "word": true, "skip": true, "auto": true};
 
-function drift(){
-  lineT += 0.35;
-  lines.style.transform = "translate3d(" + (lineT % 620).toFixed(1) + "px," + ((lineT * .4) % 620).toFixed(1) + "px,0)";
-  raf = requestAnimationFrame(drift);
-vids[0].addEventListener("loadedmetadata", () => { cv.width = vids[0].videoWidth; cv.height = vids[0].videoHeight / 2; layout(); });
-window.addEventListener("resize", layout);
-}
-raf = requestAnimationFrame(drift);
+(function(){ const d=PATHS.map(p=>'<path d="M'+p+'"/>').join("");
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000"><g fill="none" stroke="#A79E95" stroke-width="2.4" stroke-linecap="round">'+d+'</g></svg>';
+  lines.style.backgroundImage='url("data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'")'; lines.style.backgroundSize="620px 620px"; })();
 
-function layout(){
-  const r = splash.getBoundingClientRect();
-  if (cv.width > 1){
-    const asp = cv.width / cv.height;
-    const w = Math.min(S.zoom * r.width, 0.60 * r.height * asp, 320);
-    svid.style.width = w + "px";
-  }
-  const vr = svid.getBoundingClientRect();
-  const size = Math.max(0, S.discSize) * r.width;
-  disc.style.width = disc.style.height = size + "px";
-  disc.style.left = (r.width - size) / 2 + "px";
-  disc.style.top = (vr.top - r.top + vr.height * 0.48) - size / 2 + "px";
-  disc.hidden = S.discSize <= 0.01;
+/* видео + перемотка */
+const vids = DISHES.map(d=>{ const v=document.createElement("video");
+  v.src=VIDS[d.slug]; v.muted=true; v.playsInline=true; v.preload="auto"; v.setAttribute("playsinline","");
+  v.style.cssText="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"; svid.appendChild(v); return v; });
+function ready(v){ return new Promise(r=>{ if(v.readyState>=2) return r(); const t=setTimeout(r,1500); v.addEventListener("loadeddata",()=>{clearTimeout(t);r();},{once:true}); }); }
+function seek(v,f){ const t=Math.max(0,Math.min(89,f))/60+0.0001;
+  if(v.seeking){ v._want=t; return; }
+  if(Math.abs(v.currentTime-t)>0.002){ try{ v.currentTime=t; }catch(e){} } }
+vids.forEach(v=>v.addEventListener("seeked",()=>{ if(v._want!=null){ const t=v._want; v._want=null; if(Math.abs(v.currentTime-t)>0.002) v.currentTime=t; }
+  if(!running && lastP!=null) drawState(); }));
 
-  const sw = vr.width * 0.72, sh = vr.height * 0.10;
-  shadow.style.width = sw + "px"; shadow.style.height = sh + "px";
-  shadow.style.left = (r.width - sw) / 2 + "px";
-  shadow.style.top = (vr.bottom - r.top - sh * 0.55) + "px";
-  shadow.hidden = !S.shadowOn;
-  lines.style.opacity = String(S.linesOp);
-}
+/* WebGL */
+let gl=null,prog=null,tex=[],uMix=null,uSA=null,uSB=null,raf=0; const uploaded=[null,null]; const calFor=[null,null];
+const VS=`#version 300 es
+in vec2 p; out vec2 uv; void main(){ uv=vec2(p.x*.5+.5,.5-p.y*.5); gl_Position=vec4(p,0.,1.); }`;
+const FS=`#version 300 es
+precision mediump float; in vec2 uv; uniform sampler2D tA,tB; uniform float mixv,sA,sB; uniform vec2 calA,calB; out vec4 o;
+vec4 key(sampler2D t, vec2 u, vec2 cal){ float lo=cal.x, k=1.0/max(cal.y-cal.x,0.25);
+  vec3 c=clamp((texture(t,vec2(u.x,u.y*0.5)).rgb-lo)*k,0.0,1.0);
+  float a=clamp((texture(t,vec2(u.x,0.5+u.y*0.5)).r-lo)*k,0.0,1.0); a=smoothstep(0.12,0.94,a); return vec4(c*a,a); }
+vec4 scaled(sampler2D t, vec2 u, float s, vec2 cal){ vec2 q=(u-0.5)/max(s,0.001)+0.5;
+  if(q.x<0.0||q.x>1.0||q.y<0.0||q.y>1.0) return vec4(0.0); return key(t,q,cal); }
+void main(){ vec4 A=scaled(tA,uv,sA,calA); if(mixv<=0.0){ o=A; return; } vec4 B=scaled(tB,uv,sB,calB);
+  o = mixv>=2.0 ? mix(A,B,mixv-2.0) : B + A*(1.0-B.a); }`;
+/* калибровка: один раз на ролик, усреднением по эталонным квадратам — иначе сжатие даёт мерцание яркости */
+const CFS=`#version 300 es
+precision mediump float; in vec2 uv; uniform sampler2D t; out vec4 o;
+void main(){ ivec2 sz=textureSize(t,0); int hh=sz.y/2; int x0 = uv.x<0.5 ? 3 : 19; float s=0.0;
+  for(int y=0;y<10;y++) for(int x=0;x<10;x++) s+=texelFetch(t,ivec2(x0+x,hh-13+y),0).r;
+  o=vec4(vec3(s/100.0),1.0); }`;
+function sh(t,s){ const x=gl.createShader(t); gl.shaderSource(x,s); gl.compileShader(x); return x; }
+function mkTex(){ const x=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,x);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255])); return x; }
+function glInit(){ gl=cv.getContext("webgl2",{alpha:true,premultipliedAlpha:true,antialias:false}); if(!gl) return false;
+  prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS)); gl.linkProgram(prog); gl.useProgram(prog);
+  const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,"p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  tex=[mkTex(),mkTex()]; gl.uniform1i(gl.getUniformLocation(prog,"tA"),0); gl.uniform1i(gl.getUniformLocation(prog,"tB"),1);
+  uMix=gl.getUniformLocation(prog,"mixv"); uSA=gl.getUniformLocation(prog,"sA"); uSB=gl.getUniformLocation(prog,"sB");
+  uCalA=gl.getUniformLocation(prog,"calA"); uCalB=gl.getUniformLocation(prog,"calB");
+  cprog=gl.createProgram(); gl.attachShader(cprog,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(cprog,sh(gl.FRAGMENT_SHADER,CFS)); gl.linkProgram(cprog);
+  cfb=gl.createFramebuffer(); ctex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,ctex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,2,1,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,cfb); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,ctex,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  return true; }
+let cprog=null,cfb=null,ctex=null,uCalA=null,uCalB=null; const cal=[[0,1],[0,1]], calDone=[false,false];
+function calibrate(unit){ // читает средние значения чёрного и белого эталонов из уже загруженной текстуры
+  gl.useProgram(cprog); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,tex[unit]);
+  gl.uniform1i(gl.getUniformLocation(cprog,"t"),unit);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,cfb); gl.viewport(0,0,2,1); gl.drawArrays(gl.TRIANGLES,0,3);
+  const px=new Uint8Array(8); gl.readPixels(0,0,2,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.useProgram(prog);
+  const lo=px[0]/255, hi=px[4]/255; if(hi-lo>0.3){ cal[unit]=[lo,hi]; calDone[unit]=true; } }
+function up(unit,v){ gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,tex[unit]);
+  if(v&&v.videoWidth&&v.readyState>=2&&!v.seeking){ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,v); uploaded[unit]=v;
+    if(calFor[unit]!==v){ calibrate(unit); if(calDone[unit]) calFor[unit]=v; }
+    return true; }
+  return uploaded[unit]===v; }
+function draw(a,b,m,sa,sb){ if(!gl&&!glInit()) return;
+  if(a.videoWidth && cv.width!==a.videoWidth){ cv.width=a.videoWidth; cv.height=a.videoHeight/2; layout(); }
+  if(cv.width<2) return;
+  const ok=up(0,a); up(1,b||a); if(!ok) return;
+  gl.viewport(0,0,cv.width,cv.height);
+  gl.uniform1f(uMix,m); gl.uniform1f(uSA,sa); gl.uniform1f(uSB,sb);
+  gl.uniform2f(uCalA,cal[0][0],cal[0][1]); gl.uniform2f(uCalB,cal[1][0],cal[1][1]);
+  gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES,0,3); }
 
-function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
-function after(ms, fn){ timers.push(setTimeout(fn, ms)); }
+/* размещение: базовая ширина 1.0 = вписать в экран; масштаб задаётся JS */
+let baseW=300;
+function layout(){ const r=splash.getBoundingClientRect();
+  if(cv.width>1){ const asp=cv.width/cv.height; baseW=Math.min(r.width*0.9, 0.6*r.height*asp); svid.style.width=baseW+"px"; }
+  const size=1.4*r.width; disc.style.width=disc.style.height=size+"px";
+  disc.style.left=(r.width-size)/2+"px"; disc.style.top=(r.height-size)/2+S.discY+"px"; disc.hidden=Math.max(S.d0,S.d1)<=0.01;
+  disc.style.transform=`scale(${(discAt(lastP==null?0:lastP)/1.4).toFixed(4)})`;
+  lines.style.opacity=String(S.lines);
+  sword.style.transform=`translateY(${S.wordY}px)`; }
 
-function endSplash(){
-  if (!running) return;
-  running = false;
-  clearTimers();
-  const f = S.reduce ? 0 : Math.max(180, S.fade * 1.6);
-  const E = "cubic-bezier(.65,0,.35,1)";
-  splash.classList.remove("on");
-  skiphint.style.opacity = "0";
+/* кривая и состояние в момент p */
+const ease=p=>{ const a=1+2.2*S.start, b=1+2.6*S.soft; return Math.pow(1-Math.pow(1-p,b), a); };
+const easeD=p=>{ const a=1+2.2*S.dstart, b=1+2.6*S.dsoft; return Math.pow(1-Math.pow(1-p,b), a); };
+function discAt(p){ const d=S.ddelay/100; const q=d>=1?1:Math.max(0,Math.min(1,(p-d)/(1-d))); return S.d0+(S.d1-S.d0)*easeD(q); }
+let running=false,t0=0,timer=0,lastP=null,st={b:null,m:0,sa:1,sb:1};
+function stateAt(p){ p=Math.max(0,Math.min(1,p)); const e=ease(p);
+  const f=S.f0+(S.f1-S.f0)*e, z=S.z0+(S.z1-S.z0)*e, y=S.y0+(S.y1-S.y0)*e;
+  let m=0,sa=1,sb=1,b=null;
+  if(S.two){ const at=S.swapAt/100, q=(p-at)*S.hold/S.swapMs;
+    if(q>0){ b=vids[1];
+      if(q>=1){ m=S.swapMode==="fade"?3:1; sa=0; sb=1; }
+      else if(S.swapMode==="fade"){ m=2+q; }
+      else if(S.swapMode==="scale"){ m=1; sa=1-Math.pow(q,1.6); sb=0.86+0.14*(1-Math.pow(1-q,2)); }
+      else { m=1; sa=1-Math.pow(q,2.2); sb=1; } } }
+  return {p,f,z,y,m,sa,sb,b}; }
+function renderAt(p, live){ const s=stateAt(p); lastP=p; st=s;
+  if(!live){ seek(vids[0],s.f); if(s.b) seek(vids[1],s.f); }
+  svid.style.transform=`translateY(${s.y.toFixed(1)}px) scale(${s.z.toFixed(3)})`;
+  disc.style.transform=`scale(${(discAt(s.p)/1.4).toFixed(4)})`;
+  draw(vids[0],s.b,s.m,s.sa,s.sb);
+  const shown=live? vids[0].currentTime*60 : s.f;
+  $("fr").textContent="кадр "+Math.round(shown)+" · "+Math.round(s.p*100)+" % · ×"+s.z.toFixed(2); }
+function drawState(){ draw(vids[0],st.b,st.m,st.sa,st.sb); }
+/* живое воспроизведение: видео идёт само, а скорость меняется по кривой — плавно, без перемоток */
+function slope(p){ const h=0.01; return (ease(Math.min(1,p+h))-ease(Math.max(0,p-h)))/(2*h); }
+function tick(){ if(!running) return;
+  const p=(performance.now()-t0)/S.hold;
+  const ideal=S.f0+(S.f1-S.f0)*ease(Math.min(1,p));
+  const base=(S.f1-S.f0)*slope(p)/(S.hold/1000)/60;             // нужная скорость в долях от 1x
+  const want=base+((ideal-vids[0].currentTime*60)/60)/0.25;      // мягко догоняем кривую (ошибка гасится за 250 мс)
+  const endT=S.f1/60;
+  vids.forEach(v=>{ if(v.currentTime>=endT-0.004){ if(!v.paused) v.pause(); }
+    else { const r=Math.max(0.07,Math.min(4,want)); if(Math.abs(v.playbackRate-r)>0.02) v.playbackRate=r; if(v.paused&&p<1) v.play().catch(()=>{}); } });
+  renderAt(p,true);
+  if(p>=1){ end(); return; }
+  raf=requestAnimationFrame(tick); }
 
-  if (S.exit === "lift"){
-    splash.style.transition = `transform ${f}ms ${E}, opacity ${f}ms ease ${f * .55}ms`;
-    splash.style.transform = "translateY(-101%)";
-    splash.style.opacity = "0";
-  } else if (S.exit === "zoom"){
-    splash.style.transition = `opacity ${f}ms ease ${f * .35}ms`;
-    splash.style.opacity = "0";
-    svid.style.transition = `transform ${f}ms ${E}, opacity ${f}ms ease`;
-    svid.style.transform = "translate(-22%, 42%) scale(.34)";
-    sword.style.transition = disc.style.transition = `transform ${f}ms ${E}, opacity ${f * .6}ms ease`;
-    sword.style.opacity = "0";
-    disc.style.transform = "scale(.2)"; disc.style.opacity = "0";
-    shadow.style.opacity = "0";
-  } else {
-    splash.style.transition = `opacity ${f}ms ease`;
-    splash.style.opacity = "0";
-    sword.style.transition = svid.style.transition = `transform ${f}ms ease, opacity ${f}ms ease`;
-    sword.style.transform = `translateY(${S.wordY - 24}px) scale(1.03)`;
-    svid.style.transform = "scale(1.05)";
-  }
-  after(f + 40, () => {
-    keyStop();
-    splash.style.transition = "none";
-    splash.style.transform = "";
-  });
-}
+function showSplash(){ splash.style.transition="none"; splash.style.transform=""; splash.style.opacity="1"; splash.classList.add("on");
+  svid.style.transition="none"; svid.style.opacity="1"; sword.style.transition="none"; sword.style.opacity="1"; sword.hidden=!S.word;
+  sword.style.zIndex=S.wordTop?"6":"3"; disc.style.transition="none"; disc.style.opacity="1"; skiphint.style.opacity="0"; layout(); }
+let stillP=0;
+function still(p){ stillP=p; if(running){ running=false; cancelAnimationFrame(raf); } vids.forEach(v=>{ try{ v.pause(); }catch(e){} });
+  Promise.all(vids.map(ready)).then(()=>{ showSplash(); renderAt(p); setTimeout(()=>{ if(!running) renderAt(p); },60); }); }
+function stillFrame(f){ const e=(f-S.f0)/Math.max(1,(S.f1-S.f0)); // обратная кривая — приближённо перебором
+  let lo=0,hi=1; for(let i=0;i<24;i++){ const mid=(lo+hi)/2; if(ease(mid)<e) lo=mid; else hi=mid; } still((lo+hi)/2); }
 
-function playSplash(){
-  clearTimers();
-  running = true;
-  const f = S.reduce ? 0 : S.fade;
+function play(){ clearTimeout(timer); running=true; const f=S.fin;
+  splash.style.transition="none"; splash.style.transform=""; splash.style.opacity="1"; splash.classList.add("on");
+  sword.hidden=!S.word; sword.style.zIndex=S.wordTop?"6":"3";
+  sword.style.transition="none"; sword.style.opacity="0"; svid.style.transition="none"; svid.style.opacity="0";
+  disc.style.transition="none"; disc.style.opacity="0";
+  skiphint.style.opacity=S.skip?".9":"0"; skiphint.style.transition="opacity 300ms ease"; layout();
+  Promise.all(vids.map(ready)).then(()=>{ if(!running) return; vids.forEach(v=>{ try{ v.pause(); }catch(e){} });
+    return Promise.all(vids.map(v=>new Promise(r=>{ const t=S.f0/60+0.0001; if(Math.abs(v.currentTime-t)<0.002) return r();
+      const h=()=>{ v.removeEventListener("seeked",h); r(); }; v.addEventListener("seeked",h); v.currentTime=t; setTimeout(r,400); })));
+  }).then(()=>{ if(!running) return;
+    renderAt(0,true);
+    vids.forEach(v=>{ v.playbackRate=0.07; v.play().catch(()=>{}); });
+    void splash.offsetWidth;
+    const SP="cubic-bezier(.22,1,.36,1)";
+    disc.style.transition=`opacity ${f}ms ease`; disc.style.opacity="1";
+    sword.style.transition=`opacity ${f}ms ease 40ms`; sword.style.opacity="1";
+    svid.style.transition=`opacity ${f}ms ease 40ms`; svid.style.opacity="1";
+    t0=performance.now(); cancelAnimationFrame(raf); raf=requestAnimationFrame(tick); }); }
+function end(){ if(!running) return; running=false; cancelAnimationFrame(raf); vids.forEach(v=>{ try{ v.pause(); }catch(e){} });
+  const f=S.fout, E="cubic-bezier(.32,.72,0,1)"; splash.classList.remove("on"); skiphint.style.opacity="0";
+  if(S.exit==="lift"){ splash.style.transition=`transform ${f}ms ${E}, opacity ${f}ms ease ${f*.55}ms`; splash.style.transform="translateY(-101%)"; splash.style.opacity="0"; }
+  else if(S.exit==="zoom"){ splash.style.transition=`opacity ${f}ms ease ${f*.35}ms`; splash.style.opacity="0";
+    svid.style.transition=`transform ${f}ms ${E}, opacity ${f}ms ease`; svid.style.transform=`translate(-22%, 42%) scale(.3)`;
+    sword.style.transition=disc.style.transition=`transform ${f}ms ${E}, opacity ${f*.6}ms ease`; sword.style.opacity="0"; disc.style.transform="scale(.05)"; disc.style.opacity="0"; }
+  else { splash.style.transition=`opacity ${f}ms ease`; splash.style.opacity="0"; }
+  timer=setTimeout(()=>{ splash.style.transition="none"; splash.style.transform=""; still(0); }, f+60); }
+splash.addEventListener("pointerdown",()=>{ if(S.skip&&running) end(); });
+$("c-kebab").addEventListener("click",play); $("c-other").addEventListener("click",play); $("play").addEventListener("click",play);
 
-  sword.hidden = !S.word;
-  sword.style.zIndex = S.wordTop ? "6" : "3";
-  skiphint.style.opacity = S.skip ? ".9" : "0";
-  skiphint.style.transition = "opacity 300ms ease";
+/* полоска кадров */
+const strip=$("strip"), THUMBS=10;
+async function buildStrip(){ await ready(vids[0]); strip.innerHTML="";
+  const fs=[...Array(THUMBS)].map((_,i)=>Math.round(i*89/(THUMBS-1)));
+  fs.forEach(f=>{ const c=document.createElement("canvas"); c.width=90; c.height=120; c.title="кадр "+f; c.dataset.f=f;
+    c.addEventListener("click",()=>{ S.f0=f; if(S.f1<f+8) S.f1=Math.min(89,f+8); apply(); markShow("show0"); still(0); }); strip.appendChild(c); });
+  const v=vids[0]; for(const c of strip.children){ const f=+c.dataset.f;
+    await new Promise(r=>{ const h=()=>{ v.removeEventListener("seeked",h); r(); }; v.addEventListener("seeked",h); v.currentTime=f/60+0.0001; setTimeout(r,400); });
+    const w=v.videoWidth, hh=v.videoHeight/2, x=c.getContext("2d"); x.clearRect(0,0,c.width,c.height);
+    const s=Math.min(c.width/w,c.height/hh); x.drawImage(v,0,0,w,hh,(c.width-w*s)/2,(c.height-hh*s)/2,w*s,hh*s); }
+  still(0); }
+function markShow(id){ ["show0","showMid","show1"].forEach(k=>$(k).setAttribute("aria-pressed",String(k===id)));
+  [...strip.children].forEach(c=>c.dataset.on = (+c.dataset.f===S.f0 && id==="show0") ? "1":"0"); }
+$("show0").addEventListener("click",()=>{ markShow("show0"); still(0); });
+$("show1").addEventListener("click",()=>{ markShow("show1"); still(1); });
+$("showMid").addEventListener("click",()=>{ markShow("showMid"); still(0.5); });
+$("scrub").addEventListener("input",e=>{ const p=parseFloat(e.target.value)/100; $("v-scrub").textContent=Math.round(p*100)+" %"; still(p); });
 
-  splash.classList.add("on");
-  splash.style.transition = "none";
-  splash.style.transform = "";
-  splash.style.opacity = "1";
-  sword.style.transition = svid.style.transition = disc.style.transition =
-    shadow.style.transition = "none";
-  sword.style.transform = `translateY(${S.wordY + 18}px) scale(.96)`;
-  sword.style.opacity = "0";
-  svid.style.transform = "scale(.9)";
-  svid.style.opacity = "0";
-  disc.style.transform = "scale(.55)"; disc.style.opacity = "0";
-  shadow.style.opacity = "0"; shadow.style.transform = "scaleX(.7)";
+/* управление */
+const nums=["f0","f1","z0","z1","y0","y1","hold","soft","start","fin","fout","swapAt","swapMs","wordY","d0","d1","dsoft","dstart","ddelay","discY","lines"];
+const fmt={hold:v=>v+" мс",fin:v=>v+" мс",fout:v=>v+" мс",swapMs:v=>v+" мс",swapAt:v=>v+" %",soft:v=>v.toFixed(2),start:v=>v.toFixed(2),z0:v=>v.toFixed(2),z1:v=>v.toFixed(2),d0:v=>v.toFixed(2),d1:v=>v.toFixed(2),dsoft:v=>v.toFixed(2),dstart:v=>v.toFixed(2),ddelay:v=>v+" %",lines:v=>v.toFixed(2)};
+function apply(){
+  nums.forEach(k=>{ const el=$(k); if(+el.value!==S[k]) el.value=S[k]; $("v-"+k).textContent=(fmt[k]||String)(S[k]); });
+  ["wordTop","word","skip","two","auto"].forEach(k=>$(k).checked=S[k]);
+  {const m={fade:"x-fade",lift:"x-lift",zoom:"x-zoom"}; for(const k in m) $(m[k]).setAttribute("aria-pressed",String(k===S.exit));}
+  {const m={swap:"s-swap",scale:"s-scale",fade:"s-fade"}; for(const k in m) $(m[k]).setAttribute("aria-pressed",String(k===S.swapMode));}
   layout();
-
-  cur = 0; nxt = -1;
-  loadCat(curCat);
-  vids.forEach(v => { try { v.pause(); v.currentTime = 0; } catch(e){} });
-  Promise.all(vids.slice(0, Math.min(S.count, curCat[2].length)).map(ready)).then(() => { if (!running) return;
-    const r = Math.max(0.5, Math.min(2, 1500 / S.hold));
-    vids.slice(0, Math.min(S.count, curCat[2].length)).forEach(v => { try { v.currentTime = 0; v.playbackRate = r; v.play(); } catch(e){} });
-    if (vids[0].videoWidth){ cv.width = vids[0].videoWidth; cv.height = vids[0].videoHeight / 2; layout(); }
-    keyStart();
-    rateStart = performance.now(); seqT0 = rateStart;
-    const n = Math.max(1, Math.min(S.count, curCat[2].length));
-    seq = []; for (let i = 1; i < n; i++) seq.push(Math.round(S.hold * i / n));
-  });
-
-  requestAnimationFrame(() => {
-    const SP = "cubic-bezier(.2,.9,.25,1.06)";
-    disc.style.transition = `transform ${f * 1.5}ms ${SP}, opacity ${f}ms ease`;
-    disc.style.transform = "scale(1)"; disc.style.opacity = "1";
-    sword.style.transition = `transform ${f}ms ${SP} 40ms, opacity ${f}ms ease 40ms`;
-    svid.style.transition = `transform ${f * 1.25}ms ${SP} 60ms, opacity ${f}ms ease 60ms`;
-    shadow.style.transition = `transform ${f * 1.25}ms ${SP} 60ms, opacity ${f}ms ease 60ms`;
-    sword.style.transform = `translateY(${S.wordY}px) scale(1)`;
-    sword.style.opacity = "1";
-    svid.style.transform = "scale(1)";
-    svid.style.opacity = "1";
-    shadow.style.transform = "scaleX(1)"; shadow.style.opacity = "1";
-    layout();
-  });
-
-  after(S.reduce ? 600 : S.hold, endSplash);
+  $("out").textContent=`kebab: f0=${S.f0} f1=${S.f1} z0=${S.z0} z1=${S.z1} y0=${S.y0} y1=${S.y1} hold=${S.hold} soft=${S.soft} start=${S.start} fin=${S.fin} fout=${S.fout} exit=${S.exit} | two=${S.two} swapAt=${S.swapAt} swapMs=${S.swapMs} swapMode=${S.swapMode} | disc: d0=${S.d0} d1=${S.d1} dsoft=${S.dsoft} dstart=${S.dstart} ddelay=${S.ddelay} discY=${S.discY} | wordY=${S.wordY} lines=${S.lines} wordTop=${S.wordTop} word=${S.word} skip=${S.skip}`;
 }
-
-splash.addEventListener("pointerdown", () => { if (S.skip) endSplash(); });
-
-/* категории */
-const chips = $("chips"), grid = $("grid");
-CATS.forEach(c => { const b = document.createElement("button"); b.className = "chip"; b.textContent = c[1];
-  b.setAttribute("aria-pressed", String(c === curCat)); b.addEventListener("click", () => setCat(c)); chips.appendChild(b); });
-function renderGrid(cat){
-  grid.innerHTML = cat[3].map(t => `<article class="tile"><img src="" alt=""><div class="name">${t[0]}</div><div class="ing">${t[1]}</div><div class="prow"><span class="price">${t[2]}</span><span class="add">+</span></div></article>`).join("");
-}
-function setCat(cat){
-  curCat = cat;
-  [...chips.children].forEach((b, i) => b.setAttribute("aria-pressed", String(CATS[i] === cat)));
-  bb.textContent = cat[1]; sword.textContent = cat[1];
-  renderGrid(cat);
-  scroller.scrollTop = 0;
-  playSplash();
-}
-renderGrid(curCat); loadCat(curCat);
-
-/* ползунки */
-function bind(id, fmt){
-  const el = $(id);
-  el.addEventListener("input", () => {
-    S[id] = parseFloat(el.value);
-    $("v-" + id).textContent = fmt(S[id]);
-  });
-}
-bind("hold", v => Math.round(v) + " мс");
-bind("zoom", v => v.toFixed(2));
-bind("wordY", v => Math.round(v));
-bind("fade", v => Math.round(v) + " мс");
-bind("discSize", v => v.toFixed(2));
-bind("linesOp", v => v.toFixed(2));
-bind("slow", v => v.toFixed(2));
-bind("count", v => String(Math.round(v)));
-bind("xfade", v => Math.round(v) + " мс");
-$("wordTop").addEventListener("change", e => { S.wordTop = e.target.checked; sword.style.zIndex = S.wordTop ? "6" : "3"; });
-["discSize","linesOp"].forEach(id => $(id).addEventListener("input", layout));
-const EX = { fade: "x-fade", lift: "x-lift", zoom: "x-zoom" };
-for (const k in EX){
-  $(EX[k]).addEventListener("click", () => {
-    S.exit = k;
-    for (const j in EX) $(EX[j]).setAttribute("aria-pressed", String(j === k));
-  });
-}
-$("word").addEventListener("change", e => { S.word = e.target.checked; });
-$("skip").addEventListener("change", e => { S.skip = e.target.checked; });
-$("reduce").addEventListener("change", e => { S.reduce = e.target.checked; });
-$("play").addEventListener("click", () => { sword.textContent = curCat[1]; playSplash(); });
-$("copy").addEventListener("click", () => {
-  const line = `hold=${S.hold} zoom=${S.zoom} wordY=${S.wordY} fade=${S.fade} exit=${S.exit} count=${S.count} xfade=${S.xfade} slow=${S.slow} wordTop=${S.wordTop} disc=${S.discSize} lines=${S.linesOp} shadow=${S.shadowOn} word=${S.word} skip=${S.skip}`;
-  $("out").textContent = line;
-  try { navigator.clipboard.writeText(line); $("copy").textContent = "Скопировано"; } catch(e){}
-  setTimeout(() => { $("copy").textContent = "Копировать значения"; }, 1500);
-});
-
-if (matchMedia("(prefers-reduced-motion: reduce)").matches){ S.reduce = true; $("reduce").checked = true; }
+let autoT=0; function autoPlay(){ if(!S.auto) return; clearTimeout(autoT); autoT=setTimeout(play,350); }
+const stillOnInput={f0:()=>0, f1:()=>1, z0:()=>0, z1:()=>1, y0:()=>0, y1:()=>1, d0:()=>0, d1:()=>1};
+nums.forEach(k=>{ const el=$(k);
+  el.addEventListener("input",e=>{ S[k]=parseFloat(e.target.value);
+    if(k==="f0"&&S.f1<S.f0+8) S.f1=Math.min(89,S.f0+8); if(k==="f1"&&S.f0>S.f1-8) S.f0=Math.max(0,S.f1-8);
+    apply(); if(stillOnInput[k]){ const p=stillOnInput[k](); markShow(p===0?"show0":"show1"); still(p); } else if(k==="discY"||k==="lines"||k==="wordY"||k==="dsoft"||k==="dstart"||k==="ddelay"){ if(!running) still(stillP); } });
+  el.addEventListener("change",()=>autoPlay()); });
+["wordTop","word","skip","two"].forEach(k=>$(k).addEventListener("change",e=>{ S[k]=e.target.checked; apply(); autoPlay(); }));
+$("auto").addEventListener("change",e=>{ S.auto=e.target.checked; });
+{const m={fade:"x-fade",lift:"x-lift",zoom:"x-zoom"}; for(const k in m) $(m[k]).addEventListener("click",()=>{ S.exit=k; apply(); autoPlay(); });}
+{const m={swap:"s-swap",scale:"s-scale",fade:"s-fade"}; for(const k in m) $(m[k]).addEventListener("click",()=>{ S.swapMode=k; if(!S.two){ S.two=true; } apply(); autoPlay(); });}
+$("copy").addEventListener("click",async()=>{ const t=$("out").textContent,b=$("copy");
+  try{ await navigator.clipboard.writeText(t); b.textContent="Скопировано ✓"; }catch(e){ const r=document.createRange(); r.selectNodeContents($("out")); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  setTimeout(()=>b.textContent="Скопировать значения",1400); });
+window.addEventListener("resize",layout);
+apply(); buildStrip();
 </script>
 
 </body></html>

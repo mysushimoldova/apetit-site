@@ -6,8 +6,9 @@
   1. обрезает по продукту (общая рамка по всем кадрам + 5 % поля), длинная сторона 720 px;
   2. убирает фон и тень: маску считает нейросеть выделения объекта (ISNet, ai_matte.py),
      покадрово, с временным сглаживанием; внутри силуэта продукт всегда сплошной;
-  3. поднимает до 60 к/с и вшивает разгон-замедление (быстро в начале, медленно в конце),
-     итог ровно 1.5 с = 90 кадров;
+  3. поднимает до 60 к/с и вшивает кривую поворота, подобранную хозяином (config.json → curve:
+     первый/последний кадр по 90-кадровой шкале, плавный старт, замедление, длительность);
+     итог ровно hold мс (сейчас 1.0 с = 60 кадров);
   4. все ролики крутятся в одну сторону: у кого направление «не то» — время идёт назад
      (не зеркало: надписи на бутылках не страдают);
   5. кадр = цвет сверху + маска снизу (высота двойная), h264 crf 26;
@@ -32,7 +33,10 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(ROOT, "assets", "splash-video")
 OUT = os.path.join(ROOT, "public", "splash")
 CFG = json.load(open(os.path.join(os.path.dirname(__file__), "config.json"), encoding="utf-8"))
-OUT_N, SLOW, FPS_SRC = 90, 0.8, 24
+SLOW, FPS_SRC = 0.8, 24
+CURVE = CFG.get("curve", {"f0": 0, "f1": 89, "start": 0.8, "soft": 0.15, "hold": 1000})
+OUT_N = round(CURVE["hold"] / 1000 * 60)
+RAMP_N = 90   # внутренняя шкала кадров, в которой хозяин подбирал f0/f1
 
 def run(cmd): subprocess.run(cmd, check=True)
 
@@ -52,11 +56,16 @@ def crop_box(src, skip):
     return int(x0*4), int(y0*4), int((x1-x0+1)*4), int((y1-y0+1)*4)
 
 def timemap(D):
+    """90 опорных кадров с разгоном-замедлением (шкала, в которой хозяин подбирал кадры)."""
     fast, slowv = 1+SLOW*1.6, 1-SLOW*0.8
-    ps = (np.arange(OUT_N)+0.5)/OUT_N
+    ps = (np.arange(RAMP_N)+0.5)/RAMP_N
     r = slowv + (fast-slowv)*(1-ps)**2.2
     c = np.concatenate([[0], np.cumsum(r)]); c = c/c[-1]
     return c[:-1]*D
+
+def ease(p):
+    a = 1+2.2*CURVE["start"]; b = 1+2.6*CURVE["soft"]
+    return (1-(1-p)**b)**a
 
 def build(src, slug, force=False):
     out = os.path.join(OUT, f"{slug}.mp4")
@@ -82,7 +91,11 @@ def build(src, slug, force=False):
     inter = sorted(f for f in os.listdir(d) if f.startswith("i")); M = len(inter)
     ts = timemap(D)
     if slug in CFG.get("reverse", []): ts = D-ts
-    for k, t in enumerate(ts):
+    # кривая хозяина поверх шкалы: кадр k → p → опорный кадр f (0..89) → время источника
+    for k in range(OUT_N):
+        p = (k+0.5)/OUT_N
+        f = CURVE["f0"] + (CURVE["f1"]-CURVE["f0"])*ease(p)
+        t = float(np.interp(f, np.arange(RAMP_N), ts))
         shutil.copy(f"{d}/{inter[max(0,min(M-1,int(round(t*120))))]}", f"{d}/s/f{k:03d}.png")
     os.makedirs(OUT, exist_ok=True)
     run(["ffmpeg","-v","error","-y","-framerate","60","-i",f"{d}/s/f%03d.png","-vf","format=yuv420p",

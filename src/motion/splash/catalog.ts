@@ -1,10 +1,10 @@
 // Что играет на заставке категории (docs/motion/splash-prompt.md).
 //
-// Заставка есть у КАЖДОЙ категории. Где сняты ролики — играет ролик; где нет
+// Заставка есть у КАЖДОЙ категории и показывает ОДНО блюдо — первое из
+// доступных в выбранной точке. Где снят ролик — играет ролик; где нет
 // (menu, crispy, hot-dog, pizza, cartofi и любые будущие) — та же заставка,
-// но вместо ролика вырезанное фото первого доступного в точке блюда: те же
-// картинки, что на плитках меню. Нет ни ролика, ни фото — заставки нет,
-// переход к категории обычный, без ошибок в консоли.
+// но вместо ролика вырезанное фото того же первого блюда. Нет ни ролика,
+// ни фото — заставки нет, переход к категории обычный, без ошибок в консоли.
 //
 // Слаг ролика = слаг блюда = имя файла в public/splash.
 export const SPLASH_VIDEOS: Readonly<Record<string, readonly string[]>> = {
@@ -25,21 +25,19 @@ export function splashVideoSrc(slug: string): string {
 }
 
 /**
- * Ролики для заставки этой категории, в порядке показа.
+ * Ролик заставки этой категории — один, всегда.
  *
  * available — слаги блюд, которые есть в меню выбранной точки. Нет первого
  * блюда — играет второе; нет ни одного (или у категории нет роликов) —
- * пустой список, и в ход идёт фото.
+ * null, и в ход идёт фото.
  */
-export function splashVideosFor(
+export function splashVideoFor(
   categorySlug: string,
   available: ReadonlySet<string>,
-  count: number,
-): string[] {
+): string | null {
   const all = SPLASH_VIDEOS[categorySlug];
-  if (!all) return [];
-  const usable = all.filter((slug) => available.has(slug));
-  return usable.slice(0, Math.max(1, Math.round(count)));
+  if (!all) return null;
+  return all.find((slug) => available.has(slug)) ?? null;
 }
 
 /** Фото категорий: слаг категории → адрес картинки первого доступного в
@@ -49,25 +47,24 @@ export type SplashPhotos = Readonly<Record<string, string>>;
 
 /** Чем играть заставку этой категории. */
 export type SplashMode =
-  | { kind: "video"; slugs: string[] }
+  | { kind: "video"; slug: string }
   | { kind: "photo"; src: string }
   | { kind: "none" };
 
 /**
- * Режим заставки: сначала ролики, потом фото, потом ничего.
+ * Режим заставки: сначала ролик, потом фото, потом ничего.
  *
- * Ролики важнее фото даже там, где есть и то и другое: в ролике блюдо
+ * Ролик важнее фото даже там, где есть и то и другое: в ролике блюдо
  * вращается, это и задумано как заставка. Фото — для категорий, где ролика
  * нет вовсе или где снятых блюд нет в меню этой точки.
  */
 export function splashModeFor(
   categorySlug: string,
   available: ReadonlySet<string>,
-  count: number,
   photos: SplashPhotos | undefined,
 ): SplashMode {
-  const slugs = splashVideosFor(categorySlug, available, count);
-  if (slugs.length > 0) return { kind: "video", slugs };
+  const slug = splashVideoFor(categorySlug, available);
+  if (slug) return { kind: "video", slug };
   const src = photos?.[categorySlug];
   if (src) return { kind: "photo", src };
   return { kind: "none" };

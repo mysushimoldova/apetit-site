@@ -1,30 +1,40 @@
 import { describe, expect, it } from "vitest";
 import {
-  MAX_VIDEO_WIDTH,
+  HEIGHT_SHARE,
+  splashDishWidth,
   splashRate,
-  splashSwitchTimes,
-  splashVideoWidth,
   VIDEO_MS,
+  WIDTH_SHARE,
 } from "./geometry";
 
+// Ролики переснял хозяин 24.09.2026: 60 кадров = ровно 1.0 с, кривая
+// поворота вшита в файл. На сайте ролик просто играет — никаких перемоток
+// и подгонки скорости по ходу.
 describe("скорость ролика", () => {
-  it("длительность равна ролику — обычная скорость", () => {
-    expect(splashRate(VIDEO_MS)).toBe(1);
+  it("ролик — ровно секунда", () => {
+    expect(VIDEO_MS).toBe(1000);
   });
 
-  it("заставка короче — ролик идёт быстрее, но не более чем вдвое", () => {
-    expect(splashRate(750)).toBe(2);
-    expect(splashRate(300)).toBe(2);
+  it("длительность 1000 — обычная скорость", () => {
+    expect(splashRate(1000)).toBe(1);
   });
 
-  it("заставка длиннее — медленнее, но не более чем вдвое", () => {
-    expect(splashRate(3000)).toBe(0.5);
-    expect(splashRate(3500)).toBe(0.5);
+  it("заставка вдвое короче — ролик вдвое быстрее", () => {
+    expect(splashRate(500)).toBe(2);
+  });
+
+  it("заставка вдвое длиннее — вдвое медленнее", () => {
+    expect(splashRate(2000)).toBe(0.5);
+  });
+
+  it("на краях ползунка скорость остаётся человеческой", () => {
+    expect(splashRate(400)).toBeCloseTo(2.5, 5);
+    expect(splashRate(4000)).toBeCloseTo(0.25, 5);
   });
 
   it("мусор вместо длительности не роняет заставку", () => {
-    expect(splashRate(0)).toBe(2);
-    expect(splashRate(Number.NaN)).toBe(2);
+    expect(splashRate(0)).toBe(1);
+    expect(splashRate(Number.NaN)).toBe(1);
   });
 });
 
@@ -32,43 +42,29 @@ describe("размер блюда", () => {
   const stage = { stageWidth: 390, stageHeight: 720 };
 
   it("на телефоне решает ширина экрана", () => {
-    // Горизонтальный кадр 1.4: 0.83 × 390 = 323 → упирается в предел 320
-    const w = splashVideoWidth({ ...stage, aspect: 1.4, zoom: 0.83 });
-    expect(w).toBe(MAX_VIDEO_WIDTH);
+    // Горизонтальный кадр 1.4: по высоте влезло бы 0.6 × 720 × 1.4 = 605
+    const w = splashDishWidth({ ...stage, aspect: 1.4 });
+    expect(Math.round(w)).toBe(Math.round(WIDTH_SHARE * 390));
   });
 
   it("вертикальная бутылка ограничена высотой, а не шириной", () => {
-    // aspect 0.5: 0.6 × 720 × 0.5 = 216 — меньше, чем 0.83 × 390
-    const w = splashVideoWidth({ ...stage, aspect: 0.5, zoom: 0.83 });
-    expect(Math.round(w)).toBe(216);
+    const w = splashDishWidth({ ...stage, aspect: 0.5 });
+    expect(Math.round(w)).toBe(Math.round(HEIGHT_SHARE * 720 * 0.5));
   });
 
   it("невысокий экран уменьшает блюдо", () => {
-    const low = splashVideoWidth({
+    const low = splashDishWidth({
       stageWidth: 390,
       stageHeight: 380,
       aspect: 1,
-      zoom: 0.83,
     });
     expect(Math.round(low)).toBe(228);
   });
 
-  it("меньше zoom — меньше блюдо", () => {
-    const small = splashVideoWidth({ ...stage, aspect: 1.4, zoom: 0.45 });
-    expect(Math.round(small)).toBe(176);
-  });
-
   it("кадра ещё нет — размера нет (рисовать нечего)", () => {
-    expect(splashVideoWidth({ ...stage, aspect: 0, zoom: 0.83 })).toBe(0);
-  });
-});
-
-describe("смена блюда", () => {
-  it("одно блюдо — переключений нет", () => {
-    expect(splashSwitchTimes(1500, 1)).toEqual([]);
-  });
-
-  it("два блюда — второе приходит на середине", () => {
-    expect(splashSwitchTimes(1500, 2)).toEqual([750]);
+    expect(splashDishWidth({ ...stage, aspect: 0 })).toBe(0);
+    expect(
+      splashDishWidth({ stageWidth: 0, stageHeight: 0, aspect: 1.4 }),
+    ).toBe(0);
   });
 });

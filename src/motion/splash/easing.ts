@@ -53,3 +53,27 @@ export function progress(elapsedMs: number, durationMs: number): number {
 export function mix(from: number, to: number, k: number): number {
   return from + (to - from) * k;
 }
+
+/**
+ * Кривая хозяина — та, по которой на заставке едут блюдо и жёлтый круг
+ * (эталон docs/motion/splash-demo.html, функции ease и easeD):
+ *
+ *   ease(p) = (1 − (1 − p)^b)^a,   a = 1 + 2.2·start,   b = 1 + 2.6·soft
+ *
+ * start — плавный старт (0 — трогается сразу, 1 — долго разгоняется),
+ * soft — замедление к концу. При любых start и soft кривая начинается в
+ * нуле и заканчивается в единице, поэтому начало и конец движения всегда
+ * ровно те, что выставлены ползунками.
+ *
+ * Это третья кривая на сайте, и она разрешена: docs/MOTION.md §3 запрещает
+ * придумывать кривые для интерфейса, а здесь кривая вшита в сами ролики
+ * (scripts/splash-video/make.py, config.json → curve) — размер и высота
+ * блюда обязаны идти по ней же, иначе поворот и уменьшение разъедутся.
+ */
+export function splashEase(p: number, start: number, soft: number): number {
+  if (!(p > 0)) return 0;
+  if (p >= 1) return 1;
+  const a = 1 + 2.2 * start;
+  const b = 1 + 2.6 * soft;
+  return Math.pow(1 - Math.pow(1 - p, b), a);
+}

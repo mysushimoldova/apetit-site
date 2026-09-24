@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { cubicBezier, easeIn, easeOut, mix, progress } from "./easing";
+import {
+  cubicBezier,
+  easeIn,
+  easeOut,
+  mix,
+  progress,
+  splashEase,
+} from "./easing";
 
 describe("кривые движения", () => {
   it("начало и конец закреплены", () => {
@@ -65,5 +72,48 @@ describe("смешивание", () => {
     expect(mix(0.9, 1, 0)).toBe(0.9);
     expect(mix(0.9, 1, 1)).toBe(1);
     expect(mix(0, 10, 0.25)).toBe(2.5);
+  });
+});
+
+// Кривая хозяина: по ней на заставке едут блюдо и жёлтый круг, и та же
+// кривая вшита в сами ролики (scripts/splash-video/config.json → curve).
+describe("кривая хозяина", () => {
+  const DISH = [0.8, 0.15] as const; // плавный старт и замедление блюда
+  const DISC = [1, 0.15] as const; // у круга свои
+
+  it("начало и конец закреплены при любых настройках", () => {
+    for (const [start, soft] of [DISH, DISC, [0, 0], [1, 1], [0.5, 0.5]]) {
+      expect(splashEase(0, start, soft)).toBe(0);
+      expect(splashEase(1, start, soft)).toBe(1);
+      expect(splashEase(-1, start, soft)).toBe(0);
+      expect(splashEase(2, start, soft)).toBe(1);
+    }
+  });
+
+  it("только растёт", () => {
+    let prev = -1;
+    for (let p = 0; p <= 1.0001; p += 0.05) {
+      const v = splashEase(p, DISH[0], DISH[1]);
+      expect(v).toBeGreaterThanOrEqual(prev);
+      prev = v;
+    }
+  });
+
+  it("плавный старт и правда тормозит начало", () => {
+    // Чем больше start, тем меньше пройдено за первую пятую времени
+    const soft = 0.15;
+    expect(splashEase(0.2, 1, soft)).toBeLessThan(splashEase(0.2, 0, soft));
+    expect(splashEase(0.2, 0.8, soft)).toBeLessThan(0.2);
+  });
+
+  it("без плавного старта и без замедления это просто время", () => {
+    for (const p of [0.25, 0.5, 0.75]) {
+      expect(splashEase(p, 0, 0)).toBeCloseTo(p, 10);
+    }
+  });
+
+  it("замедление к концу придерживает конец", () => {
+    // Чем больше soft, тем круче кривая набирает в начале
+    expect(splashEase(0.5, 0, 1)).toBeGreaterThan(splashEase(0.5, 0, 0));
   });
 });

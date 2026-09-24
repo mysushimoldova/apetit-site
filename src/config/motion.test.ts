@@ -9,9 +9,11 @@ import {
   asColor,
   asPageBackground,
   asRevealType,
+  asSplashExit,
   motionConfig,
   pageBackground,
   productsConfig,
+  splashConfig,
 } from "./motion";
 
 const raw = JSON.parse(
@@ -88,6 +90,66 @@ describe("src/config/motion.json", () => {
     expect(raw.products.reveal.type).toBe("lift");
     expect(raw.products.lift.enabled).toBe(true);
     expect(productsConfig).toEqual(raw.products);
+  });
+
+  // Заставка категории. Числа хозяин подбирает в панели, поэтому сторожим
+  // набор полей и решения: одно блюдо на категорию (ни count, ни смены
+  // блюд в настройках больше нет) и уход затуханием.
+  it("набор настроек заставки тот же", () => {
+    expect(Object.keys(raw.splash).sort()).toEqual([
+      "disc",
+      "dish",
+      "enabled",
+      "exit",
+      "fin",
+      "fout",
+      "hold",
+      "lines",
+      "skip",
+      "wordTop",
+      "wordY",
+    ]);
+    expect(Object.keys(raw.splash.dish).sort()).toEqual([
+      "soft",
+      "start",
+      "y0",
+      "y1",
+      "z0",
+      "z1",
+    ]);
+    expect(Object.keys(raw.splash.disc).sort()).toEqual([
+      "d0",
+      "d1",
+      "delay",
+      "dsoft",
+      "dstart",
+      "y",
+    ]);
+    expect(raw.splash.enabled).toBe(true);
+    expect(raw.splash.exit).toBe("fade");
+    expect(splashConfig).toEqual(raw.splash);
+  });
+
+  it("уход заставки — один из трёх", () => {
+    for (const exit of ["fade", "lift", "zoom"]) {
+      expect(asSplashExit(exit)).toBe(exit);
+    }
+    expect(asSplashExit("кувырком")).toBe("fade");
+  });
+
+  it("настройки заставки вне границ схему не проходят", () => {
+    const bad = {
+      ...raw,
+      splash: { ...raw.splash, dish: { ...raw.splash.dish, z0: 9 } },
+    };
+    expect(motionConfigSchema.safeParse(bad).success).toBe(false);
+    const extra = {
+      ...raw,
+      splash: { ...raw.splash, count: 2 },
+    };
+    expect(motionConfigSchema.safeParse(extra).success).toBe(false);
+    const noDisc = { ...raw, splash: { ...raw.splash, disc: undefined } };
+    expect(motionConfigSchema.safeParse(noDisc).success).toBe(false);
   });
 
   it("вид появления — один из трёх", () => {

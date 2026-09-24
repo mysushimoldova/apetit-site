@@ -1,143 +1,153 @@
-// Что происходит с заставкой в каждый момент времени: числа для слоя
-// (жёлтый круг, блюдо) и для оверлея (слово, фон). Здесь нет ни DOM, ни
-// WebGL — только время и кривые, поэтому всё проверяется обычным тестом.
+// Что происходит с заставкой в каждый момент времени: размер и высота
+// блюда, диаметр жёлтого круга, прозрачность. Здесь нет ни DOM, ни WebGL —
+// только время и кривые, поэтому всё проверяется обычным тестом.
 //
-// Поведение взято из эталона docs/motion/splash-demo.html (playSplash /
-// endSplash), но кривые — наши, из docs/MOTION.md §3: у эталона своя
-// пружинистая, а закон движения сайта разрешает только две.
-import { easeIn, mix, progress } from "./easing";
+// Эталон — docs/motion/splash-demo.html (шапка файла и объект S): ролик
+// просто играет, а поверх него каждый кадр считаются размер, высота и круг.
+//
+//   p        = время от начала заставки / hold
+//   ease(p)  — кривая хозяина (start, soft), та же, что вшита в ролик
+//   размер   z = z0 + (z1 − z0)·ease(p)
+//   высота   y = y0 + (y1 − y0)·ease(p)
+//   круг     d = d0 + (d1 − d0)·easeD(q),  q = max(0, (p − delay)/(1 − delay))
+//
+// Появление (fin) и уход (fout) идут по кривым сайта — docs/MOTION.md §3.
+import { easeIn, easeOut, mix, progress, splashEase } from "./easing";
 
 export type SplashExit = "lift" | "fade" | "zoom";
 
-export interface SplashPhaseSettings {
-  /** Появление, мс (настройка fade). */
-  fade: number;
-  exit: SplashExit;
+/** Движение блюда: размер и высота от начала к концу по своей кривой. */
+export interface SplashDishTiming {
+  /** Размер в начале и в конце (множитель к размеру, вписанному в экран). */
+  z0: number;
+  z1: number;
+  /** Высота в начале и в конце, px вниз по экрану. */
+  y0: number;
+  y1: number;
+  /** Плавный старт и замедление к концу. */
+  start: number;
+  soft: number;
 }
 
-/** Уход всегда чуть длиннее появления, но не короче этого, мс. */
-export const MIN_EXIT_MS = 180;
+/** Движение жёлтого круга: свой размер, своя кривая, своя задержка. */
+export interface SplashDiscTiming {
+  /** Диаметр в начале и в конце, доля ширины экрана. */
+  d0: number;
+  d1: number;
+  /** Плавный старт и замедление к концу — у круга свои. */
+  dstart: number;
+  dsoft: number;
+  /** Круг трогается позже блюда: доля времени заставки (0.2 — на пятой части). */
+  delay: number;
+  /** Круг выше (−) или ниже (+) середины экрана, px. */
+  y: number;
+}
 
-/** Во сколько раз уход длиннее появления (эталон). */
-export const EXIT_FACTOR = 1.6;
-
-export function exitMs(fade: number): number {
-  return Math.max(MIN_EXIT_MS, Math.round(fade * EXIT_FACTOR));
+/** Всё, от чего зависит картинка заставки в данный момент. */
+export interface SplashTiming {
+  /** Сколько заставка держится до ухода, мс. */
+  hold: number;
+  /** Появление по прозрачности, мс. */
+  fin: number;
+  /** Уход, мс. */
+  fout: number;
+  exit: SplashExit;
+  dish: SplashDishTiming;
+  disc: SplashDiscTiming;
 }
 
 /** Сколько всего живёт заставка от нажатия до полного ухода, мс. */
-export function totalMs(hold: number, fade: number): number {
-  return hold + exitMs(fade);
+export function totalMs(hold: number, fout: number): number {
+  return hold + fout;
 }
 
+/** Уход «в меню»: куда и во сколько раз уезжает блюдо (эталон, endSplash). */
+const ZOOM_SCALE = 0.3;
+const ZOOM_X = -0.22;
+const ZOOM_Y = 0.42;
+/** Уход «в меню»: во сколько раз сжимается круг. */
+const ZOOM_DISC = 0.05;
+
 export interface SplashVisual {
-  /** Масштаб жёлтого круга и его непрозрачность. */
-  discScale: number;
-  discAlpha: number;
-  /** Масштаб блюда и его непрозрачность. */
-  foodScale: number;
-  foodAlpha: number;
+  /** Размер блюда: множитель к размеру, вписанному в экран. */
+  dishScale: number;
+  /** Высота блюда, px вниз по экрану. */
+  dishY: number;
+  /** Диаметр жёлтого круга, доля ширины экрана. */
+  disc: number;
+  /** Высота круга, px вниз по экрану. */
+  discY: number;
+  /** Прозрачность круга, блюда и слова (появление и уход). */
+  alpha: number;
+  /** Прозрачность кремового экрана: гаснет только при уходе затуханием. */
+  screenAlpha: number;
   /** Сдвиг всей заставки вверх, доля высоты экрана (уход «шторкой»). */
   liftShare: number;
-  /** Сдвиг блюда к корзине меню при уходе «в меню», доли ширины/высоты. */
+  /** Сдвиг блюда при уходе «в меню», доли ширины и высоты экрана. */
   zoomX: number;
   zoomY: number;
   /** Заставка ещё видна? false — слой может не рисовать вовсе. */
   visible: boolean;
 }
 
-/** На сколько пикселей фото поднимается за время показа (задание
- *  архитектора: «лёгкий сдвиг вверх на 4 px»). */
-export const PHOTO_RISE_PX = 4;
-
-/**
- * Движение фото на заставке за время показа: масштаб от zoomFrom до 1 и
- * подъём на PHOTO_RISE_PX. Кривая — та же, что вшита в ролики: быстро
- * вначале, медленно в конце (docs/MOTION.md §3, вход).
- *
- * Считается от начала заставки и не зависит от ухода: уезжает вся заставка
- * целиком, вместе с блюдом (см. liftShare в splashVisual).
- */
-export function splashPhotoMotion(
-  elapsed: number,
-  hold: number,
-  zoomFrom: number,
-): { scale: number; risePx: number } {
-  const k = easeIn(progress(elapsed, hold));
-  return { scale: mix(zoomFrom, 1, k), risePx: mix(0, PHOTO_RISE_PX, k) };
-}
-
-const START_DISC = 0.55;
-const START_FOOD = 0.9;
-
-/** Круг въезжает дольше остальных: он крупный (эталон — fade × 1.5). */
-const DISC_FACTOR = 1.5;
-const FOOD_FACTOR = 1.25;
-
-const IDLE: SplashVisual = {
-  discScale: 1,
-  discAlpha: 1,
-  foodScale: 1,
-  foodAlpha: 1,
-  liftShare: 0,
-  zoomX: 0,
-  zoomY: 0,
-  visible: true,
-};
-
 /**
  * Картинка заставки на момент elapsed (мс от нажатия на категорию).
- * hold — сколько заставка держится до ухода (настройка), дальше идёт уход.
- * ended — заставку прервали касанием: уход начинается с этого момента.
+ *
+ * exitStart — когда начинается уход: обычно это hold, но если заставку
+ * прервали касанием, то момент касания. Движение блюда и круга на этом
+ * моменте замирает — ролик в эту же секунду ставится на паузу.
  */
 export function splashVisual(
   elapsed: number,
-  hold: number,
-  settings: SplashPhaseSettings,
-  exitStart = hold,
+  settings: SplashTiming,
+  exitStart = settings.hold,
 ): SplashVisual {
-  const fade = Math.max(0, settings.fade);
-  const out = exitMs(fade);
-  if (elapsed >= exitStart) {
-    // Уход идёт по кривой ВХОДА (--ease-reveal): заставка большая, её уход
-    // обязан трогаться сразу и мягко замирать в конце (решение архитектора
-    // 24.09.2026; прежняя кривая ухода стартовала медленно, и из 320 мс
-    // глазу было видно 120).
-    const k = easeIn(progress(elapsed - exitStart, out));
-    if (k >= 1) return { ...IDLE, discAlpha: 0, foodAlpha: 0, visible: false };
-    if (settings.exit === "lift") {
-      return { ...IDLE, liftShare: k };
-    }
-    if (settings.exit === "zoom") {
-      return {
-        ...IDLE,
-        foodScale: mix(1, 0.34, k),
-        zoomX: mix(0, -0.22, k),
-        zoomY: mix(0, 0.42, k),
-        foodAlpha: 1 - k,
-        discScale: mix(1, 0.2, k),
-        discAlpha: 1 - k,
-      };
-    }
-    return { ...IDLE, discAlpha: 1 - k, foodAlpha: 1 - k };
-  }
+  const { dish, disc } = settings;
 
-  // Круг и блюдо видны с ПЕРВОГО кадра: пустого кремового экрана в начале
-  // заставки быть не должно (решение архитектора 24.09.2026). Появление
-  // остаётся движением — круг и блюдо приходят в свой размер, — но
-  // прозрачность больше не разгоняется с нуля, и блюдо не ждёт круга.
-  // Ролик или фото к этому моменту уже загружены: если нет, заставка не
-  // начинается вовсе (src/motion/splash/controller.ts).
-  const disc = easeIn(progress(elapsed, fade * DISC_FACTOR));
-  const food = easeIn(progress(elapsed, fade * FOOD_FACTOR));
-  return {
-    discScale: mix(START_DISC, 1, disc),
-    discAlpha: 1,
-    foodScale: mix(START_FOOD, 1, food),
-    foodAlpha: 1,
+  // Блюдо и круг: до ухода едут, с начала ухода стоят
+  const p = progress(Math.min(elapsed, exitStart), settings.hold);
+  const e = splashEase(p, dish.start, dish.soft);
+  const delay = Math.min(1, Math.max(0, disc.delay));
+  const q = delay >= 1 ? 1 : progress(p - delay, 1 - delay);
+  const d = splashEase(q, disc.dstart, disc.dsoft);
+
+  const base: SplashVisual = {
+    dishScale: mix(dish.z0, dish.z1, e),
+    dishY: mix(dish.y0, dish.y1, e),
+    disc: mix(disc.d0, disc.d1, d),
+    discY: disc.y,
+    // Круг, блюдо и слово появляются по прозрачности. Кривая входа набирает
+    // быстро: к 50 мс из 400 видно уже около половины — пустого кремового
+    // экрана в начале заставки не бывает (решение архитектора 24.09.2026).
+    alpha: easeIn(progress(elapsed, settings.fin)),
+    screenAlpha: 1,
     liftShare: 0,
     zoomX: 0,
     zoomY: 0,
     visible: true,
   };
+
+  if (elapsed < exitStart) return base;
+
+  // Уход — по кривой ухода сайта (docs/MOTION.md §3): трогается сразу и
+  // мягко замирает в конце.
+  const k = easeOut(progress(elapsed - exitStart, settings.fout));
+  if (k >= 1) {
+    return { ...base, alpha: 0, screenAlpha: 0, visible: false };
+  }
+  if (settings.exit === "lift") {
+    return { ...base, liftShare: k };
+  }
+  if (settings.exit === "zoom") {
+    return {
+      ...base,
+      dishScale: base.dishScale * mix(1, ZOOM_SCALE, k),
+      disc: base.disc * mix(1, ZOOM_DISC, k),
+      zoomX: mix(0, ZOOM_X, k),
+      zoomY: mix(0, ZOOM_Y, k),
+      alpha: base.alpha * (1 - k),
+    };
+  }
+  // Затухание: гаснет вся заставка целиком, ничего не двигаясь
+  return { ...base, alpha: base.alpha * (1 - k), screenAlpha: 1 - k };
 }

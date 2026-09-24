@@ -153,68 +153,104 @@ export const productsSchema = z.strictObject({
   lift: productLiftSchema,
 });
 
-/** Границы ползунков вкладки «Ecran categorie». Значения и шаги — как в
- *  эталоне docs/motion/splash-demo.html (панель слева). */
+/** Границы ползунков вкладки «Ecran categorie». Имена, значения и шаги —
+ *  ровно как на странице настройки хозяина (docs/motion/splash-demo.html,
+ *  панель справа). Общая часть заставки. */
 export const SPLASH_RANGES = {
-  hold: [300, 3500, 50],
-  fade: [120, 700, 20],
-  zoom: [0.45, 1, 0.02],
+  hold: [400, 4000, 50],
+  fin: [0, 600, 20],
+  fout: [120, 900, 20],
   wordY: [-220, 220, 5],
-  disc: [0, 1.1, 0.02],
-  lines: [0, 0.6, 0.02],
-  count: [1, 2, 1],
-  xfade: [60, 500, 20],
+  lines: [0, 0.7, 0.02],
+} as const;
+
+/** Ползунки блюда: размер и высота в начале и в конце, своя кривая. */
+export const SPLASH_DISH_RANGES = {
+  z0: [0.4, 1.6, 0.01],
+  z1: [0.4, 1.6, 0.01],
+  y0: [-160, 160, 2],
+  y1: [-160, 160, 2],
+  start: [0, 1, 0.05],
+  soft: [0, 1, 0.05],
+} as const;
+
+/** Ползунки жёлтого круга: свой размер, своя кривая, своя задержка. */
+export const SPLASH_DISC_RANGES = {
+  d0: [0, 1.4, 0.01],
+  d1: [0, 1.4, 0.01],
+  dstart: [0, 1, 0.05],
+  dsoft: [0, 1, 0.05],
+  delay: [0, 0.6, 0.05],
+  y: [-160, 160, 2],
 } as const;
 
 const splashRange = (key: keyof typeof SPLASH_RANGES) =>
   z.number().min(SPLASH_RANGES[key][0]).max(SPLASH_RANGES[key][1]);
 
-/** Границы ползунка вкладки «Ecran categorie» для фото-заставки. */
-export const SPLASH_PHOTO_RANGES = {
-  zoomFrom: [1, 1.2, 0.01],
-} as const;
+const dishRange = (key: keyof typeof SPLASH_DISH_RANGES) =>
+  z.number().min(SPLASH_DISH_RANGES[key][0]).max(SPLASH_DISH_RANGES[key][1]);
 
-/** Заставка из фото — для категорий без ролика. Фото не вращается (это
- *  картинка, а не съёмка), поэтому движение у него своё: за время показа
- *  оно съезжается с zoomFrom до 1 и чуть поднимается. */
-export const splashPhotoSchema = z.strictObject({
-  /** Начальный масштаб фото: 1.06 — чуть крупнее, чем встанет в конце. */
-  zoomFrom: z
-    .number()
-    .min(SPLASH_PHOTO_RANGES.zoomFrom[0])
-    .max(SPLASH_PHOTO_RANGES.zoomFrom[1]),
+const discRange = (key: keyof typeof SPLASH_DISC_RANGES) =>
+  z.number().min(SPLASH_DISC_RANGES[key][0]).max(SPLASH_DISC_RANGES[key][1]);
+
+/** Блюдо на заставке: размер 1.32 → 0.96 и высота 20 → 10 px по своей
+ *  кривой. Та же кривая вшита в ролик, поэтому поворот, уменьшение и
+ *  подъём идут как одно движение. */
+export const splashDishSchema = z.strictObject({
+  /** Размер в начале и в конце: множитель к размеру, вписанному в экран. */
+  z0: dishRange("z0"),
+  z1: dishRange("z1"),
+  /** Высота в начале и в конце, px вниз по экрану. */
+  y0: dishRange("y0"),
+  y1: dishRange("y1"),
+  /** Плавный старт: 0 — трогается сразу, 1 — долго разгоняется. */
+  start: dishRange("start"),
+  /** Замедление к концу. */
+  soft: dishRange("soft"),
 });
 
-/** Заставка категории (docs/motion/splash-prompt.md). Все числа берутся
- *  отсюда: в коде заставки нет ни одного своего значения. */
+/** Жёлтый круг: диаметр 0.54 → 0.12 ширины экрана по своей кривой и с
+ *  задержкой — он трогается позже блюда. */
+export const splashDiscSchema = z.strictObject({
+  /** Диаметр в начале и в конце, доля ширины экрана. 0 — круга нет. */
+  d0: discRange("d0"),
+  d1: discRange("d1"),
+  /** Плавный старт и замедление к концу — у круга свои. */
+  dstart: discRange("dstart"),
+  dsoft: discRange("dsoft"),
+  /** Круг начинает позже блюда: доля времени заставки. */
+  delay: discRange("delay"),
+  /** Круг выше (−) или ниже (+) середины экрана, px. */
+  y: discRange("y"),
+});
+
+/** Заставка категории (docs/motion/splash-prompt.md, эталон
+ *  docs/motion/splash-demo.html). Все числа берутся отсюда: в коде
+ *  заставки нет ни одного своего значения.
+ *
+ *  Блюдо всегда одно — первое доступное в точке (решение хозяина
+ *  24.09.2026), поэтому ни count, ни смены блюд в настройках нет. */
 export const splashSchema = z.strictObject({
   enabled: z.boolean(),
-  /** Сколько заставка держится до ухода, мс (уход считается от неё). */
+  /** Сколько заставка держится до ухода, мс. Ролик играет со скоростью
+   *  1000 / hold: при 1000 — ровно как снят. */
   hold: splashRange("hold"),
-  /** Появление круга, блюда и слова, мс. */
-  fade: splashRange("fade"),
-  /** Размер блюда: доля ширины экрана. */
-  zoom: splashRange("zoom"),
+  /** Появление круга, блюда и слова по прозрачности, мс. */
+  fin: splashRange("fin"),
+  /** Уход, мс. */
+  fout: splashRange("fout"),
+  /** Как заставка уходит: затуханием, шторкой вверх или в меню. */
+  exit: z.enum(["fade", "lift", "zoom"]),
+  dish: splashDishSchema,
+  disc: splashDiscSchema,
   /** Слово категории выше (−) или ниже (+) середины, px. */
   wordY: splashRange("wordY"),
   /** Слово поверх блюда или под ним. */
   wordTop: z.boolean(),
-  /** Показывать слово категории вообще. */
-  word: z.boolean(),
-  /** Диаметр жёлтого круга: доля ширины экрана. 0 — круга нет. */
-  disc: splashRange("disc"),
   /** Насыщенность линий фона на заставке. */
   lines: splashRange("lines"),
-  /** Сколько блюд показать подряд: 1 или 2. */
-  count: splashRange("count"),
-  /** Смена блюда, мс (когда их два). */
-  xfade: splashRange("xfade"),
-  /** Как заставка уходит: шторкой вверх, затуханием или в меню. */
-  exit: z.enum(["lift", "fade", "zoom"]),
   /** Можно прервать касанием. */
   skip: z.boolean(),
-  /** Заставка из фото — категории без ролика. */
-  photo: splashPhotoSchema,
 });
 
 export const pageSchema = z.strictObject({
@@ -236,7 +272,8 @@ export type ProductShadowSettings = z.infer<typeof productShadowSchema>;
 export type ProductRevealSettings = z.infer<typeof productRevealSchema>;
 export type ProductLiftSettings = z.infer<typeof productLiftSchema>;
 export type ProductsSettings = z.infer<typeof productsSchema>;
-export type SplashPhotoSettings = z.infer<typeof splashPhotoSchema>;
+export type SplashDishSettings = z.infer<typeof splashDishSchema>;
+export type SplashDiscSettings = z.infer<typeof splashDiscSchema>;
 export type SplashSettings = z.infer<typeof splashSchema>;
 export type PageSettings = z.infer<typeof pageSchema>;
 export type MotionConfig = z.infer<typeof motionConfigSchema>;

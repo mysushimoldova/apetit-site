@@ -1,145 +1,162 @@
 import { describe, expect, it } from "vitest";
-import {
-  exitMs,
-  PHOTO_RISE_PX,
-  splashPhotoMotion,
-  splashVisual,
-  totalMs,
-  type SplashExit,
-} from "./timeline";
+import { splashVisual, totalMs, type SplashTiming } from "./timeline";
 
-const S = (exit: SplashExit = "lift", fade = 200) => ({ fade, exit });
+/** Значения хозяина (src/config/motion.json → splash, эталон
+ *  docs/motion/splash-demo.html, объект S). */
+const S = (over: Partial<SplashTiming> = {}): SplashTiming => ({
+  hold: 1000,
+  fin: 400,
+  fout: 500,
+  exit: "fade",
+  dish: { z0: 1.32, z1: 0.96, y0: 20, y1: 10, start: 0.8, soft: 0.15 },
+  disc: { d0: 0.54, d1: 0.12, dstart: 1, dsoft: 0.15, delay: 0.2, y: 0 },
+  ...over,
+});
 
-describe("длительность ухода", () => {
-  it("в полтора с лишним раза длиннее появления", () => {
-    expect(exitMs(200)).toBe(320);
+describe("вся заставка", () => {
+  it("держится плюс уход", () => {
+    expect(totalMs(1000, 500)).toBe(1500);
+  });
+});
+
+describe("блюдо", () => {
+  it("в нулевой момент — размер и высота начала", () => {
+    const v = splashVisual(0, S());
+    expect(v.dishScale).toBeCloseTo(1.32, 5);
+    expect(v.dishY).toBeCloseTo(20, 5);
   });
 
-  it("никогда не короче 180 мс", () => {
-    expect(exitMs(120)).toBe(192);
-    expect(exitMs(0)).toBe(180);
+  it("к концу показа — размер и высота конца", () => {
+    const v = splashVisual(1000, S());
+    expect(v.dishScale).toBeCloseTo(0.96, 5);
+    expect(v.dishY).toBeCloseTo(10, 5);
   });
 
-  it("вся заставка = держится + уход", () => {
-    expect(totalMs(1500, 200)).toBe(1820);
+  it("только уменьшается и только поднимается — ни разу не наоборот", () => {
+    let scale = Number.POSITIVE_INFINITY;
+    let y = Number.POSITIVE_INFINITY;
+    for (let t = 0; t <= 1000; t += 25) {
+      const v = splashVisual(t, S());
+      expect(v.dishScale).toBeLessThanOrEqual(scale + 1e-9);
+      expect(v.dishY).toBeLessThanOrEqual(y + 1e-9);
+      scale = v.dishScale;
+      y = v.dishY;
+    }
+  });
+
+  // Плавный старт 0.8 — кривая трогается медленно: это подобрано хозяином и
+  // ровно так же вшито в ролик (scripts/splash-video/config.json → curve).
+  it("плавный старт: за первую пятую времени пройдено меньше пятой части пути", () => {
+    const v = splashVisual(200, S());
+    const passed = (1.32 - v.dishScale) / (1.32 - 0.96);
+    expect(passed).toBeLessThan(0.2);
+    expect(passed).toBeGreaterThan(0);
+  });
+});
+
+describe("жёлтый круг", () => {
+  it("в нулевой момент — свой начальный диаметр", () => {
+    expect(splashVisual(0, S()).disc).toBeCloseTo(0.54, 5);
+  });
+
+  it("к концу показа — конечный диаметр", () => {
+    expect(splashVisual(1000, S()).disc).toBeCloseTo(0.12, 5);
+  });
+
+  // Задержка 0.20: первые 200 мс из 1000 круг стоит на месте, потом едет.
+  it("трогается позже блюда", () => {
+    expect(splashVisual(200, S()).disc).toBeCloseTo(0.54, 5);
+    expect(splashVisual(199, S()).disc).toBeCloseTo(0.54, 5);
+    expect(splashVisual(400, S()).disc).toBeLessThan(0.54);
+    // Блюдо в эти же 200 мс уже поехало
+    expect(splashVisual(200, S()).dishScale).toBeLessThan(1.32);
+  });
+
+  it("высота круга — из настроек, она не меняется", () => {
+    const high = S({ disc: { ...S().disc, y: -40 } });
+    expect(splashVisual(0, high).discY).toBe(-40);
+    expect(splashVisual(900, high).discY).toBe(-40);
+  });
+
+  // Ползунок задержки доходит только до 0.6, но деления на ноль в формуле
+  // быть не должно: при задержке в единицу круг просто сразу конечного
+  // размера (как в эталоне), а не NaN.
+  it("задержка в единицу не ломает круг", () => {
+    const still = S({ disc: { ...S().disc, delay: 1 } });
+    expect(splashVisual(0, still).disc).toBeCloseTo(0.12, 5);
+    expect(Number.isFinite(splashVisual(500, still).disc)).toBe(true);
   });
 });
 
 describe("появление", () => {
-  // Решение архитектора 24.09.2026: пустого кремового кадра в начале нет —
-  // круг и блюдо нарисованы с первого кадра, им только остаётся дорасти.
-  it("в нулевой момент круг и блюдо уже видны и начали расти", () => {
-    const v = splashVisual(0, 1500, S());
-    expect(v.discAlpha).toBe(1);
-    expect(v.foodAlpha).toBe(1);
-    expect(v.discScale).toBeCloseTo(0.55, 5);
-    expect(v.foodScale).toBeCloseTo(0.9, 5);
+  // Решение архитектора 24.09.2026: пустого кремового кадра в начале нет.
+  // Кривая входа набирает быстро — к 50 мс из 400 видно уже около половины.
+  it("блюдо видно с первого кадра", () => {
+    expect(splashVisual(50, S()).alpha).toBeGreaterThan(0.3);
   });
 
-  it("к концу появления круг и блюдо на месте и непрозрачны", () => {
-    const v = splashVisual(400, 1500, S());
-    expect(v.discAlpha).toBe(1);
-    expect(v.foodAlpha).toBe(1);
-    expect(v.discScale).toBe(1);
-    expect(v.foodScale).toBe(1);
-    expect(v.liftShare).toBe(0);
+  it("к концу появления — полностью непрозрачно", () => {
+    expect(splashVisual(400, S()).alpha).toBe(1);
+    expect(splashVisual(900, S()).alpha).toBe(1);
   });
 
-  it("ни круг, ни блюдо не ждут: оба растут с первого мгновения", () => {
-    const v = splashVisual(40, 1500, S());
-    expect(v.foodAlpha).toBe(1);
-    expect(v.discAlpha).toBe(1);
-    expect(v.foodScale).toBeGreaterThan(0.9);
-    expect(v.discScale).toBeGreaterThan(0.55);
-  });
-
-  it("пока держится — всё неподвижно", () => {
-    const v = splashVisual(900, 1500, S());
-    expect(v).toMatchObject({
-      discScale: 1,
-      foodScale: 1,
-      foodAlpha: 1,
-      liftShare: 0,
-      visible: true,
-    });
+  it("кремовый экран непрозрачен с самого начала", () => {
+    expect(splashVisual(0, S()).screenAlpha).toBe(1);
+    expect(splashVisual(900, S()).screenAlpha).toBe(1);
   });
 });
 
 describe("уход", () => {
-  it("«шторка вверх» поднимает всю заставку и заканчивается", () => {
-    const mid = splashVisual(1500 + 160, 1500, S("lift"));
+  it("затухание гасит всю заставку, ничего не двигая", () => {
+    const mid = splashVisual(1000 + 250, S());
+    expect(mid.alpha).toBeLessThan(1);
+    expect(mid.alpha).toBeGreaterThan(0);
+    expect(mid.screenAlpha).toBeLessThan(1);
+    expect(mid.liftShare).toBe(0);
+    expect(mid.zoomX).toBe(0);
+    expect(mid.zoomY).toBe(0);
+    expect(mid.visible).toBe(true);
+  });
+
+  it("к концу ухода заставки нет", () => {
+    expect(splashVisual(1000 + 500, S()).visible).toBe(false);
+  });
+
+  // docs/MOTION.md §3: уход трогается сразу, иначе читается как залипание.
+  it("за первые 10 % времени ухода пройдено больше четверти пути", () => {
+    const early = splashVisual(1000 + 50, S());
+    expect(1 - early.screenAlpha).toBeGreaterThan(0.25);
+  });
+
+  it("во время ухода блюдо и круг стоят там, где их застали", () => {
+    const at = splashVisual(1000, S());
+    const later = splashVisual(1000 + 250, S());
+    expect(later.dishScale).toBeCloseTo(at.dishScale, 5);
+    expect(later.disc).toBeCloseTo(at.disc, 5);
+  });
+
+  it("касание в середине — уход начинается сразу, движение замирает", () => {
+    const tap = 600;
+    const atTap = splashVisual(tap, S(), tap);
+    expect(atTap.screenAlpha).toBe(1);
+    const after = splashVisual(tap + 250, S(), tap);
+    expect(after.screenAlpha).toBeLessThan(1);
+    expect(after.dishScale).toBeCloseTo(atTap.dishScale, 5);
+    expect(splashVisual(tap + 500, S(), tap).visible).toBe(false);
+  });
+
+  it("«шторка вверх» поднимает всю заставку", () => {
+    const mid = splashVisual(1000 + 250, S({ exit: "lift" }));
     expect(mid.liftShare).toBeGreaterThan(0);
     expect(mid.liftShare).toBeLessThan(1);
-    expect(mid.visible).toBe(true);
-
-    const done = splashVisual(1500 + 320, 1500, S("lift"));
-    expect(done.visible).toBe(false);
+    expect(mid.screenAlpha).toBe(1);
   });
 
-  it("«затухание» гасит круг и блюдо, не двигая их", () => {
-    const v = splashVisual(1500 + 160, 1500, S("fade"));
-    expect(v.liftShare).toBe(0);
-    expect(v.foodAlpha).toBeLessThan(1);
-    expect(v.foodScale).toBe(1);
-  });
-
-  it("«уезжает в меню» уменьшает блюдо и уводит его вбок и вниз", () => {
-    const v = splashVisual(1500 + 160, 1500, S("zoom"));
-    expect(v.foodScale).toBeLessThan(1);
-    expect(v.zoomX).toBeLessThan(0);
-    expect(v.zoomY).toBeGreaterThan(0);
-  });
-
-  // Решение архитектора 24.09.2026: уход заставки идёт по кривой ВХОДА, а
-  // значит трогается сразу. Раньше из 320 мс глазу было видно 120.
-  it("уход трогается сразу: за первые 10 % времени — больше четверти пути", () => {
-    const out = 320; // exitMs(200)
-    const early = splashVisual(1500 + out * 0.1, 1500, S("lift"));
-    expect(early.liftShare).toBeGreaterThan(0.25);
-  });
-
-  it("касание в середине — уход начинается сразу с этого момента", () => {
-    const tapped = splashVisual(600, 1500, S("lift"), 600);
-    expect(tapped.liftShare).toBe(0);
-    const later = splashVisual(760, 1500, S("lift"), 600);
-    expect(later.liftShare).toBeGreaterThan(0);
-    expect(splashVisual(920, 1500, S("lift"), 600).visible).toBe(false);
-  });
-});
-
-describe("движение фото на заставке", () => {
-  const HOLD = 1500;
-  const FROM = 1.06;
-
-  it("в начале — начальный масштаб и никакого подъёма", () => {
-    const start = splashPhotoMotion(0, HOLD, FROM);
-    expect(start.scale).toBeCloseTo(FROM, 5);
-    expect(start.risePx).toBeCloseTo(0, 5);
-  });
-
-  it("к концу показа — масштаб ровно 1 и полный подъём", () => {
-    const end = splashPhotoMotion(HOLD, HOLD, FROM);
-    expect(end.scale).toBeCloseTo(1, 5);
-    expect(end.risePx).toBeCloseTo(PHOTO_RISE_PX, 5);
-  });
-
-  it("кривая замедления: за первую половину проходит больше половины пути", () => {
-    const half = splashPhotoMotion(HOLD / 2, HOLD, FROM);
-    const passed = (FROM - half.scale) / (FROM - 1);
-    expect(passed).toBeGreaterThan(0.5);
-    expect(passed).toBeLessThan(1);
-    // Масштаб только уменьшается — перелёта нет
-    expect(half.scale).toBeLessThan(FROM);
-    expect(half.scale).toBeGreaterThan(1);
-  });
-
-  it("после конца показа ничего не ломается", () => {
-    const after = splashPhotoMotion(HOLD * 2, HOLD, FROM);
-    expect(after.scale).toBeCloseTo(1, 5);
-    expect(after.risePx).toBeCloseTo(PHOTO_RISE_PX, 5);
-  });
-
-  it("zoomFrom = 1 — фото просто стоит и чуть поднимается", () => {
-    expect(splashPhotoMotion(HOLD / 2, HOLD, 1).scale).toBe(1);
+  it("«уезжает в меню» уменьшает блюдо и уводит его влево и вниз", () => {
+    const mid = splashVisual(1000 + 250, S({ exit: "zoom" }));
+    expect(mid.dishScale).toBeLessThan(splashVisual(1000, S()).dishScale);
+    expect(mid.zoomX).toBeLessThan(0);
+    expect(mid.zoomY).toBeGreaterThan(0);
+    expect(mid.alpha).toBeLessThan(1);
   });
 });

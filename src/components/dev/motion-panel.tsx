@@ -15,7 +15,8 @@ import {
   CONTOUR_COLORS,
   PAGE_BACKGROUNDS,
   PRODUCTS_RANGES,
-  SPLASH_PHOTO_RANGES,
+  SPLASH_DISC_RANGES,
+  SPLASH_DISH_RANGES,
   SPLASH_RANGES,
   type BackgroundSettings,
   type ContourColor,
@@ -24,6 +25,8 @@ import {
   type ProductLiftSettings,
   type ProductRevealSettings,
   type ProductShadowSettings,
+  type SplashDiscSettings,
+  type SplashDishSettings,
   type SplashSettings,
 } from "@/motion/config-schema";
 import {
@@ -65,8 +68,8 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const EXIT_NAMES: Record<SplashSettings["exit"], string> = {
-  lift: "Шторка вверх",
   fade: "Затухание",
+  lift: "Шторка вверх",
   zoom: "Уезжает в меню",
 };
 
@@ -74,11 +77,14 @@ const EXIT_NAMES: Record<SplashSettings["exit"], string> = {
  *  docs/motion/splash-demo.html. */
 function splashLine(config: MotionConfig): string {
   const s = config.splash;
+  const { dish, disc } = s;
   return (
-    `hold=${s.hold} zoom=${s.zoom} wordY=${s.wordY} fade=${s.fade} exit=${s.exit}` +
-    ` count=${s.count} xfade=${s.xfade} wordTop=${s.wordTop} disc=${s.disc}` +
-    ` lines=${s.lines} word=${s.word} skip=${s.skip} enabled=${s.enabled}` +
-    ` photoZoomFrom=${s.photo.zoomFrom}`
+    `hold=${s.hold} z0=${dish.z0} z1=${dish.z1} y0=${dish.y0} y1=${dish.y1}` +
+    ` start=${dish.start} soft=${dish.soft} fin=${s.fin} fout=${s.fout}` +
+    ` exit=${s.exit} | disc: d0=${disc.d0} d1=${disc.d1} dstart=${disc.dstart}` +
+    ` dsoft=${disc.dsoft} delay=${disc.delay} discY=${disc.y}` +
+    ` | wordY=${s.wordY} lines=${s.lines} wordTop=${s.wordTop} skip=${s.skip}` +
+    ` enabled=${s.enabled}`
   );
 }
 
@@ -203,6 +209,30 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
       splash: { ...current.splash, [key]: next },
     }));
 
+  const setDish = <K extends keyof SplashDishSettings>(
+    key: K,
+    next: SplashDishSettings[K],
+  ) =>
+    setValue((current) => ({
+      ...current,
+      splash: {
+        ...current.splash,
+        dish: { ...current.splash.dish, [key]: next },
+      },
+    }));
+
+  const setDisc = <K extends keyof SplashDiscSettings>(
+    key: K,
+    next: SplashDiscSettings[K],
+  ) =>
+    setValue((current) => ({
+      ...current,
+      splash: {
+        ...current.splash,
+        disc: { ...current.splash.disc, [key]: next },
+      },
+    }));
+
   const setPageBackground = (background: PageBackground) =>
     setValue((current) => ({ ...current, page: { background } }));
 
@@ -284,77 +314,45 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
                 checked={value.splash.enabled}
                 onChange={(next) => setSplash("enabled", next)}
               />
+
+              <p className="font-ui text-label text-smoke">Время и мягкость</p>
               <Slider
-                label="Длительность всей заставки"
-                hint="мс, от нажатия до ухода"
+                label="Длительность"
+                hint="мс, от нажатия до ухода; ролик играет со скоростью 1000 / длительность"
                 range={SPLASH_RANGES.hold}
                 value={value.splash.hold}
                 digits={0}
                 onChange={(next) => setSplash("hold", next)}
               />
               <Slider
-                label="Появление и уход"
+                label="Замедление к концу"
+                range={SPLASH_DISH_RANGES.soft}
+                value={value.splash.dish.soft}
+                digits={2}
+                onChange={(next) => setDish("soft", next)}
+              />
+              <Slider
+                label="Плавный старт"
+                range={SPLASH_DISH_RANGES.start}
+                value={value.splash.dish.start}
+                digits={2}
+                onChange={(next) => setDish("start", next)}
+              />
+              <Slider
+                label="Появление"
                 hint="мс"
-                range={SPLASH_RANGES.fade}
-                value={value.splash.fade}
+                range={SPLASH_RANGES.fin}
+                value={value.splash.fin}
                 digits={0}
-                onChange={(next) => setSplash("fade", next)}
+                onChange={(next) => setSplash("fin", next)}
               />
               <Slider
-                label="Размер блюда"
-                hint="доля ширины экрана"
-                range={SPLASH_RANGES.zoom}
-                value={value.splash.zoom}
-                digits={2}
-                onChange={(next) => setSplash("zoom", next)}
-              />
-              <Slider
-                label="Слово выше / ниже"
-                hint="px"
-                range={SPLASH_RANGES.wordY}
-                value={value.splash.wordY}
+                label="Уход"
+                hint="мс"
+                range={SPLASH_RANGES.fout}
+                value={value.splash.fout}
                 digits={0}
-                onChange={(next) => setSplash("wordY", next)}
-              />
-              <Slider
-                label="Жёлтый круг"
-                hint="доля ширины экрана, 0 — круга нет"
-                range={SPLASH_RANGES.disc}
-                value={value.splash.disc}
-                digits={2}
-                onChange={(next) => setSplash("disc", next)}
-              />
-              <Slider
-                label="Линии на заставке"
-                range={SPLASH_RANGES.lines}
-                value={value.splash.lines}
-                digits={2}
-                onChange={(next) => setSplash("lines", next)}
-              />
-              <Slider
-                label="Сколько блюд подряд"
-                range={SPLASH_RANGES.count}
-                value={value.splash.count}
-                digits={0}
-                onChange={(next) => setSplash("count", next)}
-              />
-              <Slider
-                label="Смена блюда"
-                hint="мс, когда блюд два"
-                range={SPLASH_RANGES.xfade}
-                value={value.splash.xfade}
-                digits={0}
-                onChange={(next) => setSplash("xfade", next)}
-              />
-              <Slider
-                label="Фото: начальный масштаб"
-                hint="категории без ролика: фото съезжается до 1"
-                range={SPLASH_PHOTO_RANGES.zoomFrom}
-                value={value.splash.photo.zoomFrom}
-                digits={2}
-                onChange={(next) =>
-                  setSplash("photo", { ...value.splash.photo, zoomFrom: next })
-                }
+                onChange={(next) => setSplash("fout", next)}
               />
               <Choice
                 label="Уход заставки"
@@ -364,15 +362,111 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
                 ).map((id) => ({ id, label: EXIT_NAMES[id] }))}
                 onChange={(exit) => setSplash("exit", exit)}
               />
+
+              <p className="font-ui text-label text-smoke">
+                Размер — в начале большой, в конце меньше
+              </p>
+              <Slider
+                label="Размер в начале"
+                range={SPLASH_DISH_RANGES.z0}
+                value={value.splash.dish.z0}
+                digits={2}
+                onChange={(next) => setDish("z0", next)}
+              />
+              <Slider
+                label="Размер в конце"
+                range={SPLASH_DISH_RANGES.z1}
+                value={value.splash.dish.z1}
+                digits={2}
+                onChange={(next) => setDish("z1", next)}
+              />
+              <Slider
+                label="Высота в начале"
+                hint="px, плюс — ниже середины"
+                range={SPLASH_DISH_RANGES.y0}
+                value={value.splash.dish.y0}
+                digits={0}
+                onChange={(next) => setDish("y0", next)}
+              />
+              <Slider
+                label="Высота в конце"
+                hint="px"
+                range={SPLASH_DISH_RANGES.y1}
+                value={value.splash.dish.y1}
+                digits={0}
+                onChange={(next) => setDish("y1", next)}
+              />
+
+              <p className="font-ui text-label text-smoke">
+                Жёлтый круг — свой размер и свой разгон
+              </p>
+              <Slider
+                label="Круг в начале"
+                hint="доля ширины экрана, 0 — круга нет"
+                range={SPLASH_DISC_RANGES.d0}
+                value={value.splash.disc.d0}
+                digits={2}
+                onChange={(next) => setDisc("d0", next)}
+              />
+              <Slider
+                label="Круг в конце"
+                hint="доля ширины экрана"
+                range={SPLASH_DISC_RANGES.d1}
+                value={value.splash.disc.d1}
+                digits={2}
+                onChange={(next) => setDisc("d1", next)}
+              />
+              <Slider
+                label="Круг: замедление к концу"
+                range={SPLASH_DISC_RANGES.dsoft}
+                value={value.splash.disc.dsoft}
+                digits={2}
+                onChange={(next) => setDisc("dsoft", next)}
+              />
+              <Slider
+                label="Круг: плавный старт"
+                range={SPLASH_DISC_RANGES.dstart}
+                value={value.splash.disc.dstart}
+                digits={2}
+                onChange={(next) => setDisc("dstart", next)}
+              />
+              <Slider
+                label="Круг: начинает позже"
+                hint="доля времени заставки: 0.20 — на пятой части"
+                range={SPLASH_DISC_RANGES.delay}
+                value={value.splash.disc.delay}
+                digits={2}
+                onChange={(next) => setDisc("delay", next)}
+              />
+              <Slider
+                label="Круг выше / ниже"
+                hint="px"
+                range={SPLASH_DISC_RANGES.y}
+                value={value.splash.disc.y}
+                digits={0}
+                onChange={(next) => setDisc("y", next)}
+              />
+
+              <p className="font-ui text-label text-smoke">Сцена</p>
+              <Slider
+                label="Слово выше / ниже"
+                hint="px"
+                range={SPLASH_RANGES.wordY}
+                value={value.splash.wordY}
+                digits={0}
+                onChange={(next) => setSplash("wordY", next)}
+              />
+              <Slider
+                label="Линии"
+                range={SPLASH_RANGES.lines}
+                value={value.splash.lines}
+                digits={2}
+                onChange={(next) => setSplash("lines", next)}
+              />
               <Toggle
                 label="Слово поверх блюда"
                 checked={value.splash.wordTop}
                 onChange={(next) => setSplash("wordTop", next)}
-              />
-              <Toggle
-                label="Показывать слово категории"
-                checked={value.splash.word}
-                onChange={(next) => setSplash("word", next)}
               />
               <Toggle
                 label="Можно прервать касанием"

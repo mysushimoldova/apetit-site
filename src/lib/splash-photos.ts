@@ -14,10 +14,12 @@ import type { MenuSection } from "@/data/menu";
 type ImageInfo = { width: number; height: number; sizes: number[] };
 const PRODUCT_IMAGES: Record<string, ImageInfo> = images.products;
 
-/** Какую ширину файла просить. Блюдо на заставке не шире 320 px CSS
- *  (MAX_VIDEO_WIDTH в src/motion/splash/geometry.ts); при плотности экрана
- *  2–3 это 640…960 настоящих пикселей — 800 в самый раз. Нет такого
- *  размера — берём самый крупный из имеющихся. */
+/** Какую ширину файла просить. На телефоне 390 px блюдо на заставке —
+ *  около 350 CSS-пикселей (0.9 ширины экрана, src/motion/splash/geometry.ts),
+ *  в начале крупнее в 1.32 раза; при плотности экрана 2 это примерно 900
+ *  настоящих пикселей — 800 в самый раз, и это ровно тот же файл, что уже
+ *  показала плитка меню, то есть лишней загрузки нет. Нет такого размера —
+ *  берём самый крупный из имеющихся. */
 const WANT = 800;
 
 function bestSize(sizes: readonly number[]): number {

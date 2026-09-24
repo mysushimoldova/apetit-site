@@ -5,37 +5,33 @@ import {
   SPLASH_VIDEOS,
   splashModeFor,
   splashVideoSrc,
-  splashVideosFor,
+  splashVideoFor,
 } from "./catalog";
 
 const ALL = new Set(Object.values(SPLASH_VIDEOS).flat());
 
-describe("выбор роликов заставки", () => {
-  it("оба блюда есть в точке — берётся столько, сколько просят", () => {
-    expect(splashVideosFor("kebab", ALL, 2)).toEqual([
-      "kebab-xl-xxl",
-      "kebab-cheese",
-    ]);
-    expect(splashVideosFor("kebab", ALL, 1)).toEqual(["kebab-xl-xxl"]);
+describe("выбор блюда заставки", () => {
+  // Решение хозяина 24.09.2026: на заставке всегда ОДНО блюдо — первое,
+  // какое есть в меню выбранной точки.
+  it("оба блюда есть в точке — играет первое", () => {
+    expect(splashVideoFor("kebab", ALL)).toBe("kebab-xl-xxl");
+    expect(splashVideoFor("drinks", ALL)).toBe("cola");
   });
 
   it("первого блюда в точке нет — играет второе", () => {
-    const only = new Set(["kebab-cheese"]);
-    expect(splashVideosFor("kebab", only, 1)).toEqual(["kebab-cheese"]);
+    expect(splashVideoFor("kebab", new Set(["kebab-cheese"]))).toBe(
+      "kebab-cheese",
+    );
   });
 
-  it("ни одного блюда категории в точке нет — заставки нет", () => {
-    expect(splashVideosFor("kebab", new Set(), 1)).toEqual([]);
+  it("ни одного блюда категории в точке нет — ролика нет", () => {
+    expect(splashVideoFor("kebab", new Set())).toBe(null);
   });
 
-  it("у категории нет роликов — список пустой (дальше в ход идёт фото)", () => {
+  it("у категории нет роликов — ролика нет (дальше в ход идёт фото)", () => {
     for (const slug of ["menu", "crispy", "hot-dog", "pizza", "cartofi"]) {
-      expect(splashVideosFor(slug, ALL, 2)).toEqual([]);
+      expect(splashVideoFor(slug, ALL)).toBe(null);
     }
-  });
-
-  it("count меньше единицы всё равно даёт одно блюдо", () => {
-    expect(splashVideosFor("drinks", ALL, 0)).toEqual(["cola"]);
   });
 
   it("адрес ролика — файл из public/splash", () => {
@@ -49,30 +45,30 @@ describe("режим заставки: видео / фото / ничего", ()
     kebab: "/img/products/kebab-cheese-800.webp",
   };
 
-  it("есть ролики — играет ролик, даже если фото тоже есть", () => {
-    expect(splashModeFor("kebab", ALL, 2, PHOTOS)).toEqual({
+  it("есть ролик — играет ролик, даже если фото тоже есть", () => {
+    expect(splashModeFor("kebab", ALL, PHOTOS)).toEqual({
       kind: "video",
-      slugs: ["kebab-xl-xxl", "kebab-cheese"],
+      slug: "kebab-xl-xxl",
     });
   });
 
-  it("роликов у категории нет — играет фото", () => {
-    expect(splashModeFor("pizza", ALL, 1, PHOTOS)).toEqual({
+  it("ролика у категории нет — играет фото", () => {
+    expect(splashModeFor("pizza", ALL, PHOTOS)).toEqual({
       kind: "photo",
       src: PHOTOS.pizza,
     });
   });
 
   it("ролики есть, но этих блюд нет в точке — тоже фото", () => {
-    expect(splashModeFor("kebab", new Set(), 1, PHOTOS)).toEqual({
+    expect(splashModeFor("kebab", new Set(), PHOTOS)).toEqual({
       kind: "photo",
       src: PHOTOS.kebab,
     });
   });
 
   it("ни ролика, ни фото — заставки нет", () => {
-    expect(splashModeFor("hot-dog", ALL, 1, PHOTOS)).toEqual({ kind: "none" });
-    expect(splashModeFor("pizza", ALL, 1, undefined)).toEqual({ kind: "none" });
+    expect(splashModeFor("hot-dog", ALL, PHOTOS)).toEqual({ kind: "none" });
+    expect(splashModeFor("pizza", ALL, undefined)).toEqual({ kind: "none" });
   });
 });
 

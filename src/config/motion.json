@@ -43,21 +43,30 @@
   },
   "splash": {
     "enabled": true,
-    "hold": 1500,
-    "fade": 200,
-    "zoom": 0.83,
-    "wordY": -5,
+    "hold": 1000,
+    "fin": 400,
+    "fout": 500,
+    "exit": "fade",
+    "dish": {
+      "z0": 1.32,
+      "z1": 0.96,
+      "y0": 20,
+      "y1": 10,
+      "start": 0.8,
+      "soft": 0.15
+    },
+    "disc": {
+      "d0": 0.54,
+      "d1": 0.12,
+      "dstart": 1,
+      "dsoft": 0.15,
+      "delay": 0.2,
+      "y": 0
+    },
+    "wordY": -220,
     "wordTop": true,
-    "word": true,
-    "disc": 0.62,
     "lines": 0.35,
-    "count": 1,
-    "xfade": 180,
-    "exit": "lift",
-    "skip": true,
-    "photo": {
-      "zoomFrom": 1.06
-    }
+    "skip": true
   },
   "page": {
     "background": "#F7F2EA"

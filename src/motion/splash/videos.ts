@@ -1,7 +1,7 @@
 // Ролики заставки: загрузка по требованию и хранение на время визита.
 //
 // Правило из задания: при открытии сайта не грузится ничего. Первое нажатие
-// на категорию заставки не показывает (переход обычный), но ставит ролики
+// на категорию заставки не показывает (переход обычный), но ставит ролик
 // этой категории в загрузку — со второго раза заставка уже играет. Никаких
 // <link rel="preload">: ролики не должны соперничать за сеть с главной
 // картинкой страницы.
@@ -30,13 +30,11 @@ export function videoUsable(video: { readyState: number }): boolean {
 }
 
 export interface SplashVideoPool {
-  /**
-   * Готовые ролики для этих слагов. Если хоть один ещё не готов — null,
-   * и загрузка запускается (или продолжается) в фоне.
-   */
-  take(slugs: readonly string[]): HTMLVideoElement[] | null;
+  /** Готовый ролик этого блюда. Ещё не загружен — null, и загрузка
+   *  запускается (или продолжается) в фоне. */
+  take(slug: string): HTMLVideoElement | null;
   /** Поставить в загрузку, ничего не ожидая. */
-  warm(slugs: readonly string[]): void;
+  warm(slug: string): void;
   dispose(): void;
 }
 
@@ -62,15 +60,14 @@ export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
   }
 
   return {
-    take(slugs) {
-      if (slugs.length === 0) return null;
-      const videos = slugs.map(element);
-      if (!videos.every(videoUsable)) return null;
-      return videos;
+    take(slug) {
+      if (!slug) return null;
+      const video = element(slug);
+      return videoUsable(video) ? video : null;
     },
 
-    warm(slugs) {
-      for (const slug of slugs) element(slug);
+    warm(slug) {
+      if (slug) element(slug);
     },
 
     dispose() {
