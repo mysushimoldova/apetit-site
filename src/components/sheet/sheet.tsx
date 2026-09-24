@@ -19,6 +19,9 @@ import { useSheetDrag } from "./use-sheet-drag";
 
 /** = --dur-in: столько длится закрытие шторки (docs/MOTION.md §2) */
 const EXIT_MS = 320;
+/** То же при «уменьшить движение»: лист не уезжает, а гаснет за 180 мс
+ *  (docs/MOTION.md §6, решение архитектора 24.09.2026 — было мгновенно) */
+const EXIT_REDUCED_MS = 180;
 
 // Открытые сейчас листы, снизу вверх: «закрыть» для каждого. Нужен, чтобы
 // кнопка «назад» снимала только верхний и чтобы мы знали, чья запись в
@@ -205,7 +208,7 @@ function SheetDialog({
     ).matches;
     const timer = window.setTimeout(
       () => callbacks.current.onExited(),
-      reduce ? 0 : EXIT_MS,
+      reduce ? EXIT_REDUCED_MS : EXIT_MS,
     );
     return () => window.clearTimeout(timer);
   }, [open]);

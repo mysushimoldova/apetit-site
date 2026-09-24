@@ -171,7 +171,14 @@ test("свайп вниз закрывает лист, короткий медл
   const x = box.x + box.width / 2;
   const y = box.y + 20; // за ручку
 
-  async function drag(distance: number, steps: number, pauseMs: number) {
+  // holdMs — пауза перед тем, как палец оторвался: 150 мс это уже не смах,
+  // 0 — смах (окно смаха в use-sheet-drag.ts — 100 мс).
+  async function drag(
+    distance: number,
+    steps: number,
+    pauseMs: number,
+    holdMs = 150,
+  ) {
     await client.send("Input.dispatchTouchEvent", {
       type: "touchStart",
       touchPoints: [{ x, y }],
@@ -183,7 +190,7 @@ test("свайп вниз закрывает лист, короткий медл
       });
       await page.waitForTimeout(pauseMs);
     }
-    await page.waitForTimeout(150); // палец остановился — это не смах
+    if (holdMs > 0) await page.waitForTimeout(holdMs);
     await client.send("Input.dispatchTouchEvent", {
       type: "touchEnd",
       touchPoints: [],
@@ -197,6 +204,34 @@ test("свайп вниз закрывает лист, короткий медл
     .toBe(Math.round(box.y));
 
   await drag(box.height * 0.5, 10, 16);
+  await expect(sheet).toBeHidden();
+});
+
+// Порог смаха 0.11 px/мс (решение архитектора 24.09.2026, было 0.4): спокойный
+// смах пальцем обязан закрывать лист, а не возвращать его на место.
+test("спокойный смах вниз тоже закрывает лист", async ({ page }) => {
+  const sheet = await openProduct(page, "Kebab Cheese");
+  const client = await page.context().newCDPSession(page);
+  const box = (await sheet.locator(".sheet-panel").boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + 20;
+
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x, y }],
+  });
+  // 10 px за 50 мс — это 0.2 px/мс: быстрее нового порога и медленнее старого
+  for (let i = 1; i <= 6; i++) {
+    await client.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x, y: y + i * 10 }],
+    });
+    await page.waitForTimeout(50);
+  }
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
   await expect(sheet).toBeHidden();
 });
 

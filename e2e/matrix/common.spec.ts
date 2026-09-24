@@ -26,15 +26,22 @@ test("«уменьшить движение»: ничего не едет, фо�
   await setTime(page, OPEN_TIME);
   await open(page, "/soroca");
 
-  // Все длительности переходов обнулены (globals.css → prefers-reduced-motion)
-  // Safari пишет ноль как «0s», Chromium — как «0ms»: сравниваем числа
+  // Все длительности — 180 мс (globals.css → prefers-reduced-motion).
+  // Именно 180, а не ноль: «уменьшить движение» — равноценная версия, всё
+  // появляется и исчезает одной прозрачностью (docs/MOTION.md §6, решение
+  // архитектора 24.09.2026). Safari пишет «0.18s», Chromium — «180ms»,
+  // поэтому сравниваем числа в миллисекундах.
   const durations = await page.evaluate(() => {
     const s = getComputedStyle(document.documentElement);
-    return ["--dur-fast", "--dur-state", "--dur-in", "--dur-slow"].map((n) =>
-      parseFloat(s.getPropertyValue(n)),
-    );
+    return ["--dur-fast", "--dur-state", "--dur-in", "--dur-slow"].map((n) => {
+      const value = s.getPropertyValue(n).trim();
+      const number = parseFloat(value);
+      return value.endsWith("ms") ? number : number * 1000;
+    });
   });
-  expect(durations, "длительности не обнулены").toEqual([0, 0, 0, 0]);
+  expect(durations, "длительности не равны 180 мс").toEqual([
+    180, 180, 180, 180,
+  ]);
 
   // Ничего не сдвинуто: transform у карточек и теней — none. Прозрачность
   // не трогаем: при «уменьшить движение» появление оставлено (карточка ниже

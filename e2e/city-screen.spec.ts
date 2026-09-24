@@ -68,7 +68,7 @@ test("мусор в localStorage не ломает главную", async ({ pag
   await expect(page.getByRole("link")).toHaveCount(4);
 });
 
-test("prefers-reduced-motion: плитки видны без анимации и без ошибок гидратации", async ({
+test("prefers-reduced-motion: плитки проявляются на месте, без ошибок гидратации", async ({
   page,
 }) => {
   const consoleErrors: string[] = [];
@@ -78,10 +78,14 @@ test("prefers-reduced-motion: плитки видны без анимации и
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const tile = page.getByRole("link", { name: "Briceni" });
+  // Появление остаётся, но это одна прозрачность 180 мс: плитка не едет
+  // (docs/MOTION.md §6, решение архитектора 24.09.2026)
   await expect(tile).toHaveCSS("opacity", "1");
-  await expect(tile).toHaveCSS("transform", "none");
-  // Плитка без motion: никаких inline-стилей и никакого несовпадения SSR/клиент.
-  await expect(tile).not.toHaveAttribute("style", /.+/);
+  // Плитка стоит на месте: сдвига нет ни в каком виде
+  await expect(tile).toHaveCSS(
+    "transform",
+    /^(none|matrix\(1, 0, 0, 1, 0, 0\))$/,
+  );
   expect(consoleErrors.filter((e) => /hydrat/i.test(e))).toEqual([]);
 });
 
@@ -93,11 +97,11 @@ test.describe("десктоп", () => {
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
-    // Ждём гидратацию: при reduced-motion плитки становятся обычными ссылками
-    // без inline-стилей; мерить раньше — поймать отвязанный элемент.
+    // Ждём конец появления: при reduced-motion плитки только проявляются,
+    // мерить раньше — поймать полупрозрачный элемент.
     const tiles = page.getByRole("link");
     await expect(tiles).toHaveCount(4);
-    await expect(tiles.last()).not.toHaveAttribute("style", /.+/);
+    await expect(tiles.last()).toHaveCSS("opacity", "1");
     const boxes = [];
     for (const name of CITY_NAMES) {
       const box = await page.getByRole("link", { name }).boundingBox();

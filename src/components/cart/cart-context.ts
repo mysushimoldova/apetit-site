@@ -93,7 +93,7 @@ export function useBump(ref: RefObject<HTMLElement | null>) {
         { transform: "translateY(0)" },
       ],
       // --dur-state, --ease-out (docs/MOTION.md §2–3)
-      { duration: 200, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+      { duration: 200, easing: "cubic-bezier(0.32, 0.72, 0, 1)" },
     );
   }, [bump, ref]);
 }

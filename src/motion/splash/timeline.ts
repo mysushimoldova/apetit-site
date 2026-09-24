@@ -5,7 +5,7 @@
 // Поведение взято из эталона docs/motion/splash-demo.html (playSplash /
 // endSplash), но кривые — наши, из docs/MOTION.md §3: у эталона своя
 // пружинистая, а закон движения сайта разрешает только две.
-import { easeIn, easeOut, mix, progress } from "./easing";
+import { easeIn, mix, progress } from "./easing";
 
 export type SplashExit = "lift" | "fade" | "zoom";
 
@@ -70,9 +70,6 @@ export function splashPhotoMotion(
 const START_DISC = 0.55;
 const START_FOOD = 0.9;
 
-/** Блюдо и круг трогаются чуть позже фона — как в эталоне, мс. */
-const FOOD_DELAY = 60;
-
 /** Круг въезжает дольше остальных: он крупный (эталон — fade × 1.5). */
 const DISC_FACTOR = 1.5;
 const FOOD_FACTOR = 1.25;
@@ -102,7 +99,11 @@ export function splashVisual(
   const fade = Math.max(0, settings.fade);
   const out = exitMs(fade);
   if (elapsed >= exitStart) {
-    const k = easeOut(progress(elapsed - exitStart, out));
+    // Уход идёт по кривой ВХОДА (--ease-reveal): заставка большая, её уход
+    // обязан трогаться сразу и мягко замирать в конце (решение архитектора
+    // 24.09.2026; прежняя кривая ухода стартовала медленно, и из 320 мс
+    // глазу было видно 120).
+    const k = easeIn(progress(elapsed - exitStart, out));
     if (k >= 1) return { ...IDLE, discAlpha: 0, foodAlpha: 0, visible: false };
     if (settings.exit === "lift") {
       return { ...IDLE, liftShare: k };
@@ -121,16 +122,19 @@ export function splashVisual(
     return { ...IDLE, discAlpha: 1 - k, foodAlpha: 1 - k };
   }
 
+  // Круг и блюдо видны с ПЕРВОГО кадра: пустого кремового экрана в начале
+  // заставки быть не должно (решение архитектора 24.09.2026). Появление
+  // остаётся движением — круг и блюдо приходят в свой размер, — но
+  // прозрачность больше не разгоняется с нуля, и блюдо не ждёт круга.
+  // Ролик или фото к этому моменту уже загружены: если нет, заставка не
+  // начинается вовсе (src/motion/splash/controller.ts).
   const disc = easeIn(progress(elapsed, fade * DISC_FACTOR));
-  const discA = progress(elapsed, fade);
-  const foodT = elapsed - FOOD_DELAY;
-  const food = easeIn(progress(foodT, fade * FOOD_FACTOR));
-  const foodA = progress(foodT, fade);
+  const food = easeIn(progress(elapsed, fade * FOOD_FACTOR));
   return {
     discScale: mix(START_DISC, 1, disc),
-    discAlpha: discA,
+    discAlpha: 1,
     foodScale: mix(START_FOOD, 1, food),
-    foodAlpha: foodA,
+    foodAlpha: 1,
     liftShare: 0,
     zoomX: 0,
     zoomY: 0,

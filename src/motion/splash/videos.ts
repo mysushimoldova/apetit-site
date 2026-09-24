@@ -10,8 +10,24 @@
 // не отдаёт кадры в WebGL у элемента, которого нет на странице.
 import { splashVideoSrc } from "./catalog";
 
-/** Ролик готов отдавать кадры (HAVE_CURRENT_DATA и выше). */
-const READY = 2;
+/**
+ * Ролик готов играть заставку — HAVE_ENOUGH_DATA, не меньше.
+ *
+ * Было HAVE_CURRENT_DATA (2), и это и есть та самая ошибка, из-за которой на
+ * телефоне заставка у категорий с роликом показывала пустой кремовый экран:
+ * уровень 2 означает «расшифрован один кадр», а не «файл загружен». Заставка
+ * тут же перематывала такой ролик на ноль и включала воспроизведение — ролик
+ * уходил в перемотку и подкачку, кадров видеокарте не доставалось, и на
+ * экране оставался кремовый фон с жёлтым кругом. Правило задания — «если
+ * файл ещё не загружен, заставка не играет» (docs/motion/splash-prompt.md,
+ * раздел ЗАГРУЗКА), и «загружен» — это именно уровень 4.
+ */
+const READY = 4;
+
+/** Ролик можно отдавать заставке? Отдельная функция — её проверяет тест. */
+export function videoUsable(video: { readyState: number }): boolean {
+  return video.readyState >= READY;
+}
 
 export interface SplashVideoPool {
   /**
@@ -49,7 +65,7 @@ export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
     take(slugs) {
       if (slugs.length === 0) return null;
       const videos = slugs.map(element);
-      if (videos.some((v) => v.readyState < READY)) return null;
+      if (!videos.every(videoUsable)) return null;
       return videos;
     },
 

@@ -26,10 +26,12 @@ describe("длительность ухода", () => {
 });
 
 describe("появление", () => {
-  it("в нулевой момент ничего не видно, но круг уже начал расти", () => {
+  // Решение архитектора 24.09.2026: пустого кремового кадра в начале нет —
+  // круг и блюдо нарисованы с первого кадра, им только остаётся дорасти.
+  it("в нулевой момент круг и блюдо уже видны и начали расти", () => {
     const v = splashVisual(0, 1500, S());
-    expect(v.discAlpha).toBe(0);
-    expect(v.foodAlpha).toBe(0);
+    expect(v.discAlpha).toBe(1);
+    expect(v.foodAlpha).toBe(1);
     expect(v.discScale).toBeCloseTo(0.55, 5);
     expect(v.foodScale).toBeCloseTo(0.9, 5);
   });
@@ -43,10 +45,12 @@ describe("появление", () => {
     expect(v.liftShare).toBe(0);
   });
 
-  it("блюдо трогается позже круга", () => {
+  it("ни круг, ни блюдо не ждут: оба растут с первого мгновения", () => {
     const v = splashVisual(40, 1500, S());
-    expect(v.foodAlpha).toBe(0);
-    expect(v.discAlpha).toBeGreaterThan(0);
+    expect(v.foodAlpha).toBe(1);
+    expect(v.discAlpha).toBe(1);
+    expect(v.foodScale).toBeGreaterThan(0.9);
+    expect(v.discScale).toBeGreaterThan(0.55);
   });
 
   it("пока держится — всё неподвижно", () => {
@@ -84,6 +88,14 @@ describe("уход", () => {
     expect(v.foodScale).toBeLessThan(1);
     expect(v.zoomX).toBeLessThan(0);
     expect(v.zoomY).toBeGreaterThan(0);
+  });
+
+  // Решение архитектора 24.09.2026: уход заставки идёт по кривой ВХОДА, а
+  // значит трогается сразу. Раньше из 320 мс глазу было видно 120.
+  it("уход трогается сразу: за первые 10 % времени — больше четверти пути", () => {
+    const out = 320; // exitMs(200)
+    const early = splashVisual(1500 + out * 0.1, 1500, S("lift"));
+    expect(early.liftShare).toBeGreaterThan(0.25);
   });
 
   it("касание в середине — уход начинается сразу с этого момента", () => {

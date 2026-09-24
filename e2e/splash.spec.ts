@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { SPLASH_VIDEOS } from "../src/motion/splash/catalog";
 
 // Заставка категории (docs/motion/splash-prompt.md) на телефоне 390 px.
 //
@@ -251,4 +252,172 @@ test("hot-dog: ролика нет, фото есть — заставка иг�
   await page.waitForTimeout(2000);
   expect(await splashOn(page)).toBe(false);
   expect(errors).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
+// Все категории с роликом: заставка появилась, блюдо нарисовано, заставка ушла
+// ---------------------------------------------------------------------------
+//
+// Одной категории мало: именно поэтому и пропустили баг, из-за которого на
+// телефоне заставку показывала только категория с фото, а у категорий с
+// роликом оставался пустой кремовый экран (ролик считался готовым, когда у
+// него был расшифрован один кадр). Здесь проверяется КАЖДАЯ категория,
+// у которой есть ролик и которая есть в меню города.
+
+/**
+ * Что нарисовано на экране во время заставки. Скриншот декодирует сама
+ * страница: так проекту не нужен ни один новый пакет.
+ *
+ * painted — доля пикселей экрана, которые не кремовые и не чернильные:
+ *   это и есть нарисованное (жёлтый круг и само блюдо). Слово категории —
+ *   чернильный контур, оно в счёт не идёт. Пустой кремовый экран даёт ноль.
+ * discYellow — доля полного жёлтого круга, оставшаяся видимой. Единица
+ *   означает круг без блюда — тот самый «пустой экран» из жалобы хозяина.
+ */
+async function splashPaint(
+  page: Page,
+): Promise<{ painted: number; discYellow: number }> {
+  const shot = (await page.screenshot()).toString("base64");
+  return page.evaluate(async (data) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${data}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(image, 0, 0);
+    const { data: px } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let yellow = 0;
+    let painted = 0;
+    const total = px.length / 4;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i];
+      const g = px[i + 1];
+      const b = px[i + 2];
+      // Фирменный #FFBC0D с запасом на сглаживание и сжатие
+      if (r > 230 && g > 155 && g < 215 && b < 90) yellow++;
+      const ink = r < 70 && g < 70 && b < 70;
+      const cream =
+        Math.abs(r - 247) < 60 &&
+        Math.abs(g - 242) < 60 &&
+        Math.abs(b - 234) < 60;
+      if (!ink && !cream) painted++;
+    }
+    // Полный круг: радиус — доля ширины экрана из настроек (splash.disc)
+    const scale = canvas.width / window.innerWidth;
+    const radius = (0.62 * window.innerWidth * scale) / 2;
+    return {
+      painted: painted / total,
+      discYellow: yellow / (Math.PI * radius * radius),
+    };
+  }, shot);
+}
+
+/** Слаги категорий, у которых в проекте есть ролик. */
+const VIDEO_CATEGORIES = Object.keys(SPLASH_VIDEOS);
+
+test("заставка играет у каждой категории с роликом", async ({ page }) => {
+  test.slow();
+  const errors = await openMenu(page);
+
+  const present: string[] = [];
+  for (const slug of VIDEO_CATEGORIES) {
+    if (await chip(page, slug).count()) present.push(slug);
+  }
+  // Супы выключены во всех точках (src/data/menu/point-products.ts) — их
+  // ролики играть негде; всё остальное обязано быть в меню Сорок.
+  expect(present, "категории с роликом в меню").toEqual(
+    VIDEO_CATEGORIES.filter((slug) => slug !== "supe"),
+  );
+
+  for (const slug of present) {
+    // Первое нажатие ставит ролик в загрузку — заставки пока нет
+    await chip(page, slug).click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const videos = [
+              ...document.querySelectorAll<HTMLVideoElement>(
+                ".splash-videos video",
+              ),
+            ];
+            return videos.length > 0 && videos.every((v) => v.readyState === 4);
+          }),
+        { timeout: 30_000, message: `ролик категории ${slug} не загрузился` },
+      )
+      .toBe(true);
+
+    // Второе — заставка обязана сыграть
+    await chip(page, slug).click();
+    await page.waitForTimeout(250);
+    expect(await splashOn(page), `${slug}: заставка играет`).toBe(true);
+    await expect(page.locator(".splash[data-on]")).toHaveCount(1);
+
+    // И на ней что-то нарисовано, причём не один голый круг: середину
+    // закрывает блюдо. Пустой кремовый экран провалит первую проверку,
+    // круг без блюда — вторую.
+    const paint = await splashPaint(page);
+    expect(
+      paint.painted,
+      `${slug}: на заставке нарисован круг и блюдо`,
+    ).toBeGreaterThan(0.05);
+    expect(
+      paint.discYellow,
+      `${slug}: блюдо закрывает часть круга`,
+    ).toBeLessThan(0.85);
+
+    // И уходит сама, оставляя страницу на выбранной категории
+    await expect
+      .poll(() => splashOn(page), {
+        timeout: 5000,
+        message: `${slug}: заставка не ушла`,
+      })
+      .toBe(false);
+  }
+  // Куда встала страница после заставки, проверяют отдельные тесты выше
+  // (drinks и pizza): при быстром переборе всех категорий подряд картинки
+  // блюд дозагружаются и сами двигают секции на десятки пикселей — здесь
+  // это мерить нечестно.
+
+  expect(errors).toEqual([]);
+});
+
+test("в первом же кадре заставки нарисованы круг и блюдо", async ({ page }) => {
+  // Решение архитектора 24.09.2026: пустого кремового кадра в начале нет.
+  await openMenu(page);
+  await warmUp(page);
+
+  await chip(page, CATEGORY).click();
+  // Ждём появления заставки и смотрим ровно на её первые кадры
+  await expect.poll(() => splashOn(page), { timeout: 2000 }).toBe(true);
+  const paint = await splashPaint(page);
+  expect(
+    paint.painted,
+    "в самом начале заставки уже нарисованы круг и блюдо",
+  ).toBeGreaterThan(0.05);
+});
+
+test("прокрутка заблокирована ровно на время заставки", async ({ page }) => {
+  await openMenu(page);
+  await warmUp(page);
+
+  await chip(page, CATEGORY).click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page)).toBe(true);
+
+  const before = await page.evaluate(() => window.scrollY);
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.scrollY), "во время заставки").toBe(
+    before,
+  );
+
+  // Заставка ушла — прокрутка работает сразу, без «хвоста»
+  await expect.poll(() => splashOn(page), { timeout: 5000 }).toBe(false);
+  await page.mouse.wheel(0, 400);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY), { timeout: 2000 })
+    .toBeGreaterThan(before);
 });

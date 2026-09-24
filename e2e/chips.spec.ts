@@ -1,20 +1,21 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Лента чипов категорий (DESIGN.md → Category Chips): оборот иконки при
-// нажатии и переход к категории.
+// Лента чипов категорий (DESIGN.md → Category Chips): переход к категории.
+// Сами чипы не двигаются — ни иконка, ни подпись (docs/MOTION.md §4,
+// решение архитектора 24.09.2026: оборот иконки убран совсем).
 
 // Высота липкой шапки (56) + ленты чипов (46)
 const STICKY = 102;
 
-/** Запоминаем каждый вызов element.animate() на иконке чипа. */
-async function recordSpins(page: Page) {
+/** Запоминаем каждый вызов element.animate() внутри чипа: их быть не должно. */
+async function recordChipAnimations(page: Page) {
   await page.addInitScript(() => {
-    const w = window as unknown as { __spins: unknown[] };
-    w.__spins = [];
+    const w = window as unknown as { __chipAnimations: unknown[] };
+    w.__chipAnimations = [];
     const original = Element.prototype.animate;
     Element.prototype.animate = function (keyframes, options) {
       if (this.closest(".chip")) {
-        w.__spins.push({
+        w.__chipAnimations.push({
           slug: this.closest(".chip")!.getAttribute("data-slug"),
           keyframes,
           options,
@@ -25,13 +26,25 @@ async function recordSpins(page: Page) {
   });
 }
 
-type Spin = {
-  slug: string;
-  keyframes: { transform: string }[];
-  options: { duration: number; easing: string };
-};
-const spins = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __spins: Spin[] }).__spins);
+const chipAnimations = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __chipAnimations: unknown[] }).__chipAnimations,
+  );
+
+/** Чип и его иконка стоят на месте: никакого transform. */
+async function expectChipStill(page: Page, slug: string) {
+  const transforms = await page.evaluate((s) => {
+    const chip = document.querySelector<HTMLElement>(`.chip[data-slug="${s}"]`);
+    const icon = chip?.querySelector("svg");
+    const read = (el: Element | null | undefined) =>
+      el ? getComputedStyle(el).transform : "missing";
+    return [read(chip), read(icon)];
+  }, slug);
+  for (const value of transforms) {
+    expect(["none", "matrix(1, 0, 0, 1, 0, 0)"]).toContain(value);
+  }
+}
 
 async function expectAtSection(page: Page, slug: string) {
   const section = page.locator(`#${slug}`);
@@ -49,36 +62,24 @@ async function expectAtSection(page: Page, slug: string) {
   );
 }
 
-test("нажатие на чип: один оборот иконки 250ms и переход к категории", async ({
+test("нажатие на чип: переход к категории, сам чип не шевелится", async ({
   page,
 }) => {
-  await recordSpins(page);
+  await recordChipAnimations(page);
   await page.goto("/soroca");
   await page
     .getByRole("navigation", { name: /Categorii|Категории/ })
     .getByRole("link", { name: "Burgers" })
     .click();
-  const [spin, ...rest] = await spins(page);
-  expect(rest).toHaveLength(0);
-  expect(spin.slug).toBe("burgers");
-  expect(spin.keyframes).toEqual([
-    { transform: "rotate(0deg)" },
-    { transform: "rotate(360deg)" },
-  ]);
-  expect(spin.options.duration).toBe(250);
-  // --ease-out из DESIGN; браузер может записать 0.2 как .2
-  expect(spin.options.easing.replace(/\b0\./g, ".")).toBe(
-    "cubic-bezier(.2, .8, .2, 1)",
-  );
-  // Один раз: без повторов и бесконечности
-  expect(spin.options).not.toHaveProperty("iterations");
   await expectAtSection(page, "burgers");
+  expect(await chipAnimations(page), "чип ничего не анимирует").toEqual([]);
+  await expectChipStill(page, "burgers");
 });
 
-test("чип с клавиатуры: Enter и Space — тот же оборот и переход", async ({
+test("чип с клавиатуры: Enter и Space — переход без движения чипа", async ({
   page,
 }) => {
-  await recordSpins(page);
+  await recordChipAnimations(page);
   await page.goto("/soroca");
   const nav = page.getByRole("navigation", { name: /Categorii|Категории/ });
   await nav.getByRole("link", { name: "Burgers" }).focus();
@@ -87,13 +88,13 @@ test("чип с клавиатуры: Enter и Space — тот же оборо�
   await nav.getByRole("link", { name: "Crispy" }).focus();
   await page.keyboard.press("Space");
   await expectAtSection(page, "crispy");
-  expect((await spins(page)).map((s) => s.slug)).toEqual(["burgers", "crispy"]);
+  expect(await chipAnimations(page)).toEqual([]);
 });
 
-test("при «уменьшить движение» иконка не крутится, переход работает", async ({
+test("при «уменьшить движение» чип тоже не крутится, переход работает", async ({
   page,
 }) => {
-  await recordSpins(page);
+  await recordChipAnimations(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/soroca");
   await page
@@ -101,5 +102,6 @@ test("при «уменьшить движение» иконка не крут�
     .getByRole("link", { name: "Burgers" })
     .click();
   await expectAtSection(page, "burgers");
-  expect(await spins(page)).toHaveLength(0);
+  expect(await chipAnimations(page)).toEqual([]);
+  await expectChipStill(page, "burgers");
 });

@@ -9,10 +9,14 @@ import { useEffect, useRef, type RefObject } from "react";
 
 /** Доля высоты листа, после которой отпущенный лист закрывается. */
 const CLOSE_DISTANCE = 0.25;
-/** Скорость смаха (px/мс), при которой лист закрывается даже с короткого хода. */
-const CLOSE_VELOCITY = 0.4;
+/** Скорость смаха (px/мс), при которой лист закрывается даже с короткого хода.
+ *  0.11 — решение архитектора 24.09.2026: прежние 0.4 требовали рывка, и
+ *  обычный быстрый смах листом воспринимался как «не сработало». */
+const CLOSE_VELOCITY = 0.11;
 /** Палец остановился дольше — это уже не смах. */
 const FLICK_WINDOW_MS = 100;
+/** Возврат листа на место, мс (docs/MOTION.md §2 — мелкое изменение). */
+const SNAP_BACK_MS = 200;
 const DESKTOP = "(min-width: 1024px)";
 
 export function useSheetDrag({
@@ -60,8 +64,23 @@ export function useSheetDrag({
         scrim.style.opacity = opacity;
       }
     };
-    // Убрать всё inline — CSS-переход вернёт лист на место
-    const snapBack = () => setInline("", "", "");
+    // Лист не утянули достаточно — возвращаем его на место. Это мелкое
+    // движение, а не открытие: 200 мс по кривой входа (docs/MOTION.md §2–3,
+    // решение архитектора 24.09.2026, было 500 мс от CSS-перехода).
+    let snapTimer = 0;
+    const snapBack = () => {
+      setInline(
+        "",
+        "",
+        `transform ${SNAP_BACK_MS}ms var(--ease-reveal), opacity ${SNAP_BACK_MS}ms var(--ease-reveal)`,
+      );
+      window.clearTimeout(snapTimer);
+      // Вернуть переходы странице: дальше ими снова распоряжается CSS
+      snapTimer = window.setTimeout(() => {
+        panel.style.transition = "";
+        if (scrim) scrim.style.transition = "";
+      }, SNAP_BACK_MS);
+    };
 
     function onStart(e: TouchEvent) {
       tracking = false;
@@ -135,6 +154,7 @@ export function useSheetDrag({
     panel.addEventListener("touchend", onEnd, { passive: true });
     panel.addEventListener("touchcancel", onEnd, { passive: true });
     return () => {
+      window.clearTimeout(snapTimer);
       panel.removeEventListener("touchstart", onStart);
       panel.removeEventListener("touchmove", onMove);
       panel.removeEventListener("touchend", onEnd);

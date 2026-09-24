@@ -20,6 +20,8 @@ const MotionLink = motion.create(Link);
 const EASE_REVEAL = [0.22, 1, 0.36, 1] as const;
 const DURATION = 0.5;
 const STAGGER = 0.07;
+/** «Уменьшить движение»: только прозрачность, 180 мс (docs/MOTION.md §6). */
+const REDUCED_DURATION = 0.18;
 /** Дальше третьего шага каскад не растёт: четвёртая и пятая плитки приходят
  *  вместе с третьей — длинные каскады выглядят дёшево (MOTION.md §2). */
 const MAX_STEPS = 2;
@@ -42,10 +44,21 @@ export function CityGrid({ locale }: { locale: Locale }) {
         return (
           <li key={city.slug}>
             {reduceMotion ? (
-              // «Уменьшить движение» — без анимации вообще, обычная ссылка
-              <Link href={href} className="city-tile">
+              // «Уменьшить движение» — плитка не выезжает снизу, а проявляется
+              // на месте за 180 мс и без лесенки (docs/MOTION.md §6,
+              // решение архитектора 24.09.2026 — было совсем без анимации)
+              <MotionLink
+                href={href}
+                className="city-tile"
+                // transform здесь обязателен: на сервере плитка отрисована
+                // обычным вариантом со сдвигом, и без явного нуля она так бы
+                // и осталась сдвинутой на 24 px
+                initial={{ opacity: 0, transform: "translateY(0px)" }}
+                animate={{ opacity: 1, transform: "translateY(0px)" }}
+                transition={{ duration: REDUCED_DURATION, ease: EASE_REVEAL }}
+              >
                 {city.name}
-              </Link>
+              </MotionLink>
             ) : (
               <MotionLink
                 href={href}

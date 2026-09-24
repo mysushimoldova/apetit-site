@@ -264,3 +264,48 @@ test("на медленном устройстве движок сам пони�
   await waitForCanvas(page);
   expect((await stats(page))!.quality).toBeGreaterThanOrEqual(quality);
 });
+
+// «Уменьшить движение» — равноценная версия, а не выключенная (docs/MOTION.md
+// §6, решение архитектора 24.09.2026): всё появляется и исчезает за 180 мс
+// одной прозрачностью, но ничто не едет и не поджимается.
+test("при «уменьшить движение» всё живёт 180 мс и только прозрачностью", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/soroca");
+
+  // Сборщик стилей может записать 180ms как .18s — сравниваем числа
+  const durations = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    return ["fast", "state", "in", "slow"].map((name) => {
+      const value = root.getPropertyValue(`--dur-${name}`).trim();
+      const number = parseFloat(value);
+      return value.endsWith("ms") ? number : number * 1000;
+    });
+  });
+  expect(durations).toEqual([180, 180, 180, 180]);
+
+  // Бар корзины: не выезжает снизу, а проявляется
+  await page.getByRole("button", { name: "Adaugă: Coca-Cola" }).click();
+  const bar = page.locator(".cart-bar");
+  await expect(bar).toHaveCSS("transform", "none");
+  await expect(bar).toHaveCSS("opacity", "1");
+
+  // Лист блюда: тоже без выезда
+  await page
+    .getByRole("button", { name: "Kebab XL / XXL", exact: true })
+    .click();
+  const panel = page.locator(".sheet-panel");
+  await expect(panel).toHaveCSS("transform", "none");
+  await expect(panel).toHaveCSS("opacity", "1");
+  await expect(panel).toHaveCSS("transition-duration", /^0\.18s/);
+
+  // Нажатие кнопки не поджимает её
+  const add = page.getByRole("button", { name: "Adaugă", exact: true }).first();
+  if (await add.count()) {
+    await add.hover();
+    await page.mouse.down();
+    await expect(add).toHaveCSS("transform", "none");
+    await page.mouse.up();
+  }
+});

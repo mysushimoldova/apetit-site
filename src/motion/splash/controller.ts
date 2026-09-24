@@ -137,7 +137,6 @@ export function createSplashController(deps: SplashDeps): SplashController {
   let switching: { from: number; started: number } | null = null;
   let current = 0;
   let popGuard: (() => void) | null = null;
-  let lockRaf = 0;
 
   const blockScroll = (event: Event) => event.preventDefault();
 
@@ -164,8 +163,6 @@ export function createSplashController(deps: SplashDeps): SplashController {
     layer.setDraw(null);
     dom.root.removeAttribute("data-on");
     dom.word.removeAttribute("data-on");
-    if (lockRaf) cancelAnimationFrame(lockRaf);
-    lockRaf = 0;
     document.documentElement.removeAttribute(SPLASH_ATTR);
     window.removeEventListener("wheel", blockScroll);
     window.removeEventListener("touchmove", blockScroll);
@@ -259,13 +256,12 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (settings.word) dom.word.dataset.on = "";
     else dom.word.removeAttribute("data-on");
     dom.root.dataset.on = "";
-    // Замок прокрутки — со следующего кадра: ровно сейчас лента чипов ещё
-    // переводит страницу к выбранной категории (мгновенно, под заставкой),
-    // а при overflow: hidden этот переход бы не сработал.
-    lockRaf = requestAnimationFrame(() => {
-      lockRaf = 0;
-      if (playing) document.documentElement.setAttribute(SPLASH_ATTR, "");
-    });
+    // Холст движка поднимается над кремовым экраном сразу, в этом же кадре.
+    // Раньше признак ставился со следующего кадра — и ровно один кадр
+    // человек видел пустой кремовый экран: круг и блюдо уже рисовались, но
+    // холст ещё лежал под экраном заставки. Ничего, кроме z-index холста,
+    // этот признак не меняет (globals.css), поэтому ждать нечего.
+    document.documentElement.setAttribute(SPLASH_ATTR, "");
     // Пока заставка на экране, страница не прокручивается. Именно
     // событиями, а не overflow: hidden на <html>: тот снимается вместе с
     // положением прокрутки, и страница уезжала бы обратно наверх.
@@ -278,7 +274,11 @@ export function createSplashController(deps: SplashDeps): SplashController {
     for (const item of ready) {
       if (!(item instanceof HTMLVideoElement)) continue;
       try {
-        item.currentTime = 0;
+        // Перемотка только если ролик и правда не в начале. Присвоение
+        // currentTime = 0 уже стоящему на нуле ролику всё равно запускает
+        // перемотку, а на время перемотки браузер перестаёт отдавать кадры
+        // видеокарте — и первые кадры заставки выходили пустыми.
+        if (item.currentTime > 0) item.currentTime = 0;
         item.playbackRate = rate;
         void item.play();
       } catch {
@@ -318,7 +318,11 @@ export function createSplashController(deps: SplashDeps): SplashController {
       requestAnimationFrame(done);
     };
 
-    raf = requestAnimationFrame(frame);
+    // Первый кадр считаем прямо сейчас, не дожидаясь следующего: нажатие на
+    // чип и появление круга с блюдом должны попасть в одну и ту же отрисовку
+    // экрана. Отсюда же встаёт и обычный ход кадров — frame() сам просит
+    // следующий.
+    frame(startedAt);
   }
 
   function end(): void {

@@ -81,13 +81,18 @@
   }
 }
 
-/* Уважаем «уменьшить движение»: все длительности — 0 */
+/* «Уменьшить движение» — это не «выключить движение» (docs/MOTION.md §6,
+   решение архитектора 24.09.2026). Раньше здесь стояли нули, и всё менялось
+   рывком. Теперь каждое появление и скрытие идёт 180 мс и только по
+   прозрачности — как уже сделано у карточек блюд; двигаться перестаёт всё
+   (сами сдвиги снимаются в конце файла, раздел «Уменьшить движение»). */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --dur-fast: 0ms;
-    --dur-state: 0ms;
-    --dur-in: 0ms;
-    --dur-slow: 0ms;
+    --dur-fast: 180ms;
+    --dur-state: 180ms;
+    --dur-in: 180ms;
+    --dur-slow: 180ms;
+    /* Каскада нет: лесенка — тоже движение */
     --stagger: 0ms;
   }
 }
@@ -128,8 +133,11 @@
   --container-page: 1200px;
 
   /* Кривая ухода, закрытия и перемещения (docs/MOTION.md §3). Вход,
-     появление и подъём идут по --ease-reveal — третьей кривой на сайте нет. */
-  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+     появление и подъём идут по --ease-reveal — третьей кривой на сайте нет.
+     Уход обязан трогаться сразу: кривая с медленным стартом читается как
+     залипание (решение архитектора 24.09.2026; прежняя кривая .4 / 0 / .2 / 1
+     проходила за первые 10 % времени лишь 5 % пути). */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* Шкала размеров текста (DESIGN.md → Type Scale) */
   --text-caption: 12px; /* подпись ЗАГЛАВНЫМИ */
@@ -1875,5 +1883,89 @@ html[data-splash] .motion-stage {
     left: 0;
     height: 28px;
     background: var(--color-yellow);
+  }
+}
+
+/* ---------- «Уменьшить движение»: одна прозрачность, 180 мс ----------
+   docs/MOTION.md §6, решение архитектора 24.09.2026. Длительности уже
+   переведены в 180 мс (см. :root в начале файла), здесь снимается само
+   движение: всё, что ехало, сдвигалось или поджималось, остаётся на месте,
+   а появление и уход идут одной прозрачностью. Правила стоят вне слоёв и в
+   конце файла — так они перекрывают и @layer components, и @utility. */
+@media (prefers-reduced-motion: reduce) {
+  /* Нажатие кнопок: остаётся только смена цвета */
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active,
+  .add-button:active,
+  .icon-button:active:not(:disabled),
+  .segment:active,
+  .tile-cart-minus:active {
+    transform: none;
+  }
+
+  /* Минус и число в пилюле корзины: только проявление */
+  .tile-cart-extra {
+    @starting-style {
+      opacity: 0;
+      transform: none;
+    }
+  }
+
+  /* Лист блюда и корзина: не выезжают снизу, а проявляются на месте */
+  .sheet-panel {
+    opacity: 0;
+    transform: none;
+    transition:
+      opacity var(--dur-in) var(--ease-reveal),
+      transform 0s;
+  }
+  .sheet[data-state="open"] .sheet-panel {
+    opacity: 1;
+    transform: none;
+  }
+  @media (min-width: 1024px) {
+    /* На десктопе transform держит модалку по центру — снимаем только сдвиг */
+    .sheet-panel,
+    .sheet[data-state="open"] .sheet-panel {
+      transform: translate3d(-50%, -50%, 0);
+    }
+  }
+
+  /* Бар корзины: не выезжает снизу, а проявляется */
+  .cart-bar {
+    opacity: 0;
+    transform: none;
+    transition:
+      opacity var(--dur-in) var(--ease-reveal),
+      visibility 0s linear var(--dur-in);
+  }
+  .cart-bar[data-visible] {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity var(--dur-in) var(--ease-reveal),
+      visibility 0s;
+  }
+
+  /* Кнопка корзины в шапке: без поджатия */
+  .header-cart {
+    @starting-style {
+      opacity: 0;
+      transform: none;
+    }
+  }
+
+  /* Подтверждение заказа: круг не прыгает, строки не приезжают снизу —
+     всё проявляется разом, без лесенки */
+  .confirm-check,
+  .confirm-step {
+    animation-name: confirm-fade;
+    animation-delay: 0ms;
+  }
+}
+
+@keyframes confirm-fade {
+  from {
+    opacity: 0;
   }
 }

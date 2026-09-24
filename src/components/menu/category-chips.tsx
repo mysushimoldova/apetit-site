@@ -1,9 +1,10 @@
 "use client";
 // Лента чипов категорий (DESIGN.md → Category Chips): якоря на секции.
-// Клик — плавный скролл к секции (без smooth при reduced-motion) и один
-// оборот иконки чипа, 200ms, --ease-out (при reduced-motion — только цвет);
-// активный чип меняется при скролле через IntersectionObserver: активна та
-// секция, через которую проходит линия сразу под липкой шапкой и лентой.
+// Клик — плавный скролл к секции (без smooth при reduced-motion); сам чип
+// при этом не двигается: чипы не анимируются вовсе (docs/MOTION.md §4,
+// решение архитектора 24.09.2026 — оборот иконки убран). Активный чип
+// меняется при скролле через IntersectionObserver: активна та секция,
+// через которую проходит линия сразу под липкой шапкой и лентой.
 // Пока страница сама едет к выбранной категории, активным остаётся её чип:
 // промежуточные категории по дороге не загораются.
 import {
@@ -47,26 +48,6 @@ function sectionAtLine(items: ChipItem[]): string | undefined {
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-/** Оборот иконки при нажатии на чип. 200 мс — смена состояния по шкале
- *  docs/MOTION.md §2 (решение архитектора 24.09.2026, было 250). */
-const CHIP_SPIN_MS = 200;
-
-/** Один оборот иконки чипа. Если она ещё крутится — не начинаем заново
- *  (иначе прыжок к 0°); при reduced-motion — без движения. */
-function spinIcon(chip: HTMLElement) {
-  if (prefersReducedMotion()) return;
-  const icon = chip.querySelector("svg");
-  if (!icon || typeof icon.animate !== "function") return;
-  if (icon.getAnimations().some((a) => a.playState === "running")) return;
-  const easing = getComputedStyle(document.documentElement)
-    .getPropertyValue("--ease-out")
-    .trim();
-  icon.animate(
-    [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }],
-    { duration: CHIP_SPIN_MS, easing: easing || "ease-out" },
-  );
 }
 
 export function CategoryChips({
@@ -132,7 +113,6 @@ export function CategoryChips({
     const section = document.getElementById(slug);
     if (!section) return; // без секции сработает обычный якорь
     event.preventDefault();
-    spinIcon(event.currentTarget);
 
     // Заставка категории (docs/motion/splash-prompt.md). Если она играет,
     // страница переходит к категории мгновенно — под заставкой: когда та

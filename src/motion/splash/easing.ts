@@ -3,7 +3,7 @@
 //
 // Кривые — те, что в docs/MOTION.md §3, третьей на сайте нет:
 //   вход/появление — cubic-bezier(.22, 1, .36, 1)
-//   уход/закрытие  — cubic-bezier(.4, 0, .2, 1)
+//   уход/закрытие  — cubic-bezier(.32, .72, 0, 1)
 
 /**
  * Значение кривой cubic-bezier(x1, y1, x2, y2) в точке t (0…1).
@@ -40,8 +40,9 @@ export function cubicBezier(
 /** Появление, подъём (docs/MOTION.md §3). */
 export const easeIn = cubicBezier(0.22, 1, 0.36, 1);
 
-/** Уход, перемещение, закрытие (docs/MOTION.md §3). */
-export const easeOut = cubicBezier(0.4, 0, 0.2, 1);
+/** Уход, перемещение, закрытие (docs/MOTION.md §3). Трогается сразу:
+ *  кривая с медленным стартом читается как залипание. */
+export const easeOut = cubicBezier(0.32, 0.72, 0, 1);
 
 /** Доля пройденного времени, 0…1. Нулевая длительность — сразу 1. */
 export function progress(elapsedMs: number, durationMs: number): number {
