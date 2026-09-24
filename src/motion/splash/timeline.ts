@@ -46,6 +46,27 @@ export interface SplashVisual {
   visible: boolean;
 }
 
+/** На сколько пикселей фото поднимается за время показа (задание
+ *  архитектора: «лёгкий сдвиг вверх на 4 px»). */
+export const PHOTO_RISE_PX = 4;
+
+/**
+ * Движение фото на заставке за время показа: масштаб от zoomFrom до 1 и
+ * подъём на PHOTO_RISE_PX. Кривая — та же, что вшита в ролики: быстро
+ * вначале, медленно в конце (docs/MOTION.md §3, вход).
+ *
+ * Считается от начала заставки и не зависит от ухода: уезжает вся заставка
+ * целиком, вместе с блюдом (см. liftShare в splashVisual).
+ */
+export function splashPhotoMotion(
+  elapsed: number,
+  hold: number,
+  zoomFrom: number,
+): { scale: number; risePx: number } {
+  const k = easeIn(progress(elapsed, hold));
+  return { scale: mix(zoomFrom, 1, k), risePx: mix(0, PHOTO_RISE_PX, k) };
+}
+
 const START_DISC = 0.55;
 const START_FOOD = 0.9;
 

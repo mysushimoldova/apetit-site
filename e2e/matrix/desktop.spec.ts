@@ -96,6 +96,15 @@ test("клавиатура: города → меню → товар → кор�
   await page.keyboard.press("Escape");
   await expect(cart).toBeHidden();
 
+  // Корзина уехала, но у неё есть ещё одно дело: снять свою запись из
+  // истории браузера (кнопка «назад» закрывает лист, а не уводит со
+  // страницы — src/components/sheet/sheet.tsx). Делается это сразу после
+  // того, как лист убран со страницы, шагом history.back(). Жёсткий переход
+  // ровно в этот миг браузер отменяет: ERR_ABORTED. Человеку в эту
+  // миллисекунду не попасть — он ещё ведёт мышь, — а Playwright попадает
+  // каждый раз. Поэтому даём листу договорить.
+  await page.waitForTimeout(150);
+
   // Оформление: до кнопки отправки можно дойти клавишами
   await page.goto("/soroca/comanda");
   await page.waitForFunction(() => document.readyState === "complete");

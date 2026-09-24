@@ -15,6 +15,7 @@ import {
   CONTOUR_COLORS,
   PAGE_BACKGROUNDS,
   PRODUCTS_RANGES,
+  SPLASH_PHOTO_RANGES,
   SPLASH_RANGES,
   type BackgroundSettings,
   type ContourColor,
@@ -76,7 +77,8 @@ function splashLine(config: MotionConfig): string {
   return (
     `hold=${s.hold} zoom=${s.zoom} wordY=${s.wordY} fade=${s.fade} exit=${s.exit}` +
     ` count=${s.count} xfade=${s.xfade} wordTop=${s.wordTop} disc=${s.disc}` +
-    ` lines=${s.lines} word=${s.word} skip=${s.skip} enabled=${s.enabled}`
+    ` lines=${s.lines} word=${s.word} skip=${s.skip} enabled=${s.enabled}` +
+    ` photoZoomFrom=${s.photo.zoomFrom}`
   );
 }
 
@@ -343,6 +345,16 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
                 value={value.splash.xfade}
                 digits={0}
                 onChange={(next) => setSplash("xfade", next)}
+              />
+              <Slider
+                label="Фото: начальный масштаб"
+                hint="категории без ролика: фото съезжается до 1"
+                range={SPLASH_PHOTO_RANGES.zoomFrom}
+                value={value.splash.photo.zoomFrom}
+                digits={2}
+                onChange={(next) =>
+                  setSplash("photo", { ...value.splash.photo, zoomFrom: next })
+                }
               />
               <Choice
                 label="Уход заставки"

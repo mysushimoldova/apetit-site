@@ -5,7 +5,7 @@
 // Подгружаем после контента: сначала страница показана и нарисован первый
 // кадр, только потом запрашивается код движка (dynamic import, ssr:false).
 // На скорость показа страницы (LCP) он не влияет, холст проявляется за
-// 300 мс (globals.css → .motion-canvas).
+// 320 мс (globals.css → .motion-canvas, --dur-in).
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -30,11 +30,18 @@ function afterFirstPaint(callback: () => void): () => void {
 
 export function MotionStage({
   splashProducts,
+  splashPhotos,
 }: {
   /** Блюда этой страницы — нужны заставке категории (только меню). */
   splashProducts?: readonly string[];
+  splashPhotos?: Readonly<Record<string, string>>;
 }) {
   const [load, setLoad] = useState(false);
   useEffect(() => afterFirstPaint(() => setLoad(true)), []);
-  return load ? <MotionRuntime splashProducts={splashProducts} /> : null;
+  return load ? (
+    <MotionRuntime
+      splashProducts={splashProducts}
+      splashPhotos={splashPhotos}
+    />
+  ) : null;
 }

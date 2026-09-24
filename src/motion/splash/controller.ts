@@ -5,23 +5,32 @@
 // собственный DOM заставки (кремовый экран и слово категории),
 // ролики и весь порядок действий.
 //
+// Заставка есть у каждой категории: где снят ролик — играет ролик, где нет —
+// та же заставка с вырезанным фото первого доступного в точке блюда.
+//
 // Заставки НЕ будет (переход к категории обычный, без ошибок в консоли):
 //  • настройка выключена;
 //  • «уменьшить движение» в системе;
 //  • самый низкий уровень качества движка (4 — движок стоит совсем);
 //  • экономия трафика (saveData или сеть 2g);
 //  • нет WebGL2 — слой не соберётся;
-//  • у категории нет роликов или их нет в меню выбранной точки;
-//  • ролики ещё не загружены: первое нажатие ставит их в загрузку.
+//  • у категории нет ни ролика, ни фото в меню выбранной точки;
+//  • ролик или фото ещё не загружены: первое нажатие ставит их в загрузку.
 import type { SplashSettings } from "../config-schema";
 import { engine } from "../engine";
 import { createSplashLayer, type SplashLayer } from "../layers/splash";
 import { pauseMotion, resumeMotion } from "../pause";
-import { SPLASH_VIDEOS, splashVideosFor } from "./catalog";
+import {
+  SPLASH_VIDEOS,
+  splashModeFor,
+  splashVideosFor,
+  type SplashPhotos,
+} from "./catalog";
 import { splashRate, splashSwitchTimes } from "./geometry";
 export { setSplashPlayer } from "./request";
 import { setSplashPlayer, type SplashRequest } from "./request";
-import { splashVisual } from "./timeline";
+import { splashPhotoMotion, splashVisual } from "./timeline";
+import type { SplashMedia } from "../layers/splash";
 
 /** Причина паузы движка, пока играет заставка (docs/MOTION.md §1). */
 export const SPLASH_PAUSE = "splash";
@@ -36,6 +45,8 @@ export interface SplashDeps {
   settings: SplashSettings;
   /** Слаги блюд, которые есть в меню выбранной точки. */
   available: ReadonlySet<string>;
+  /** Адреса фото по категориям — для категорий без ролика. */
+  photos?: SplashPhotos;
   /** Заставка ушла — сетка уже на месте (карточки не анимируются). */
   onEnd?: () => void;
   /** Насыщенность линий фона на время заставки; null — вернуть свою. */
@@ -108,12 +119,20 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (!disposed) pool = module.createSplashVideoPool(dom.videos);
   });
 
+  // То же самое для фото: свой маленький загрузчик, тоже отдельным куском
+  let photoPool: import("./photos").SplashPhotoPool | null = null;
+  void import("./photos").then((module) => {
+    if (!disposed) photoPool = module.createSplashPhotoPool();
+  });
+
   let disposed = false;
   let playing = false;
   let raf = 0;
   let startedAt = 0;
   let exitAt = Number.POSITIVE_INFINITY;
-  let videos: HTMLVideoElement[] = [];
+  let media: SplashMedia[] = [];
+  /** Играем фото, а не ролик: у фото своё движение и своя распаковка. */
+  let photo = false;
   let switchAt: number[] = [];
   let switching: { from: number; started: number } | null = null;
   let current = 0;
@@ -123,10 +142,11 @@ export function createSplashController(deps: SplashDeps): SplashController {
   const blockScroll = (event: Event) => event.preventDefault();
 
   function stopVideos(): void {
-    for (const video of videos) {
+    for (const item of media) {
+      if (!(item instanceof HTMLVideoElement)) continue;
       try {
-        video.pause();
-        video.currentTime = 0;
+        item.pause();
+        item.currentTime = 0;
       } catch {
         // Ролик мог не догрузиться — заставке это не мешает
       }
@@ -138,7 +158,8 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
     stopVideos();
-    videos = [];
+    media = [];
+    photo = false;
     switching = null;
     layer.setDraw(null);
     dom.root.removeAttribute("data-on");
@@ -164,7 +185,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
     // Смена блюда по расписанию (если в настройках их два)
     if (!switching && switchAt.length && elapsed >= switchAt[0]) {
       switchAt.shift();
-      if (videos.length > 1) switching = { from: current, started: now };
+      if (media.length > 1) switching = { from: current, started: now };
     }
     let mix = 0;
     let scaleA = 1;
@@ -185,6 +206,12 @@ export function createSplashController(deps: SplashDeps): SplashController {
     }
 
     const visual = splashVisual(elapsed, settings.hold, settings, exitAt);
+    // Фото не вращается, поэтому движение ему даём сами: масштаб съезжает с
+    // zoomFrom до 1 и блюдо чуть поднимается — по той же кривой замедления,
+    // что вшита в ролики
+    const photoMotion = photo
+      ? splashPhotoMotion(elapsed, settings.hold, settings.photo.zoomFrom)
+      : null;
     // Экран, слово и блюдо уезжают вверх одним движением: доля одна и та же
     const lift = `${-visual.liftShare * 101}%`;
     dom.root.style.setProperty("--splash-lift", lift);
@@ -199,11 +226,13 @@ export function createSplashController(deps: SplashDeps): SplashController {
     dom.word.style.setProperty("--splash-word-alpha", String(visual.foodAlpha));
     layer.setDraw({
       ...visual,
-      videos: switching
-        ? [videos[switching.from], videos[switching.from === 0 ? 1 : 0]]
-        : [videos[current]],
+      media: switching
+        ? [media[switching.from], media[switching.from === 0 ? 1 : 0]]
+        : [media[current]],
+      photo,
+      risePx: photoMotion ? photoMotion.risePx : 0,
       mix,
-      scaleA,
+      scaleA: photoMotion ? photoMotion.scale : scaleA,
       scaleB,
       zoom: settings.zoom,
       disc: settings.disc,
@@ -213,12 +242,13 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (!visual.visible) finish();
   }
 
-  function begin(word: string, ready: HTMLVideoElement[]): void {
+  function begin(word: string, ready: SplashMedia[], asPhoto: boolean): void {
     playing = true;
-    videos = ready;
+    media = ready;
+    photo = asPhoto;
     current = 0;
     switching = null;
-    switchAt = splashSwitchTimes(settings.hold, ready.length);
+    switchAt = asPhoto ? [] : splashSwitchTimes(settings.hold, ready.length);
     exitAt = settings.hold;
     startedAt = performance.now();
 
@@ -245,11 +275,12 @@ export function createSplashController(deps: SplashDeps): SplashController {
     deps.setLines?.(settings.lines);
 
     const rate = splashRate(settings.hold);
-    for (const video of ready) {
+    for (const item of ready) {
+      if (!(item instanceof HTMLVideoElement)) continue;
       try {
-        video.currentTime = 0;
-        video.playbackRate = rate;
-        void video.play();
+        item.currentTime = 0;
+        item.playbackRate = rate;
+        void item.play();
       } catch {
         // Не дали играть — заставка просто покажет первый кадр
       }
@@ -310,16 +341,30 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (engine.stats().quality >= 4) return false;
     if (!layer.isSupported()) return false;
 
-    const slugs = splashVideosFor(request.category, available, settings.count);
-    if (slugs.length === 0) return false;
-    if (!pool) {
-      // Загрузчик ещё не подтянулся — в следующий раз
-      void poolModule;
-      return false;
+    const mode = splashModeFor(
+      request.category,
+      available,
+      settings.count,
+      deps.photos,
+    );
+    if (mode.kind === "none") return false;
+
+    if (mode.kind === "video") {
+      if (!pool) {
+        // Загрузчик ещё не подтянулся — в следующий раз
+        void poolModule;
+        return false;
+      }
+      const ready = pool.take(mode.slugs);
+      if (!ready) return false; // грузится: заставка будет со следующего раза
+      begin(request.word, ready, false);
+      return true;
     }
-    const ready = pool.take(slugs);
-    if (!ready) return false; // грузится: заставка будет со следующего раза
-    begin(request.word, ready);
+
+    if (!photoPool) return false;
+    const image = photoPool.take(mode.src);
+    if (!image) return false; // грузится: заставка будет со следующего раза
+    begin(request.word, [image], true);
     return true;
   }
 
@@ -341,6 +386,8 @@ export function createSplashController(deps: SplashDeps): SplashController {
       dom.root.removeEventListener("pointerdown", onPointer);
       pool?.dispose();
       pool = null;
+      photoPool?.dispose();
+      photoPool = null;
       engine.remove(layer.id);
       dom.root.remove();
       dom.word.remove();

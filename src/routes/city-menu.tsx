@@ -27,6 +27,7 @@ import { paths } from "@/i18n/routes";
 import { billboardWidthEm } from "@/lib/billboard-fit";
 import { buildCatalog } from "@/lib/cart/catalog";
 import { breadcrumbSchema, restaurantSchema } from "@/lib/schema-org";
+import { splashPhotosFor } from "@/lib/splash-photos";
 import { pageMetadata } from "@/lib/seo";
 
 export type CityParams = { params: Promise<{ city: string }> };
@@ -92,11 +93,13 @@ export async function CityMenuPage({
           ...points.map((p) => restaurantSchema(p, locale)),
         ]}
       />
-      {/* Блюда этого города — по ним заставка категории выбирает ролик */}
+      {/* Блюда этого города: по слагам заставка выбирает ролик, а по
+          адресам фото играет заставку у категорий, где ролика нет */}
       <MotionStage
         splashProducts={menu.flatMap((section) =>
           section.products.map((product) => product.slug),
         )}
+        splashPhotos={splashPhotosFor(menu)}
       />
       <RememberCity slug={city.slug} />
       <CartProvider

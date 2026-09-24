@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORIES } from "@/data/menu/categories";
 import { PRODUCTS } from "@/data/menu/products";
-import { SPLASH_VIDEOS, splashVideoSrc, splashVideosFor } from "./catalog";
+import {
+  SPLASH_VIDEOS,
+  splashModeFor,
+  splashVideoSrc,
+  splashVideosFor,
+} from "./catalog";
 
 const ALL = new Set(Object.values(SPLASH_VIDEOS).flat());
 
@@ -23,7 +28,7 @@ describe("выбор роликов заставки", () => {
     expect(splashVideosFor("kebab", new Set(), 1)).toEqual([]);
   });
 
-  it("у категории нет роликов — заставки нет", () => {
+  it("у категории нет роликов — список пустой (дальше в ход идёт фото)", () => {
     for (const slug of ["menu", "crispy", "hot-dog", "pizza", "cartofi"]) {
       expect(splashVideosFor(slug, ALL, 2)).toEqual([]);
     }
@@ -35,6 +40,39 @@ describe("выбор роликов заставки", () => {
 
   it("адрес ролика — файл из public/splash", () => {
     expect(splashVideoSrc("cola")).toBe("/splash/cola.mp4");
+  });
+});
+
+describe("режим заставки: видео / фото / ничего", () => {
+  const PHOTOS = {
+    pizza: "/img/products/pizza-margarita-800.webp",
+    kebab: "/img/products/kebab-cheese-800.webp",
+  };
+
+  it("есть ролики — играет ролик, даже если фото тоже есть", () => {
+    expect(splashModeFor("kebab", ALL, 2, PHOTOS)).toEqual({
+      kind: "video",
+      slugs: ["kebab-xl-xxl", "kebab-cheese"],
+    });
+  });
+
+  it("роликов у категории нет — играет фото", () => {
+    expect(splashModeFor("pizza", ALL, 1, PHOTOS)).toEqual({
+      kind: "photo",
+      src: PHOTOS.pizza,
+    });
+  });
+
+  it("ролики есть, но этих блюд нет в точке — тоже фото", () => {
+    expect(splashModeFor("kebab", new Set(), 1, PHOTOS)).toEqual({
+      kind: "photo",
+      src: PHOTOS.kebab,
+    });
+  });
+
+  it("ни ролика, ни фото — заставки нет", () => {
+    expect(splashModeFor("hot-dog", ALL, 1, PHOTOS)).toEqual({ kind: "none" });
+    expect(splashModeFor("pizza", ALL, 1, undefined)).toEqual({ kind: "none" });
   });
 });
 

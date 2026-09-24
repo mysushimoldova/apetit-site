@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { exitMs, splashVisual, totalMs, type SplashExit } from "./timeline";
+import {
+  exitMs,
+  PHOTO_RISE_PX,
+  splashPhotoMotion,
+  splashVisual,
+  totalMs,
+  type SplashExit,
+} from "./timeline";
 
 const S = (exit: SplashExit = "lift", fade = 200) => ({ fade, exit });
 
@@ -85,5 +92,42 @@ describe("уход", () => {
     const later = splashVisual(760, 1500, S("lift"), 600);
     expect(later.liftShare).toBeGreaterThan(0);
     expect(splashVisual(920, 1500, S("lift"), 600).visible).toBe(false);
+  });
+});
+
+describe("движение фото на заставке", () => {
+  const HOLD = 1500;
+  const FROM = 1.06;
+
+  it("в начале — начальный масштаб и никакого подъёма", () => {
+    const start = splashPhotoMotion(0, HOLD, FROM);
+    expect(start.scale).toBeCloseTo(FROM, 5);
+    expect(start.risePx).toBeCloseTo(0, 5);
+  });
+
+  it("к концу показа — масштаб ровно 1 и полный подъём", () => {
+    const end = splashPhotoMotion(HOLD, HOLD, FROM);
+    expect(end.scale).toBeCloseTo(1, 5);
+    expect(end.risePx).toBeCloseTo(PHOTO_RISE_PX, 5);
+  });
+
+  it("кривая замедления: за первую половину проходит больше половины пути", () => {
+    const half = splashPhotoMotion(HOLD / 2, HOLD, FROM);
+    const passed = (FROM - half.scale) / (FROM - 1);
+    expect(passed).toBeGreaterThan(0.5);
+    expect(passed).toBeLessThan(1);
+    // Масштаб только уменьшается — перелёта нет
+    expect(half.scale).toBeLessThan(FROM);
+    expect(half.scale).toBeGreaterThan(1);
+  });
+
+  it("после конца показа ничего не ломается", () => {
+    const after = splashPhotoMotion(HOLD * 2, HOLD, FROM);
+    expect(after.scale).toBeCloseTo(1, 5);
+    expect(after.risePx).toBeCloseTo(PHOTO_RISE_PX, 5);
+  });
+
+  it("zoomFrom = 1 — фото просто стоит и чуть поднимается", () => {
+    expect(splashPhotoMotion(HOLD / 2, HOLD, 1).scale).toBe(1);
   });
 });

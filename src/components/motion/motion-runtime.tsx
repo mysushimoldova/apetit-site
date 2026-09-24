@@ -12,14 +12,17 @@ import { createProductsControl } from "@/motion/products";
 import type { SplashSettings } from "@/motion/config-schema";
 
 /**
- * splashProducts — слаги блюд, которые есть в меню этой страницы. По ним
- * заставка категории решает, какое блюдо показать (и показывать ли вообще).
- * Пусто — заставки нет: значит страница не меню.
+ * splashProducts — слаги блюд, которые есть в меню этой страницы: по ним
+ * заставка выбирает ролик. splashPhotos — адрес фото на каждую категорию:
+ * им заставка играет там, где ролика нет. Пусто и то и другое — заставки
+ * нет: значит страница не меню.
  */
 export default function MotionRuntime({
   splashProducts,
+  splashPhotos,
 }: {
   splashProducts?: readonly string[];
+  splashPhotos?: Readonly<Record<string, string>>;
 }) {
   useEffect(() => {
     const settings = motionConfig.background;
@@ -53,6 +56,7 @@ export default function MotionRuntime({
         const controller = module.createSplashController({
           settings: motionConfig.splash,
           available,
+          photos: splashPhotos,
           // Линии фона на заставке приглушаются до своей настройки, а
           // после — возвращаются к обычной
           setLines: (opacity) =>
@@ -102,7 +106,7 @@ export default function MotionRuntime({
       engine.remove(layer.id);
       unmount();
     };
-  }, [splashProducts]);
+  }, [splashProducts, splashPhotos]);
 
   return null;
 }

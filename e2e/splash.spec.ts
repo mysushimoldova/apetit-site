@@ -2,9 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Заставка категории (docs/motion/splash-prompt.md) на телефоне 390 px.
 //
-// Важная особенность: ролики не грузятся при открытии сайта. Первое
-// нажатие на категорию заставки не показывает — оно только ставит ролики
-// в загрузку. Поэтому каждый тест сначала «прогревает» категорию.
+// Заставка есть у каждой категории: где снят ролик — играет ролик, где нет
+// (pizza, menu, crispy, hot-dog, cartofi) — та же заставка, но с вырезанным
+// фото первого доступного в точке блюда.
+//
+// Важная особенность: ни ролики, ни фото не грузятся при открытии сайта.
+// Первое нажатие на категорию заставки не показывает — оно только ставит
+// их в загрузку. Поэтому каждый тест сначала «прогревает» категорию.
 
 const MENU = "/soroca";
 const CATEGORY = "drinks";
@@ -152,12 +156,99 @@ test("ролики не грузятся при открытии страниц�
   expect(requests).toEqual([]);
 });
 
-test("у категории без роликов заставки нет", async ({ page }) => {
-  const errors = await openMenu(page);
+// ---------------------------------------------------------------------------
+// Категории без ролика: заставка из фото
+// ---------------------------------------------------------------------------
+
+/** Меню Briceni: там есть пицца (в Сороках её нет — point-products.ts). */
+const PIZZA_MENU = "/briceni";
+
+test("pizza: заставка с фото появилась и ушла", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+
+  const photos: string[] = [];
+  page.on("request", (r) => {
+    if (/\/img\/products\/pizza-/.test(r.url())) photos.push(r.url());
+  });
+
+  await page.goto(PIZZA_MENU);
+  await page.waitForLoadState("load");
+  await page
+    .locator("canvas.motion-canvas[data-ready]")
+    .waitFor({ state: "attached" });
+
+  // Первое нажатие — фото только встаёт в загрузку, заставки нет
+  await chip(page, "pizza").click();
+  await page.waitForTimeout(400);
+  expect(await splashOn(page), "первое нажатие — заставки нет").toBe(false);
+  await page.waitForTimeout(2500);
+
+  await chip(page, "kebab").click();
+  await page.waitForTimeout(1200);
+
+  // Второе — заставка играет, и это фото, а не ролик: ни одного запроса
+  // к /splash/ у категории без ролика быть не может
+  await chip(page, "pizza").click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page), "второе нажатие — заставка играет").toBe(true);
+  await expect(page.locator(".splash[data-on]")).toHaveCount(1);
+  await expect(page.locator(".splash-word")).toHaveText("Pizza");
+  expect(photos.length, "фото пиццы запрошено").toBeGreaterThan(0);
+
+  // Уходит сама и оставляет страницу на выбранной категории
+  await page.waitForTimeout(2000);
+  expect(await splashOn(page), "заставка ушла").toBe(false);
+  const top = await page.evaluate(
+    () => document.getElementById("pizza")!.getBoundingClientRect().top,
+  );
+  expect(Math.abs(top), "сетка категории — сразу под шапкой").toBeLessThan(140);
+  expect(errors).toEqual([]);
+});
+
+test("фото-заставка: ролики для такой категории не грузятся", async ({
+  page,
+}) => {
+  const videos: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/splash/")) videos.push(r.url());
+  });
+  await page.goto(PIZZA_MENU);
+  await page.waitForLoadState("load");
   for (let i = 0; i < 2; i++) {
-    await chip(page, "menu").click();
-    await page.waitForTimeout(1200);
-    expect(await splashOn(page)).toBe(false);
+    await chip(page, "pizza").click();
+    await page.waitForTimeout(2500);
   }
+  expect(videos, "у категории без ролика ролики не запрашиваются").toEqual([]);
+});
+
+test("фото-заставка при «уменьшить движение» — заставки нет", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(PIZZA_MENU);
+  await page.waitForLoadState("load");
+  for (let i = 0; i < 2; i++) {
+    await chip(page, "pizza").click();
+    await page.waitForTimeout(2500);
+  }
+  expect(await splashOn(page)).toBe(false);
+});
+
+test("hot-dog: ролика нет, фото есть — заставка играет", async ({ page }) => {
+  const errors = await openMenu(page);
+  await chip(page, "hot-dog").click();
+  await page.waitForTimeout(2500);
+  await chip(page, "kebab").click();
+  await page.waitForTimeout(1200);
+
+  await chip(page, "hot-dog").click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page)).toBe(true);
+  await page.waitForTimeout(2000);
+  expect(await splashOn(page)).toBe(false);
   expect(errors).toEqual([]);
 });

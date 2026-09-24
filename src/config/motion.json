@@ -54,7 +54,10 @@
     "count": 1,
     "xfade": 180,
     "exit": "lift",
-    "skip": true
+    "skip": true,
+    "photo": {
+      "zoomFrom": 1.06
+    }
   },
   "page": {
     "background": "#F7F2EA"

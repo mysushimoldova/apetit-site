@@ -169,6 +169,22 @@ export const SPLASH_RANGES = {
 const splashRange = (key: keyof typeof SPLASH_RANGES) =>
   z.number().min(SPLASH_RANGES[key][0]).max(SPLASH_RANGES[key][1]);
 
+/** Границы ползунка вкладки «Ecran categorie» для фото-заставки. */
+export const SPLASH_PHOTO_RANGES = {
+  zoomFrom: [1, 1.2, 0.01],
+} as const;
+
+/** Заставка из фото — для категорий без ролика. Фото не вращается (это
+ *  картинка, а не съёмка), поэтому движение у него своё: за время показа
+ *  оно съезжается с zoomFrom до 1 и чуть поднимается. */
+export const splashPhotoSchema = z.strictObject({
+  /** Начальный масштаб фото: 1.06 — чуть крупнее, чем встанет в конце. */
+  zoomFrom: z
+    .number()
+    .min(SPLASH_PHOTO_RANGES.zoomFrom[0])
+    .max(SPLASH_PHOTO_RANGES.zoomFrom[1]),
+});
+
 /** Заставка категории (docs/motion/splash-prompt.md). Все числа берутся
  *  отсюда: в коде заставки нет ни одного своего значения. */
 export const splashSchema = z.strictObject({
@@ -197,6 +213,8 @@ export const splashSchema = z.strictObject({
   exit: z.enum(["lift", "fade", "zoom"]),
   /** Можно прервать касанием. */
   skip: z.boolean(),
+  /** Заставка из фото — категории без ролика. */
+  photo: splashPhotoSchema,
 });
 
 export const pageSchema = z.strictObject({
@@ -218,6 +236,7 @@ export type ProductShadowSettings = z.infer<typeof productShadowSchema>;
 export type ProductRevealSettings = z.infer<typeof productRevealSchema>;
 export type ProductLiftSettings = z.infer<typeof productLiftSchema>;
 export type ProductsSettings = z.infer<typeof productsSchema>;
+export type SplashPhotoSettings = z.infer<typeof splashPhotoSchema>;
 export type SplashSettings = z.infer<typeof splashSchema>;
 export type PageSettings = z.infer<typeof pageSchema>;
 export type MotionConfig = z.infer<typeof motionConfigSchema>;

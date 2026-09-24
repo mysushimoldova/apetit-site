@@ -1,6 +1,12 @@
-// Слой заставки категории: жёлтый круг и настоящее блюдо, вращающееся
-// поверх него. Рисует в тот же холст и тот же контекст, что фон, — своей
-// программой (docs/motion/splash-prompt.md, эталон docs/motion/splash-demo.html).
+// Слой заставки категории: жёлтый круг и настоящее блюдо поверх него.
+// Рисует в тот же холст и тот же контекст, что фон, — своей программой
+// (docs/motion/splash-prompt.md, эталон docs/motion/splash-demo.html).
+//
+// Блюдо приходит двумя способами, и оба рисует этот же слой — чтобы
+// поведение и настройки заставки были едиными:
+//  • ролик (<video>) — там, где он снят: блюдо вращается;
+//  • фото (<img>) — у категорий без ролика: та же вырезка, что на плитке
+//    меню. Фото не вращается, его движение считает контроллер.
 //
 // Формат ролика особый: верхняя половина кадра — цвет, нижняя — маска
 // (альфа) того же кадра, поэтому файл вдвое выше видимого. Маска посчитана
@@ -33,7 +39,7 @@ uniform sampler2D tA, tB;
 uniform vec4 uRectA, uRectB;
 uniform vec3 uDisc;
 uniform vec3 uYellow;
-uniform float uDiscA, uFoodA, uMix;
+uniform float uDiscA, uFoodA, uMix, uPhoto;
 out vec4 o;
 
 vec4 key(sampler2D t, vec2 u){
@@ -51,8 +57,15 @@ vec4 key(sampler2D t, vec2 u){
 vec4 food(sampler2D t, vec4 rect){
   vec2 u = (gl_FragCoord.xy - rect.xy) / max(rect.zw - rect.xy, vec2(1.0));
   if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return vec4(0.0);
-  // Ролик сверху вниз, холст снизу вверх
-  return key(t, vec2(u.x, 1.0 - u.y));
+  // И ролик, и картинка идут сверху вниз, а холст снизу вверх
+  vec2 uv = vec2(u.x, 1.0 - u.y);
+  if (uPhoto > 0.5){
+    // Фото — обычный WebP с настоящей прозрачностью: ни маски в нижней
+    // половине кадра, ни калибровки по эталонным квадратам не нужно
+    vec4 c = texture(t, uv);
+    return vec4(c.rgb * c.a, c.a);
+  }
+  return key(t, uv);
 }
 
 void main(){
@@ -70,10 +83,17 @@ void main(){
   o = a + col * (1.0 - a.a);
 }`;
 
+/** Источник картинки для видеокарты: ролик или фото. */
+export type SplashMedia = HTMLVideoElement | HTMLImageElement;
+
 /** Что слой рисует в этом кадре. Всё считает контроллер заставки. */
 export interface SplashDraw extends SplashVisual {
-  /** Ролики: первый — текущий, второй (если есть) — сменяющий его. */
-  videos: readonly HTMLVideoElement[];
+  /** Блюда: первое — текущее, второе (если есть) — сменяющее его. */
+  media: readonly SplashMedia[];
+  /** Фото вместо ролика: у него своя, простая распаковка в шейдере. */
+  photo: boolean;
+  /** Подъём блюда вверх, CSS-пиксели (движение фото). */
+  risePx: number;
   /** Доля смены блюда 0…1 (0 — второго нет). */
   mix: number;
   /** Масштаб уходящего и приходящего блюда при смене. */
@@ -99,10 +119,25 @@ export interface SplashLayer extends Layer {
   } | null;
 }
 
-/** Пропорции кадра: ширина к ВИДИМОЙ высоте (половине файла). */
-function aspectOf(video: HTMLVideoElement | undefined): number {
-  if (!video || !video.videoWidth || !video.videoHeight) return 0;
-  return video.videoWidth / (video.videoHeight / 2);
+/** Ролик уже можно отдать видеокарте. */
+function videoReady(video: HTMLVideoElement): boolean {
+  return video.readyState >= 2 && video.videoWidth > 0;
+}
+
+function isVideo(media: SplashMedia): media is HTMLVideoElement {
+  return media.tagName === "VIDEO";
+}
+
+/** Пропорции кадра: ширина к видимой высоте. У ролика видимая высота —
+ *  половина файла (внизу лежит маска), у фото — вся картинка. */
+function aspectOf(media: SplashMedia | undefined): number {
+  if (!media) return 0;
+  if (isVideo(media)) {
+    if (!media.videoWidth || !media.videoHeight) return 0;
+    return media.videoWidth / (media.videoHeight / 2);
+  }
+  if (!media.naturalWidth || !media.naturalHeight) return 0;
+  return media.naturalWidth / media.naturalHeight;
 }
 
 export function createSplashLayer(): SplashLayer {
@@ -111,6 +146,8 @@ export function createSplashLayer(): SplashLayer {
   let attrib = -1;
   let supported = true;
   let textures: [WebGLTexture | null, WebGLTexture | null] = [null, null];
+  /** Какое фото уже лежит на каждой текстуре: второй раз не грузим. */
+  let uploaded: [SplashMedia | null, SplashMedia | null] = [null, null];
   let draw: SplashDraw | null = null;
   const u: Record<string, WebGLUniformLocation | null> = {};
 
@@ -139,20 +176,31 @@ export function createSplashLayer(): SplashLayer {
   function upload(
     gl: WebGL2RenderingContext,
     unit: 0 | 1,
-    video: HTMLVideoElement | undefined,
+    media: SplashMedia | undefined,
   ): void {
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, textures[unit]);
-    if (video && video.readyState >= 2 && video.videoWidth) {
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        video,
-      );
+    if (!media) return;
+    if (isVideo(media)) {
+      // У ролика каждый кадр новый — отдаём видеокарте каждый раз
+      if (videoReady(media)) {
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          media,
+        );
+      }
+      return;
     }
+    // Фото не меняется — грузим один раз, а не по кадру на каждый кадр
+    if (uploaded[unit] === media || !media.complete || !media.naturalWidth) {
+      return;
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, media);
+    uploaded[unit] = media;
   }
 
   /** Прямоугольник блюда в пикселях холста, отсчёт снизу. */
@@ -172,12 +220,14 @@ export function createSplashLayer(): SplashLayer {
     const height = aspect > 0 ? width / aspect : 0;
     const dpr = frame.dpr;
     const cx = (frame.width / 2 + current.zoomX * frame.width) * dpr;
-    // Заставка уезжает вверх шторкой: блюдо уходит вместе с ней
+    // Заставка уезжает вверх шторкой: блюдо уходит вместе с ней.
+    // risePx — своё движение фото: экранный верх — это плюс по оси холста.
     const cy =
       (frame.height / 2 +
         current.liftShare * frame.height +
         current.zoomY * frame.height) *
-      dpr;
+        dpr +
+      current.risePx * dpr;
     const hw = (width * dpr) / 2;
     const hh = (height * dpr) / 2;
     return [cx - hw, cy - hh, cx + hw, cy + hh];
@@ -210,6 +260,7 @@ export function createSplashLayer(): SplashLayer {
         "uDiscA",
         "uFoodA",
         "uMix",
+        "uPhoto",
       ]) {
         u[name] = gl.getUniformLocation(program, name);
       }
@@ -224,7 +275,7 @@ export function createSplashLayer(): SplashLayer {
       if (!current || !current.visible) return;
       if (!supported || !program || !buffer || attrib < 0 || !isGL2(gl)) return;
 
-      const [a, b] = current.videos;
+      const [a, b] = current.media;
       const aspectA = aspectOf(a);
       if (aspectA <= 0) return;
       const aspectB = aspectOf(b) || aspectA;
@@ -266,6 +317,7 @@ export function createSplashLayer(): SplashLayer {
       gl.uniform1f(u.uDiscA, current.discAlpha);
       gl.uniform1f(u.uFoodA, current.foodAlpha);
       gl.uniform1f(u.uMix, current.mix > 0 && b ? 1 : 0);
+      gl.uniform1f(u.uPhoto, current.photo ? 1 : 0);
 
       // Цвет уже домножен на альфу (как в слое фона, см. src/motion/gl.ts)
       gl.enable(gl.BLEND);
@@ -278,6 +330,7 @@ export function createSplashLayer(): SplashLayer {
       if (program) gl.deleteProgram(program);
       for (const tex of textures) if (tex) gl.deleteTexture(tex);
       textures = [null, null];
+      uploaded = [null, null];
       buffer = null;
       program = null;
       draw = null;
@@ -293,8 +346,7 @@ export function createSplashLayer(): SplashLayer {
 
     foodBox(frame) {
       const current = draw;
-      const video = current?.videos[0];
-      const aspect = aspectOf(video);
+      const aspect = aspectOf(current?.media[0]);
       if (!current || aspect <= 0) return null;
       const width = splashVideoWidth({
         stageWidth: frame.width,
