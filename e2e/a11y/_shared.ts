@@ -47,28 +47,13 @@ export async function scan(
   }));
 }
 
-/**
- * Известное нарушение, которое нельзя починить, не тронув палитру.
+/** Нарушения serious и critical — падение теста с понятным перечислением.
  *
- * Текст ошибки под полем формы — цвет --color-closed (#C9473A) на кремовом
- * фоне: контраст 4,24 при норме 4,5. Палитра — решение архитектора
- * (CLAUDE.md), поэтому здесь исключение, а в PROGRESS.md — вопрос и
- * предложение (#B53A2D даёт 5,2).
- */
-const KNOWN = [{ id: "color-contrast", selector: 'class="field-error"' }];
-
-function isKnown(violation: Violation): boolean {
-  return KNOWN.some(
-    (k) =>
-      k.id === violation.id &&
-      violation.nodes.every((html) => html.includes(k.selector)),
-  );
-}
-
-/** Нарушения serious и critical — падение теста с понятным перечислением. */
+ *  Исключений нет: цвет ошибок формы (--color-closed) с 24.09.2026 стал
+ *  #B93A2E и норму выполняет — прежнее послабление убрано. */
 export function expectClean(violations: Violation[], where: string): void {
-  const blocking = violations.filter(
-    (v) => (BLOCKING as readonly string[]).includes(v.impact) && !isKnown(v),
+  const blocking = violations.filter((v) =>
+    (BLOCKING as readonly string[]).includes(v.impact),
   );
   const text = blocking
     .map(

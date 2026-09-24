@@ -30,11 +30,11 @@ test("«уменьшить движение»: ничего не едет, фо�
   // Safari пишет ноль как «0s», Chromium — как «0ms»: сравниваем числа
   const durations = await page.evaluate(() => {
     const s = getComputedStyle(document.documentElement);
-    return ["--dur-fast", "--dur-base", "--dur-slow"].map((n) =>
+    return ["--dur-fast", "--dur-state", "--dur-in", "--dur-slow"].map((n) =>
       parseFloat(s.getPropertyValue(n)),
     );
   });
-  expect(durations, "длительности не обнулены").toEqual([0, 0, 0]);
+  expect(durations, "длительности не обнулены").toEqual([0, 0, 0, 0]);
 
   // Ничего не сдвинуто: transform у карточек и теней — none. Прозрачность
   // не трогаем: при «уменьшить движение» появление оставлено (карточка ниже

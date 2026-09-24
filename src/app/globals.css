@@ -26,10 +26,16 @@
   --gutter-left: max(var(--gutter), env(safe-area-inset-left, 0px));
   --gutter-right: max(var(--gutter), env(safe-area-inset-right, 0px));
 
-  /* Длительности анимаций (DESIGN.md → Motion) */
-  --dur-fast: 150ms; /* нажатия, переключатели */
-  --dur-base: 240ms; /* появление плиток, чипы, лист */
-  --dur-slow: 420ms; /* экран городов, переход в меню */
+  /* Длительности анимаций. Источник правды — docs/MOTION.md §2 (закон
+     движения старше DESIGN.md); значения — решение архитектора 24.09.2026.
+     Прежний --dur-base делился на два случая, поэтому вместо него два
+     токена: --dur-state и --dur-in. */
+  --dur-fast: 120ms; /* мгновенный отклик: нажатие, +/− количества, кнопки */
+  --dur-state: 200ms; /* смена состояния: цвет, подсветка, чипы, кнопка корзины в шапке */
+  --dur-in: 320ms; /* появление и скрытие: холст, панель корзины, подтверждение, закрытие шторок */
+  --dur-slow: 500ms; /* крупное: открытие шторки блюда и корзины, плитки городов */
+  /* Шаг каскада появления, не больше трёх шагов подряд (docs/MOTION.md §2) */
+  --stagger: 70ms;
 
   /* Появление карточек блюд: быстрый старт, длинный мягкий выход. Своя кривая,
      а не --ease-out: так в эталонном демо docs/motion/produse-demo.html */
@@ -49,9 +55,6 @@
   --glass-bg: rgba(247, 242, 234, 0.78);
   --glass-bg-fallback: rgba(247, 242, 234, 0.96);
   --glass-blur: blur(16px) saturate(130%);
-
-  /* Появление холста движка анимаций (src/motion/engine.ts) */
-  --dur-canvas: 300ms;
 
   /* Затемнение фона под листом блюда */
   --scrim: rgba(26, 23, 20, 0.35);
@@ -82,8 +85,10 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-fast: 0ms;
-    --dur-base: 0ms;
+    --dur-state: 0ms;
+    --dur-in: 0ms;
     --dur-slow: 0ms;
+    --stagger: 0ms;
   }
 }
 
@@ -106,7 +111,7 @@
   --color-smoke: #6b625b; /* граммы, подписи, плейсхолдеры */
   --color-ash: #a79e95; /* подвал, самый тихий текст */
   --color-open: #2f8f5b; /* только индикатор «открыто» */
-  --color-closed: #c9473a; /* только «закрыто» и ошибки формы */
+  --color-closed: #b93a2e; /* только «закрыто» и ошибки формы */
 
   /* Радиусов ровно четыре (DESIGN.md → Border Radius) */
   --radius-*: initial;
@@ -122,8 +127,9 @@
   /* Максимальная ширина контента: max-w-page */
   --container-page: 1200px;
 
-  /* Кривая анимаций */
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Кривая ухода, закрытия и перемещения (docs/MOTION.md §3). Вход,
+     появление и подъём идут по --ease-reveal — третьей кривой на сайте нет. */
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Шкала размеров текста (DESIGN.md → Type Scale) */
   --text-caption: 12px; /* подпись ЗАГЛАВНЫМИ */
@@ -247,9 +253,10 @@
    сквозь. Рамка с overflow: hidden держит его ровно по экрану.
    Высота холста — 100lvh, самый высокий экран телефона: когда браузер
    прячет адресную строку, размер холста не меняется и рисунок не дёргается.
-   Холст проявляется после первого нарисованного кадра, за --dur-canvas
-   (плавность оставлена и при «уменьшить движение»: это прозрачность,
-   а не движение). */
+   Холст проявляется после первого нарисованного кадра, за --dur-in —
+   обычное появление элемента (docs/MOTION.md §2, решение архитектора
+   24.09.2026). При «уменьшить движение» токен обнулён, и холст встаёт
+   сразу: линии фона в этом режиме всё равно не двигаются. */
 .motion-stage {
   position: fixed;
   inset: 0;
@@ -263,7 +270,7 @@
   height: 100vh;
   height: 100lvh;
   opacity: 0;
-  transition: opacity var(--dur-canvas) var(--ease-out);
+  transition: opacity var(--dur-in) var(--ease-reveal);
 }
 .motion-canvas[data-ready] {
   opacity: 1;
@@ -467,8 +474,8 @@ html[data-splash] .motion-stage {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition:
-    background-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
+    background-color var(--dur-state) var(--ease-out),
+    color var(--dur-state) var(--ease-out);
 
   /* Hover только для мыши: на тачскрине тап даёт ложный hover */
   @media (hover: hover) and (pointer: fine) {
@@ -988,7 +995,7 @@ html[data-splash] .motion-stage {
     inset: 0;
     background: var(--scrim);
     opacity: 0;
-    transition: opacity var(--dur-base) var(--ease-out);
+    transition: opacity var(--dur-slow) var(--ease-reveal);
   }
 
   .sheet-panel {
@@ -1004,7 +1011,7 @@ html[data-splash] .motion-stage {
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
     box-shadow: var(--shadow-lift);
     transform: translate3d(0, 100%, 0);
-    transition: transform var(--dur-base) var(--ease-out);
+    transition: transform var(--dur-slow) var(--ease-reveal);
     will-change: transform;
   }
 
@@ -1014,10 +1021,11 @@ html[data-splash] .motion-stage {
   .sheet[data-state="open"] .sheet-panel {
     transform: translate3d(0, 0, 0);
   }
-  /* Закрытие быстрее открытия */
+  /* Закрытие быстрее открытия и по кривой ухода (docs/MOTION.md §2–3) */
   .sheet[data-state="closed"] .sheet-scrim,
   .sheet[data-state="closed"] .sheet-panel {
-    transition-duration: var(--dur-fast);
+    transition-duration: var(--dur-in);
+    transition-timing-function: var(--ease-out);
   }
 
   /* Десктоп: модалка 520px по центру, рамка rule целиком; появление —
@@ -1032,8 +1040,8 @@ html[data-splash] .motion-stage {
       opacity: 0;
       transform: translate3d(-50%, calc(-50% + 16px), 0);
       transition:
-        transform var(--dur-base) var(--ease-out),
-        opacity var(--dur-base) var(--ease-out);
+        transform var(--dur-slow) var(--ease-reveal),
+        opacity var(--dur-slow) var(--ease-reveal);
     }
     .sheet[data-state="open"] .sheet-panel {
       opacity: 1;
@@ -1335,14 +1343,14 @@ html[data-splash] .motion-stage {
     transform: translate3d(0, 100%, 0);
     visibility: hidden;
     transition:
-      transform var(--dur-fast) var(--ease-out),
-      visibility 0s linear var(--dur-fast);
+      transform var(--dur-in) var(--ease-out),
+      visibility 0s linear var(--dur-in);
 
     &[data-visible] {
       transform: translate3d(0, 0, 0);
       visibility: visible;
       transition:
-        transform var(--dur-base) var(--ease-out),
+        transform var(--dur-in) var(--ease-reveal),
         visibility 0s;
     }
     @media (min-width: 1024px) {
@@ -1388,8 +1396,8 @@ html[data-splash] .motion-stage {
   /* Кнопка корзины в шапке появляется мягко (не из ничего: чуть меньше + прозрачность) */
   .header-cart {
     transition:
-      opacity var(--dur-base) var(--ease-out),
-      transform var(--dur-base) var(--ease-out);
+      opacity var(--dur-state) var(--ease-reveal),
+      transform var(--dur-state) var(--ease-reveal);
     @starting-style {
       opacity: 0;
       transform: scale(0.96);
@@ -1413,7 +1421,7 @@ html[data-splash] .motion-stage {
     font-family: var(--font-body);
     /* 15px по DESIGN, но iOS увеличивает страницу при фокусе на поле < 16px */
     font-size: 16px;
-    transition: border-color var(--dur-fast) var(--ease-out);
+    transition: border-color var(--dur-state) var(--ease-out);
 
     &::placeholder {
       color: var(--color-smoke);
@@ -1563,7 +1571,8 @@ html[data-splash] .motion-stage {
 
   /* Подтверждение: круг 96px Yellow с галочкой Ink. Появление — один раз:
      круг — scale .94→1 + прозрачность, остальное — снизу 8px + прозрачность,
-     лесенкой по --step × 60ms (= --dur-base / 4; при reduced-motion — 0).
+     лесенкой по --step × 70ms (шаг каскада, docs/MOTION.md §2; шагов ровно
+     три, дальше каскад не растёт).
      CSS-анимация идёт вне главного потока, пока страница догружается. */
   .confirm-check {
     display: inline-flex;
@@ -1574,11 +1583,11 @@ html[data-splash] .motion-stage {
     border-radius: var(--radius-pill);
     background: var(--color-yellow);
     color: var(--color-ink);
-    animation: confirm-pop var(--dur-base) var(--ease-out) both;
+    animation: confirm-pop var(--dur-in) var(--ease-reveal) both;
   }
   .confirm-step {
-    animation: confirm-rise var(--dur-base) var(--ease-out) both;
-    animation-delay: calc(var(--dur-base) / 4 * var(--step, 1));
+    animation: confirm-rise var(--dur-in) var(--ease-reveal) both;
+    animation-delay: calc(var(--stagger) * var(--step, 1));
   }
 
   /* Пока лист открыт, страница под ним не прокручивается */

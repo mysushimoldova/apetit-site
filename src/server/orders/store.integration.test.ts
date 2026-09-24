@@ -232,6 +232,72 @@ describe.skipIf(!ready)("orders в настоящей Supabase (.env.local)", NE
     expect(eleventh).toEqual({ outcome: "limited", by: "ip" });
   });
 
+  // Миграция 0006: признак ставится внутри place_order(), той же вставкой.
+  // Проверяем на настоящей базе — иначе «герметичность» остаётся словами.
+  //
+  // Миграции в этом проекте применяет хозяин вручную (Supabase → SQL Editor),
+  // поэтому тест сначала спрашивает базу, есть ли уже параметр p_is_test:
+  // нет — пропускается с криком в лог, а не красит прогон в красный из-за
+  // ненажатой кнопки. Обычные заказы от этого не зависят: они зовут функцию
+  // без этого параметра.
+  it("place(isTest): строка сразу с is_test = true; обычный заказ — false", async (ctx) => {
+    // Проба ничего не записывает: с p_phone_limit = 0 функция сразу
+    // отвечает limited, до вставки дело не доходит
+    const probe = await db.rpc("place_order", {
+      p_point_id: "briceni",
+      p_city: "briceni",
+      p_lang: "ro",
+      p_name: "probe",
+      p_phone: "+37360300000",
+      p_address: null,
+      p_items: [],
+      p_total: 0,
+      p_ip_hash: null,
+      p_dedup_hash: hash("probe"),
+      p_now: new Date().toISOString(),
+      p_dedup_seconds: 1,
+      p_phone_limit: 0,
+      p_phone_window_seconds: 1,
+      p_ip_limit: 0,
+      p_ip_window_seconds: 1,
+      p_is_test: true,
+    });
+    if (probe.error) {
+      console.error(
+        "[orders] миграция 0006 не применена: у place_order() нет параметра" +
+          " p_is_test — Supabase → SQL Editor →" +
+          " supabase/migrations/0006_place_order_is_test.sql → Run",
+      );
+      ctx.skip();
+      return;
+    }
+
+    const test = await place(
+      newOrder({
+        phone: "+37360300001",
+        dedupHash: hash("is-test"),
+        isTest: true,
+      }),
+    );
+    const live = await place(
+      newOrder({ phone: "+37360300002", dedupHash: hash("is-live") }),
+    );
+    expect(test.outcome).toBe("created");
+    expect(live.outcome).toBe("created");
+    if (test.outcome !== "created" || live.outcome !== "created") return;
+
+    const rows = await db
+      .from("orders")
+      .select("number, is_test")
+      .in("number", [test.order.number, live.order.number]);
+    expect(rows.error).toBeNull();
+    const byNumber = Object.fromEntries(
+      (rows.data ?? []).map((r) => [r.number, r.is_test]),
+    );
+    expect(byNumber[test.order.number]).toBe(true);
+    expect(byNumber[live.order.number]).toBe(false);
+  });
+
   it("anonymize_old_orders(): заказ старше года — без имени, телефона, адреса; свежий цел", async () => {
     const old = await place(
       newOrder({

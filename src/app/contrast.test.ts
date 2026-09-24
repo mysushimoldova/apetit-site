@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { PAGE_BACKGROUNDS } from "@/motion/config-schema";
+
 const CSS = readFileSync(
   path.join(process.cwd(), "src/app/globals.css"),
   "utf8",
@@ -56,13 +58,23 @@ describe("контраст текста (WCAG AA 4.5:1)", () => {
     }
   }
 
-  // Известное расхождение: цвет ошибок формы на кремовом фоне даёт 4,24.
-  // Чинится только сменой цвета в палитре — это решение архитектора,
-  // вопрос вынесен в PROGRESS.md. Тест держит цифру под наблюдением: станет
-  // хуже — упадёт.
-  it("цвет ошибок формы: 4,24 на кремовом — ниже нормы, ждёт архитектора", () => {
-    const ratio = contrast(token("closed"), token("cream"));
-    expect(ratio).toBeGreaterThanOrEqual(4.24);
-    expect(ratio).toBeLessThan(4.5);
-  });
+  // Цвет ошибок формы и тихий текст живут на любом из четырёх вариантов
+  // фона страницы (их выбирает Амян в /dev/motion) и на молочных
+  // поверхностях — листе блюда, инпутах, карточке точки. Проверяем все
+  // пять: норма должна выполняться при любом выборе фона.
+  for (const [hex, name] of Object.entries(PAGE_BACKGROUNDS)) {
+    for (const text of ["closed", "smoke"] as const) {
+      it(`${text} на фоне ${name} (${hex})`, () => {
+        const ratio = contrast(token(text), hex);
+        expect(ratio, `${ratio}:1`).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+
+  for (const text of ["closed", "smoke"] as const) {
+    it(`${text} на milk`, () => {
+      const ratio = contrast(token(text), token("milk"));
+      expect(ratio, `${ratio}:1`).toBeGreaterThanOrEqual(4.5);
+    });
+  }
 });

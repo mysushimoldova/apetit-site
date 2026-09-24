@@ -17,6 +17,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -48,9 +49,13 @@ async function startServer() {
     return null;
   }
   console.log(`Поднимаю dev-сервер на ${PORT}…`);
-  // npx.cmd, а не shell: true — так аргументы не склеиваются в строку
-  const command = process.platform === "win32" ? "npx.cmd" : "npx";
-  const child = spawn(command, ["next", "dev", "-p", String(PORT)], {
+  // Запускаем сам node по файлу next, а не npx: Node 24 на Windows
+  // отказывается запускать .cmd без оболочки (spawn EINVAL), а оболочка
+  // склеивает аргументы в строку — лишний повод для ошибок с пробелами.
+  const bin = fileURLToPath(
+    new URL("../node_modules/next/dist/bin/next", import.meta.url),
+  );
+  const child = spawn(process.execPath, [bin, "dev", "-p", String(PORT)], {
     stdio: "ignore",
   });
   for (let i = 0; i < 120; i++) {

@@ -127,6 +127,15 @@ export interface Messages {
     call: string;
     back: string;
   };
+  /** Страница «такого адреса нет» (src/app/global-not-found.tsx) */
+  notFound: {
+    /** Заголовок под большой цифрой 404 */
+    title: string;
+    /** Одна строка объяснения: почему адрес не открылся */
+    text: string;
+    /** Подпись кнопки возврата (в меню города или на выбор города) */
+    back: string;
+  };
   /** Правовые страницы и подвал */
   legal: {
     /** Ссылка на /confidentialitate в подвале */
@@ -255,6 +264,12 @@ export const messages: Record<Locale, Messages> = {
       call: "Sună la local",
       back: "Înapoi la meniu",
     },
+    // Тексты 404 — из задания архитектора 24.09.2026
+    notFound: {
+      title: "Pagina nu există",
+      text: "Poate link-ul e vechi sau adresa e scrisă greșit.",
+      back: "Înapoi la meniu",
+    },
     legal: {
       privacy: "Politica de confidențialitate",
       terms: "Termeni",
@@ -373,6 +388,12 @@ export const messages: Record<Locale, Messages> = {
       number: "№ {n}",
       callSoon: "Перезвоним через несколько минут",
       call: "Позвонить в заведение",
+      back: "Вернуться в меню",
+    },
+    // Тексты 404 — из задания архитектора 24.09.2026
+    notFound: {
+      title: "Страница не найдена",
+      text: "Возможно, ссылка устарела или в адресе опечатка.",
       back: "Вернуться в меню",
     },
     legal: {

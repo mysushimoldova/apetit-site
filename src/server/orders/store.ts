@@ -92,7 +92,7 @@ const OutcomeSchema = z.discriminatedUnion("outcome", [
 export function createSupabaseOrderStore(getDb: () => DbClient): OrderStore {
   return {
     async place(order) {
-      const { data, error } = await getDb().rpc("place_order", {
+      const args = {
         p_point_id: order.pointId,
         p_city: order.city,
         p_lang: order.lang,
@@ -110,7 +110,34 @@ export function createSupabaseOrderStore(getDb: () => DbClient): OrderStore {
         p_phone_window_seconds: PHONE_LIMIT.windowMs / 1000,
         p_ip_limit: IP_LIMIT.max,
         p_ip_window_seconds: IP_LIMIT.windowMs / 1000,
-      });
+      };
+
+      // Пометку тестового заказа ставит сама функция базы, той же вставкой
+      // (миграция 0006): состояния «строка уже есть, метки ещё нет» больше не
+      // бывает — отдельного UPDATE нет.
+      //
+      // Параметр уходит только когда он true. Обычный заказ зовёт функцию
+      // ровно как раньше, шестнадцатью аргументами, и работает в любой базе.
+      let { data, error } = await getDb().rpc(
+        "place_order",
+        order.isTest ? { ...args, p_is_test: true } : args,
+      );
+
+      // PGRST202 — такой функции нет: 0006 в этой базе ещё не применена
+      // (миграции нажимает хозяин руками). Заказ всё равно принимаем — без
+      // пометки в строке, зато с криком в лог. В Telegram он не уйдёт и так:
+      // тестовость знает сам запрос (src/server/orders/submit.ts), а не
+      // только строка в базе.
+      if (error?.code === "PGRST202" && order.isTest) {
+        console.error(
+          "[orders] миграция 0006 не применена: у place_order() нет параметра" +
+            " p_is_test — заказ из теста записан как обычный." +
+            " Supabase → SQL Editor →" +
+            " supabase/migrations/0006_place_order_is_test.sql → Run",
+        );
+        ({ data, error } = await getDb().rpc("place_order", args));
+      }
+
       if (error) fail("place", error);
       const parsed = OutcomeSchema.safeParse(data);
       if (!parsed.success) {
@@ -121,31 +148,6 @@ export function createSupabaseOrderStore(getDb: () => DbClient): OrderStore {
       }
       const r = parsed.data;
       if (r.outcome === "limited") return { outcome: "limited", by: r.by };
-      // Заказ из прогона тестов — пометить сразу, отдельным UPDATE:
-      // place_order() и выдачу номеров не трогаем. Напоминания смотрят
-      // только на заказы старше двух минут, так что этот зазор им не виден.
-      // Не получилось пометить по другой причине — приём считается
-      // неудачным (submit.ts вернёт db_error и никуда ничего не отправит):
-      // лучше упавший тест, чем строка, неотличимая от настоящего заказа.
-      if (order.isTest && r.outcome === "created") {
-        const { error: markError } = await getDb()
-          .from("orders")
-          .update({ is_test: true })
-          .eq("id", r.id);
-        // 42703 / PGRST204 — колонки нет: миграция 0005 в этой базе не
-        // применена (PostgREST на UPDATE отвечает про кеш схемы).
-        // Заказ всё равно не уйдёт в Telegram (признак известен этому
-        // запросу), но строка останется неотличимой от настоящей — об этом
-        // надо кричать в лог, а не валить прогон.
-        if (markError?.code === "42703" || markError?.code === "PGRST204") {
-          console.error(
-            "[orders] миграция 0005 не применена: в orders нет колонки is_test —" +
-              " заказ из теста записан как обычный",
-          );
-        } else if (markError) {
-          fail("mark_test", markError);
-        }
-      }
       return {
         outcome: r.outcome,
         order: {

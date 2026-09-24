@@ -146,7 +146,8 @@ export type Database = {
     Functions: {
       /** Заказам старше 365 дней стирает имя, телефон, адрес; возвращает число строк */
       anonymize_old_orders: { Args: Record<string, never>; Returns: number };
-      /** Дубль → лимиты → INSERT в одной транзакции; jsonb с outcome (0002) */
+      /** Дубль → лимиты → INSERT в одной транзакции; jsonb с outcome
+       *  (0002, параметр p_is_test добавлен в 0006) */
       place_order: {
         Args: {
           p_point_id: string;
@@ -165,6 +166,10 @@ export type Database = {
           p_phone_window_seconds: number;
           p_ip_limit: number;
           p_ip_window_seconds: number;
+          /** Пометка «заказ из прогона тестов». Передаётся только когда
+           *  true — обычный заказ зовёт функцию без этого параметра, как до
+           *  миграции 0006 (см. src/server/orders/store.ts). */
+          p_is_test?: boolean;
         };
         Returns: Json;
       };

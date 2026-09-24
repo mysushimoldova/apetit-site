@@ -73,7 +73,6 @@ describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
   });
 
   it("холст движка: за контентом, клики сквозь, появляется плавно", () => {
-    expect(css).toContain("--dur-canvas: 300ms");
     const stage = css.slice(css.indexOf(".motion-stage {"));
     const stageRule = stage.slice(0, stage.indexOf("}"));
     expect(stageRule).toContain("position: fixed");
@@ -87,9 +86,54 @@ describe("дизайн-токены (globals.css) — DESIGN.md 2.1", () => {
     expect(canvasRule).toContain("height: 100lvh");
     expect(canvasRule).toContain("opacity: 0");
     expect(canvasRule).toContain(
-      "transition: opacity var(--dur-canvas) var(--ease-out)",
+      "transition: opacity var(--dur-in) var(--ease-reveal)",
     );
     expect(css).toMatch(/\.motion-canvas\[data-ready\] \{\s*opacity: 1;/);
+  });
+
+  // Закон движения (docs/MOTION.md §2–3) старше DESIGN.md: шкала длительностей
+  // ровно из четырёх значений плюс шаг каскада, кривых ровно две.
+  it("шкала длительностей и шаг каскада — по MOTION.md", () => {
+    // Объявления в :root (не обнулённые «уменьшить движение»)
+    const durations = Object.fromEntries(
+      [...css.matchAll(/--dur-([a-z]+): ([1-9]\d*)ms;/g)].map((m) => [
+        m[1],
+        m[2],
+      ]),
+    );
+    expect(durations).toEqual({
+      fast: "120",
+      state: "200",
+      in: "320",
+      slow: "500",
+    });
+    expect(css).toContain("--stagger: 70ms");
+  });
+
+  it("кривых ровно две: вход и уход", () => {
+    expect(css).toContain("--ease-out: cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(css).toContain("--ease-reveal: cubic-bezier(0.22, 1, 0.36, 1)");
+    const curves = new Set(
+      [...css.matchAll(/cubic-bezier\([^)]+\)/g)].map((m) => m[0]),
+    );
+    expect([...curves].sort()).toEqual([
+      "cubic-bezier(0.22, 1, 0.36, 1)",
+      "cubic-bezier(0.4, 0, 0.2, 1)",
+    ]);
+  });
+
+  it("при «уменьшить движение» обнулены все длительности и каскад", () => {
+    const block = css.slice(css.indexOf("@media (prefers-reduced-motion"));
+    const rule = block.slice(0, block.indexOf("}"));
+    for (const name of [
+      "--dur-fast",
+      "--dur-state",
+      "--dur-in",
+      "--dur-slow",
+      "--stagger",
+    ]) {
+      expect(rule, name).toContain(name + ": 0ms");
+    }
   });
 
   it("старого растрового фона в стилях не осталось", () => {
