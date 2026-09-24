@@ -10,6 +10,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     "node_modules/**",
     ".next/**",
+    // Сборка для Cloudflare (npm run build:cf) — чужой сгенерированный код
+    ".open-next/**",
+    ".wrangler/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

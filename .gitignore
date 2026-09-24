@@ -14,9 +14,16 @@ assets/splash-video/
 *.tsbuildinfo
 next-env.d.ts
 
-# Секреты — только в .env.local, никогда в git
+# Сборка для Cloudflare (OpenNext): npm run build:cf
+/.open-next/
+/.wrangler/
+
+# Секреты — только в .env.local, никогда в git.
+# .dev.vars — запасной файл ключей wrangler; мы им не пользуемся
+# (npm run preview:cf читает .env.local), но пусть не попадёт в git случайно.
 .env*
 !.env.example
+.dev.vars*
 
 # Тесты
 /coverage
@@ -34,6 +41,9 @@ next-env.d.ts
 
 # Лог последнего прогона матрицы
 /matrix.log
+
+# Отчёты Lighthouse (их читает npm run launch:check) — по мегабайту каждый
+/docs/qa/lighthouse/
 
 # Разное
 .DS_Store

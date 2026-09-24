@@ -1,6 +1,7 @@
-// Долгий кэш для файлов, которые не меняются под своим адресом.
-// Next сам ставит его на /_next/static, но на Cloudflare (OpenNext) отдачей
-// занимается не он, поэтому правило задаётся явно в next.config.ts.
+// Кеш ответов сайта. Три разных правила, и каждое — про свой срок жизни.
+//
+// Next сам ставит долгий кеш на /_next/static, но на Cloudflare (OpenNext)
+// отдачей занимается не он, поэтому все правила заданы явно в next.config.ts.
 //
 // /img — наши готовые файлы: фото блюд (<slug>-400|800|1600.webp) и значки.
 // Имя фото = slug блюда и не меняется при замене картинки: тому, кто уже
@@ -15,14 +16,41 @@ export const IMMUTABLE = "public, max-age=31536000, immutable";
 /** Никакого кеша: ответы API у всех разные и устаревают мгновенно. */
 export const NO_STORE = "no-store";
 
+/**
+ * HTML страниц: у браузера не живёт совсем, у Cloudflare — минуту, и ещё
+ * пять минут старая копия может отдаваться, пока в фоне берётся свежая.
+ *
+ * Почему не год (так было до 24.09.2026): страницы не неизменяемые. Меню,
+ * цены, часы работы и «точка закрыта» меняются, и с годовым s-maxage люди
+ * месяцами видели бы старое меню, даже когда сайт уже перевыложен.
+ * max-age=0 и must-revalidate — чтобы у человека в браузере не осело
+ * вчерашнее меню; s-maxage=60 — чтобы Cloudflare всё-таки принимал на себя
+ * поток; stale-while-revalidate=300 — чтобы обновление кеша никому не
+ * стоило ожидания.
+ */
+export const HTML_CACHE =
+  "public, max-age=0, must-revalidate, s-maxage=60, stale-while-revalidate=300";
+
+/**
+ * Что НЕ является страницей: у этих адресов свои правила ниже, и попасть
+ * под правило для HTML они не должны — иначе на один ответ ушло бы два
+ * разных Cache-Control.
+ */
+const NOT_HTML = "_next|img|splash|api";
+
 export interface HeaderRule {
   source: string;
   headers: Header[];
 }
 
-export function immutableCacheRules(): HeaderRule[] {
+export function cacheRules(): HeaderRule[] {
   const headers: Header[] = [{ key: "Cache-Control", value: IMMUTABLE }];
   return [
+    // Всё, кроме сборки, фото, роликов и API, — это страницы сайта
+    {
+      source: `/:path((?!${NOT_HTML}).*)`,
+      headers: [{ key: "Cache-Control", value: HTML_CACHE }],
+    },
     { source: "/img/:path*", headers },
     // Ролики заставки категории: имя файла = слаг блюда, содержимое под этим
     // адресом не меняется (docs/motion/splash-prompt.md)

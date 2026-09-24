@@ -1,0 +1,20 @@
+# Заголовки для файлов, которые на Cloudflare отдаёт не наш код, а сам
+# Cloudflare (Workers static assets): сборка Next, фото блюд, ролики
+# заставки. До правил из next.config.ts эти ответы не доходят вовсе —
+# Cloudflare ставит им своё «public, max-age=0, must-revalidate», и каждое
+# фото качалось бы заново при каждом заходе.
+#
+# Значения — те же, что в src/lib/cache-headers.ts (IMMUTABLE). Менять
+# только вместе с ним: за совпадением следит тест cache-headers.test.ts.
+#
+# Файл не для обычного сервера Next: `npm start` правила берёт из
+# next.config.ts, а этот файл просто лежит в public.
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/img/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/splash/*
+  Cache-Control: public, max-age=31536000, immutable

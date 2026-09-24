@@ -19,7 +19,12 @@
     "telegram:dev": "node scripts/telegram-dev.mjs",
     "telegram:setup": "node scripts/telegram-setup.mjs",
     "og": "node scripts/og-images.mjs",
-    "motion": "node scripts/record-motion.mjs"
+    "motion": "node scripts/record-motion.mjs",
+    "build:cf": "opennextjs-cloudflare build && opennextjs-cloudflare populateCache local",
+    "preview:cf": "wrangler dev --env-file .env.local",
+    "launch:check": "node scripts/launch-check.mjs",
+    "test:e2e:cf": "playwright test -c playwright.cf.config.ts",
+    "deploy:cf": "opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
@@ -33,16 +38,19 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@opennextjs/cloudflare": "^1.20.6",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "^16.3.5",
     "prettier": "^3.9.8",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "wrangler": "^4.137.0"
   }
 }

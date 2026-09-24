@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { immutableCacheRules } from "./src/lib/cache-headers";
+import { cacheRules } from "./src/lib/cache-headers";
 import { securityHeaders } from "./src/lib/security-headers";
 
 // Адрес, с которого Амян открывает dev-сервер с телефона в домашней сети
@@ -28,14 +28,15 @@ const nextConfig: NextConfig = {
   // Не сообщать всем «X-Powered-By: Next.js» — лишняя подсказка атакующему
   poweredByHeader: false,
   // Защитные заголовки (CSP, HSTS и др.) на все адреса — src/lib/security-headers.ts,
-  // плюс долгий кэш для неизменяемых файлов (src/lib/cache-headers.ts).
+  // плюс правила кеша (src/lib/cache-headers.ts): страницы — минута у CDN,
+  // сборка, фото и ролики — год, API — никогда.
   async headers() {
     return [
       {
         source: "/:path*",
         headers: securityHeaders(process.env.NODE_ENV === "development"),
       },
-      ...immutableCacheRules(),
+      ...cacheRules(),
     ];
   },
 };

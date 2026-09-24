@@ -45,8 +45,10 @@ test("сайт не даёт вставлять себя в чужую рамк�
 // принимает «тестовые» заказы, невидимые для точки и владельца.
 test("маршрута /api/dev/e2e в боевой сборке нет", async ({ request }) => {
   expect((await request.get("/api/dev/e2e")).status()).toBe(404);
+  // Значение заголовка — только латиница: с кириллицей Playwright не
+  // отправляет запрос вовсе, и проверка молча не проверяла ничего
   const withHeader = await request.get("/api/dev/e2e", {
-    headers: { "x-apetit-test": "любой" },
+    headers: { "x-apetit-test": "any-secret" },
   });
   expect(withHeader.status()).toBe(404);
 });

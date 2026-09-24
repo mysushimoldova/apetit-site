@@ -1,0 +1,34 @@
+{
+  // Настройки Worker для Cloudflare (SPEC §9.1, план A). Сборка — OpenNext:
+  // npm run build:cf кладёт сюда .open-next/worker.js и .open-next/assets.
+  //
+  // Секретов в этом файле НЕТ и быть не может: он лежит в git. Ключи
+  // (Supabase, Telegram, ORDER_HASH_SECRET, REMINDERS_SECRET) заводятся в
+  // Cloudflare как Secrets — см. docs/launch.md, шаг 3. Локально их берёт
+  // .dev.vars (он в .gitignore).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "apetit",
+  // Не сам .open-next/worker.js, а наша обёртка над ним: она поправляет
+  // Cache-Control у страниц (src/worker.ts объясняет, зачем).
+  "main": "cloudflare/worker.ts",
+
+  // Дата совместимости: ниже неё Workers ведут себя как в этот день. Меняем
+  // осознанно, вместе с проверкой, а не «чтобы было свежее».
+  "compatibility_date": "2026-09-21",
+  // nodejs_compat — Next и Supabase ждут части Node (Buffer, streams).
+  // global_fetch_strictly_public — fetch внутри Worker ходит наружу как
+  // обычный запрос из интернета, а не по внутренним путям Cloudflare:
+  // так запрос к Telegram и Supabase ведёт себя одинаково и локально, и в бою.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  // Готовые файлы (сборка Next, фото, ролики заставки) отдаёт сам Cloudflare,
+  // не наш код.
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+
+  "observability": {
+    "enabled": true,
+  },
+}
