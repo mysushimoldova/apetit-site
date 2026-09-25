@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IDLE_TIMEOUT, idleQueue, waitUpTo } from "./wait";
+import { afterMenuShown, fileQueue, START_DELAY, waitUpTo } from "./wait";
 
 // Нажатие на чип, когда ролик ещё грузится: заставка ждёт не дольше 150 мс
 // (решение архитектора 25.09.2026), потом — обычный переход без неё.
@@ -39,31 +39,25 @@ describe("ожидание с пределом", () => {
   });
 });
 
-// Предзагрузка без цены для главного потока (решение архитектора 25.09.2026):
-// по одному файлу на кусок простоя, и только если в куске есть время.
-describe("очередь по простоям", () => {
-  type Idle = (deadline: IdleDeadline) => void;
-  let idle: Idle[] = [];
-
+// Предзагрузка (решение архитектора 25.09.2026, B0): файлы идут по очереди,
+// по одному, и следующий начинается сразу, как скачан предыдущий. Простоя
+// страницы не ждём вовсе: линии фона рисуются постоянно, простоя почти нет,
+// а в Safari requestIdleCallback нет совсем.
+describe("очередь файлов", () => {
   beforeEach(() => {
-    idle = [];
-    vi.stubGlobal("requestIdleCallback", (callback: Idle) => {
-      idle.push(callback);
-      return idle.length;
-    });
-    vi.stubGlobal("cancelIdleCallback", () => {});
+    vi.useFakeTimers();
+    // Простой не нужен: если очередь его попросит — тест это увидит
+    vi.stubGlobal(
+      "requestIdleCallback",
+      vi.fn(() => {
+        throw new Error("очередь не должна ждать простоя");
+      }),
+    );
   });
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
-
-  /** Отдать очереди один кусок простоя с таким запасом времени. */
-  async function runIdle(remaining: number, didTimeout = false) {
-    const callback = idle.shift();
-    callback?.({ didTimeout, timeRemaining: () => remaining });
-    await Promise.resolve();
-    await Promise.resolve();
-  }
 
   /** Задача-загрузка, которую тест завершает сам. */
   function file() {
@@ -77,79 +71,166 @@ describe("очередь по простоям", () => {
     return { task, finish: () => finish() };
   }
 
-  it("один файл на кусок, следующий — только когда скачан предыдущий", async () => {
+  it("первый файл — сразу, следующий — только когда скачан предыдущий", async () => {
     const a = file();
     const b = file();
-    idleQueue([a.task, b.task]);
-    expect(idle).toHaveLength(1);
-
-    await runIdle(20);
+    fileQueue([a.task, b.task]);
+    await vi.advanceTimersByTimeAsync(0);
     expect(a.task).toHaveBeenCalledTimes(1);
     expect(b.task).not.toHaveBeenCalled();
-    // Пока первый файл качается, новый кусок простоя не просим
-    expect(idle).toHaveLength(0);
+
+    // Сколько бы ни прошло, пока первый качается, второй не начинается
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(b.task).not.toHaveBeenCalled();
 
     a.finish();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(idle).toHaveLength(1);
-    await runIdle(20);
+    await vi.advanceTimersByTimeAsync(0);
     expect(b.task).toHaveBeenCalledTimes(1);
   });
 
-  it("в куске мало времени — файл ждёт следующего простоя", async () => {
-    const a = file();
-    idleQueue([a.task]);
-    await runIdle(0.5);
-    expect(a.task).not.toHaveBeenCalled();
-    expect(idle).toHaveLength(1);
-    await runIdle(20);
-    expect(a.task).toHaveBeenCalledTimes(1);
-  });
-
-  it("браузер так и не простоял до предела — файл всё равно идёт", async () => {
-    const a = file();
-    idleQueue([a.task]);
-    await runIdle(0, true);
-    expect(a.task).toHaveBeenCalledTimes(1);
-  });
-
-  it("простои всё время короткие — файл идёт не позже IDLE_TIMEOUT от первой просьбы", async () => {
-    // Фон движка рисует каждый кадр, и куски простоя бывают по 0.5 мс
-    // подряд. Раньше каждая новая просьба начинала предел заново, и файл
-    // не шёл никогда.
-    let now = 0;
-    vi.spyOn(performance, "now").mockImplementation(() => now);
-    const a = file();
-    idleQueue([a.task]);
-    for (; now < IDLE_TIMEOUT; now += 500) {
-      await runIdle(0.5);
-      expect(a.task).not.toHaveBeenCalled();
-    }
-    await runIdle(0.5);
-    expect(a.task).toHaveBeenCalledTimes(1);
-    vi.restoreAllMocks();
+  it("между файлами нет пауз: 8 мгновенных файлов — без единого шага времени", async () => {
+    const tasks = Array.from({ length: 8 }, () =>
+      vi.fn(() => Promise.resolve()),
+    );
+    fileQueue(tasks);
+    await vi.advanceTimersByTimeAsync(0);
+    for (const task of tasks) expect(task).toHaveBeenCalledTimes(1);
+    expect(requestIdleCallback).not.toHaveBeenCalled();
   });
 
   it("упавшая загрузка не останавливает очередь", async () => {
     const b = file();
-    idleQueue([() => Promise.reject(new Error("сеть")), b.task]);
-    await runIdle(20);
-    await Promise.resolve();
-    await runIdle(20);
+    fileQueue([() => Promise.reject(new Error("сеть")), b.task]);
+    await vi.advanceTimersByTimeAsync(0);
     expect(b.task).toHaveBeenCalledTimes(1);
   });
 
   it("отмена — больше ничего не начинается", async () => {
     const a = file();
     const b = file();
-    const cancel = idleQueue([a.task, b.task]);
-    await runIdle(20);
+    const cancel = fileQueue([a.task, b.task]);
+    await vi.advanceTimersByTimeAsync(0);
     cancel();
     a.finish();
-    await Promise.resolve();
-    await Promise.resolve();
-    await runIdle(20);
+    await vi.advanceTimersByTimeAsync(0);
     expect(b.task).not.toHaveBeenCalled();
+  });
+
+  it("отмена до первого файла — не начинается ничего", async () => {
+    const a = file();
+    const cancel = fileQueue([a.task]);
+    cancel();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(a.task).not.toHaveBeenCalled();
+  });
+});
+
+// Когда начинать: через 1 с после отрисовки меню (после load и LCP), обычным
+// таймером. Страница здесь поддельная: load, LCP и таймеры двигает тест.
+describe("старт предзагрузки после отрисовки меню", () => {
+  type Listener = (list: unknown) => void;
+  let lcp: Listener | null;
+  let loaded: (() => void) | null;
+  let readyState: string;
+  let supported: string[];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    lcp = null;
+    loaded = null;
+    readyState = "loading";
+    supported = ["largest-contentful-paint"];
+    vi.stubGlobal("document", {
+      get readyState() {
+        return readyState;
+      },
+    });
+    vi.stubGlobal("window", {
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === "load") loaded = listener;
+      },
+      removeEventListener: () => {
+        loaded = null;
+      },
+      setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+      clearTimeout: (id: number) => clearTimeout(id),
+      requestIdleCallback: vi.fn(() => {
+        throw new Error("старт не должен ждать простоя");
+      }),
+    });
+    class Observer {
+      static get supportedEntryTypes() {
+        return supported;
+      }
+      constructor(listener: Listener) {
+        lcp = listener;
+      }
+      observe() {}
+      disconnect() {
+        lcp = null;
+      }
+    }
+    vi.stubGlobal("PerformanceObserver", Observer);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function load() {
+    readyState = "complete";
+    loaded?.();
+  }
+
+  it("load, LCP — и ровно через 1 с файлы пошли", async () => {
+    const run = vi.fn();
+    afterMenuShown(run);
+    load();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(run).not.toHaveBeenCalled();
+    lcp?.({});
+    await vi.advanceTimersByTimeAsync(START_DELAY - 1);
+    expect(run).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("LCP пришла несколькими записями — старт всё равно один", async () => {
+    const run = vi.fn();
+    afterMenuShown(run);
+    load();
+    const listener = lcp;
+    listener?.({});
+    listener?.({});
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("браузер не знает LCP (Safari) — через 1 с после load", async () => {
+    supported = [];
+    const run = vi.fn();
+    afterMenuShown(run);
+    load();
+    await vi.advanceTimersByTimeAsync(START_DELAY);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("страница уже загружена к подключению — не ждём load", async () => {
+    readyState = "complete";
+    const run = vi.fn();
+    afterMenuShown(run);
+    lcp?.({});
+    await vi.advanceTimersByTimeAsync(START_DELAY);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("отмена до старта — файлы не пошли", async () => {
+    const run = vi.fn();
+    const cancel = afterMenuShown(run);
+    load();
+    lcp?.({});
+    cancel();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(run).not.toHaveBeenCalled();
   });
 });

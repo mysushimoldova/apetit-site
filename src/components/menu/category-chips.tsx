@@ -17,7 +17,7 @@ import {
 import { CategoryIcon } from "@/components/icons/category-icon";
 import { watchProgrammaticScroll } from "@/lib/programmatic-scroll";
 import { pauseMotion, resumeMotion } from "@/motion/pause";
-import { requestSplash } from "@/motion/splash/request";
+import { requestSplash, warmSplash } from "@/motion/splash/request";
 
 /** Причина паузы движка на время прокрутки к категории. */
 const SCROLL_PAUSE = "scroll";
@@ -213,6 +213,9 @@ export function CategoryChips({
               href={`#${item.slug}`}
               data-slug={item.slug}
               aria-current={active === item.slug ? "true" : undefined}
+              // Палец коснулся чипа — заставка собирает программы видеокарты,
+              // пока его ещё не отпустили: нажатие их уже не ждёт
+              onPointerDown={warmSplash}
               onClick={(e) => onClick(e, item.slug)}
               onKeyDown={onKeyDown}
               className="chip"

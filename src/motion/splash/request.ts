@@ -41,3 +41,24 @@ export function setSplashPlayer(next: SplashPlayer): () => void {
 export function requestSplash(request: SplashRequest): SplashAnswer {
   return player ? player(request) : false;
 }
+
+let warmer: (() => void) | null = null;
+
+/** Заставка готова заранее собрать своё для видеокарты. Возвращает
+ *  отключение. */
+export function setSplashWarmer(next: () => void): () => void {
+  warmer = next;
+  return () => {
+    if (warmer === next) warmer = null;
+  };
+}
+
+/**
+ * Палец только коснулся чипа (pointerdown): заставка собирает программы
+ * видеокарты, пока палец ещё не отпущен (решение архитектора 25.09.2026).
+ * Тогда само нажатие (click) их уже не ждёт. Заставки не будет — ничего не
+ * делает.
+ */
+export function warmSplash(): void {
+  warmer?.();
+}

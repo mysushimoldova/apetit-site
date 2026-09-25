@@ -65,8 +65,11 @@ export default function MotionRuntime({
             ),
         });
         const unset = module.setSplashPlayer(controller.play);
+        // Касание чипа заранее собирает программы видеокарты заставки
+        const unwarm = module.setSplashWarmer(controller.warm);
         unmountSplash = () => {
           unset();
+          unwarm();
           controller.dispose();
           splashControl = null;
         };

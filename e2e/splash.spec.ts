@@ -8,11 +8,12 @@ import { SPLASH_VIDEOS } from "../src/motion/splash/catalog";
 // (pizza, menu, crispy, hot-dog) — та же заставка, но с вырезанным фото
 // первого доступного в точке блюда. Блюдо всегда одно.
 //
-// Загрузка (решение архитектора 25.09.2026): при открытии страницы ролики
-// не грузятся. Когда меню показано и страница простаивает, ролики и фото
-// всех категорий точки тихо догружаются с низким приоритетом — и заставка
-// играет уже с первого нажатия. Поэтому тесты сначала ждут конца этой
-// предзагрузки (waitPrefetched).
+// Загрузка (решение архитектора 25.09.2026, B0): при открытии страницы ролики
+// не грузятся. Через секунду после отрисовки меню ролики и фото всех
+// категорий точки тихо догружаются по одному с низким приоритетом, а каждый
+// ролик сразу доводится до первого кадра (вариант «б») — и заставка играет
+// уже с первого нажатия. Поэтому тесты сначала ждут конца этой предзагрузки
+// (waitPrefetched).
 
 const MENU = "/soroca";
 const CATEGORY = "drinks";
@@ -81,27 +82,57 @@ async function expectedVideos(page: Page): Promise<string[]> {
   });
 }
 
+/** Сколько роликов предзагрузка уже довела до первого кадра. */
+const framedVideos = (page: Page) =>
+  page.evaluate(
+    () =>
+      [
+        ...document.querySelectorAll<HTMLVideoElement>(".splash-videos video"),
+      ].filter((video) => video.readyState >= 2).length,
+  );
+
 /**
- * Дождаться конца тихой предзагрузки: все ролики точки скачаны. До нажатия
- * предзагрузка только качает файлы — <video> ещё нет, поэтому смотрим на
- * сеть: запись о загрузке появляется, когда файл скачан целиком. Файлы идут
- * по одному, фото — первыми, так что «скачаны все ролики» и значит «скачано
- * всё».
+ * Дождаться конца тихой предзагрузки: все ролики точки скачаны и у каждого
+ * есть первый кадр. Скачан — по сети: запись о загрузке появляется, когда
+ * файл скачан целиком. Первый кадр — по самим <video>. Файлы идут по одному,
+ * фото — первыми, так что «готовы все ролики» и значит «готово всё».
  */
 async function waitPrefetched(page: Page): Promise<void> {
   const expected = await expectedVideos(page);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            performance
-              .getEntriesByType("resource")
-              .filter((entry) => entry.name.includes("/splash/")).length,
-        ),
-      { timeout: 30_000, message: "тихая предзагрузка роликов не закончилась" },
-    )
-    .toBe(expected.length);
+  try {
+    await expect
+      .poll(
+        async () => ({
+          downloaded: await page.evaluate(
+            () =>
+              performance
+                .getEntriesByType("resource")
+                .filter((entry) => entry.name.includes("/splash/")).length,
+          ),
+          framed: await framedVideos(page),
+        }),
+        {
+          timeout: 30_000,
+          message: "тихая предзагрузка роликов не закончилась",
+        },
+      )
+      .toEqual({ downloaded: expected.length, framed: expected.length });
+  } catch (error) {
+    // Предзагрузка не стартует, если заставки быть не может (например,
+    // движок на уровне 4). Чтобы при сбое причина была видна сразу —
+    // состояние движка и сколько файлов вообще запрошено
+    const state = await page.evaluate(() => ({
+      engine: (
+        window as unknown as { __apetitMotion?: () => unknown }
+      ).__apetitMotion?.(),
+      photos: performance
+        .getEntriesByType("resource")
+        .filter((entry) => entry.name.includes("/img/products/")).length,
+      splashDom: document.querySelectorAll(".splash").length,
+    }));
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${reason}\nсостояние: ${JSON.stringify(state)}`);
+  }
 }
 
 test("ролики не в критическом пути: не в HTML, после load и LCP, тихо и по одному", async ({
@@ -167,6 +198,40 @@ test("ролики не в критическом пути: не в HTML, пос
   );
 });
 
+// B0 (решение архитектора 25.09.2026): предзагрузка не ждёт простоя
+// страницы. Линии фона рисуются каждый кадр, простоя почти нет — раньше за
+// 30 с успевало скачаться 3 ролика из 8. Правило: все ролики точки скачаны
+// не позже 5 с от открытия страницы, пока фон живой.
+test("все ролики точки скачаны за 5 с, пока фон рисуется", async ({ page }) => {
+  await openMenu(page);
+  await waitPrefetched(page);
+  const result = await page.evaluate(() => {
+    const videos = performance
+      .getEntriesByType("resource")
+      .filter((entry): entry is PerformanceResourceTiming =>
+        entry.name.includes("/splash/"),
+      );
+    const stats = (
+      window as unknown as {
+        __apetitMotion?: () => { running: boolean; quality: number };
+      }
+    ).__apetitMotion?.();
+    return {
+      count: videos.length,
+      lastEnd: Math.max(...videos.map((entry) => entry.responseEnd)),
+      running: stats?.running ?? false,
+      quality: stats?.quality ?? 4,
+    };
+  });
+  expect(result.running, "фон рисуется").toBe(true);
+  expect(result.quality, "движок не остановлен").toBeLessThan(4);
+  expect(result.count).toBe((await expectedVideos(page)).length);
+  expect(
+    result.lastEnd,
+    "последний ролик скачан, мс от открытия",
+  ).toBeLessThanOrEqual(5000);
+});
+
 test("по одному ролику на категорию точки — ровно тот, что сыграет", async ({
   page,
 }) => {
@@ -181,11 +246,13 @@ test("по одному ролику на категорию точки — ро
   expect(requests.sort()).toEqual(expected.sort());
 });
 
-// До первого нажатия — только сеть (решение архитектора 25.09.2026): ни
-// <video>, ни экрана заставки в DOM, ни программ видеокарты для неё. Всё
-// это — при первом воспроизведении, а <video> — только той категории, что
-// играет.
-test("до первого нажатия заставка только качает файлы", async ({ page }) => {
+// Вариант «б» (решение архитектора 25.09.2026). До касания у каждого ролика
+// точки уже есть <video> с первым кадром. Программ видеокарты для заставки
+// ещё нет: их собирает первое касание чипа (pointerdown), пока палец не
+// отпущен. Само нажатие новых <video> не создаёт.
+test("до касания ролики разобраны, программы — по касанию чипа", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     const w = window as Window & { __programs?: number };
     w.__programs = 0;
@@ -203,15 +270,32 @@ test("до первого нажатия заставка только кача�
   await waitPrefetched(page);
   await page.waitForTimeout(500);
 
-  expect(await page.locator("video").count(), "ни одного <video>").toBe(0);
-  expect(await page.locator(".splash").count(), "экрана заставки нет").toBe(0);
+  const expected = await expectedVideos(page);
+  const videos = page.locator(".splash-videos video");
+  expect(await videos.count(), "по <video> на каждый ролик точки").toBe(
+    expected.length,
+  );
+  expect(
+    await page.locator(".splash[data-on]").count(),
+    "заставка скрыта",
+  ).toBe(0);
   const before = await programs();
 
-  await chip(page, CATEGORY).click();
+  // Палец на чипе и ещё не отпущен: программы уже собраны, заставки ещё нет
+  const target = chip(page, CATEGORY);
+  await target.scrollIntoViewIfNeeded();
+  const box = (await target.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  // Две программы заставки: блюдо и пре-проход калибровки
+  expect((await programs()) - before, "программы — по касанию").toBe(2);
+  expect(await splashOn(page), "до отпускания заставки нет").toBe(false);
+  await page.mouse.up();
   await page.waitForTimeout(250);
   expect(await splashOn(page), "первое нажатие — заставка играет").toBe(true);
-  expect(await page.locator(".splash-videos video").count()).toBe(1);
-  // Две программы заставки: блюдо и пре-проход калибровки
+  expect(await videos.count(), "нажатие новых <video> не делает").toBe(
+    expected.length,
+  );
   expect((await programs()) - before).toBe(2);
 
   await expect
@@ -220,8 +304,8 @@ test("до первого нажатия заставка только кача�
   await chip(page, SECOND).click();
   await page.waitForTimeout(250);
   expect(await splashOn(page)).toBe(true);
-  // Вторая категория — свой <video>; программы уже собраны
-  expect(await page.locator(".splash-videos video").count()).toBe(2);
+  // Вторая категория — тот же запас роликов; программы уже собраны
+  expect(await videos.count()).toBe(expected.length);
   expect((await programs()) - before).toBe(2);
   expect(errors).toEqual([]);
 });
@@ -509,7 +593,7 @@ test("экономия трафика — заставки нет и ролик�
     if (r.url().includes("/splash/")) requests.push(r.url());
   });
   await openMenu(page);
-  // Страница давно простаивает — предзагрузки всё равно нет
+  // Меню давно отрисовано — предзагрузки всё равно нет
   await page.waitForTimeout(3000);
 
   await chip(page, CATEGORY).click();
@@ -722,6 +806,23 @@ test("заставка играет у каждой категории с рол
   );
 
   for (const slug of present) await checkCategory(page, slug);
+  expect(errors).toEqual([]);
+});
+
+// Человек нажимает чип не сразу. Chrome примерно через 20–30 с простоя
+// усыпляет стоящий ролик, а при нажатии будит и перечитывает его файл по
+// адресу blob:. Когда адрес закрывали сразу после первого кадра (пункт B7),
+// после 30–40 с простоя заставка шла без блюда (замер 25.09.2026: 5 прогонов из
+// 5 красные, без закрытия — зелёные).
+test("через 30 с простоя заставка по-прежнему с блюдом", async ({ page }) => {
+  test.slow();
+  const errors = await openMenu(page);
+  await waitPrefetched(page);
+  await page.waitForTimeout(30_000);
+
+  for (const slug of VIDEO_CATEGORIES) {
+    if (await chip(page, slug).count()) await checkCategory(page, slug);
+  }
   expect(errors).toEqual([]);
 });
 

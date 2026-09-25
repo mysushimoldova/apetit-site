@@ -1,16 +1,26 @@
 // Ролики заставки: тихая предзагрузка и хранение на время визита.
 //
-// Правило (решение архитектора 25.09.2026): когда меню отрисовано и страница
-// простаивает, заставка сама догружает ролики всех категорий точки — по
+// Правило (решение архитектора 25.09.2026, B0): через секунду после
+// отрисовки меню заставка сама догружает ролики всех категорий точки — по
 // одному, с низким приоритетом (fetch priority "low"), чтобы не спорить за
 // сеть ни с главной картинкой, ни с плитками меню. Поэтому уже первое
 // нажатие на категорию играет заставку. Никаких <link rel="preload"> и
 // ничего в <head>: ролики не в критическом пути страницы.
 //
-// До первого нажатия — только сеть (download): файл лежит в памяти, и всё.
-// Элемент <video>, его разбор и расшифровка кадров — только когда категорию
-// впервые играют (take / wait): при загрузке страницы главный поток этой
-// работой не занят вовсе.
+// Сразу после скачивания ролик становится элементом <video>, и заставка
+// ждёт его первого готового кадра (readyState ≥ 2) — тоже по одному, не
+// параллельно (решение архитектора 25.09.2026, вариант «б»). Так нажатие
+// получает уже разобранный ролик и заставка встаёт на экран без ~110 мс
+// разбора. Загрузка кадра в видеокарту и калибровка — по-прежнему только
+// при показе.
+//
+// Адрес blob: у готового ролика НЕ закрывается до ухода со страницы, хотя
+// архитектор просил отпускать файл сразу после первого кадра (пункт B7).
+// Замер 25.09.2026: Chrome усыпляет стоящий ролик примерно через 20–30 с
+// простоя, а при нажатии будит его и перечитывает файл по тому же адресу.
+// Адрес закрыт — ролик пуст, и заставка идёт без блюда (тест «через 30 с
+// простоя» в e2e/splash.spec.ts). Своя ссылка на файл после первого кадра
+// всё же убирается (files): файл держит только адрес ролика.
 //
 // Почему fetch, а не просто <video preload>: у <video> нельзя задать
 // приоритет загрузки. Файл скачивается fetch-ем целиком и отдаётся ролику
@@ -41,50 +51,80 @@ export function videoUsable(video: { readyState: number }): boolean {
   return video.readyState >= READY;
 }
 
+/**
+ * Первый кадр ролика расшифрован (HAVE_CURRENT_DATA). Предзагрузке этого
+ * хватает, чтобы переходить к следующему ролику. Играть
+ * заставку — только с уровня READY.
+ */
+const FIRST_FRAME = 2;
+
+/**
+ * Сколько предзагрузка ждёт первый кадр одного ролика, мс. Не дождалась —
+ * переходит к следующему ролику, а этот готовится дальше сам. Без предела
+ * очередь встала бы там, где браузер заранее разбирает только размеры
+ * ролика (iPhone в режиме энергосбережения), и остальные ролики не
+ * скачались бы вовсе.
+ */
+export const FIRST_FRAME_WAIT = 2000;
+
+/** Что от <video> нужно ожиданию: уровень готовности и события. Тесту
+ *  хватает поддельного объекта. */
+type MediaState = EventTarget & { readonly readyState: number };
+
+/** События, после которых уровень готовности мог вырасти. */
+const PROGRESS = ["loadeddata", "canplay", "canplaythrough"] as const;
+
+/** Дождаться, пока ролик дойдёт до уровня level. Ошибка — false. */
+export function untilLevel(video: MediaState, level: number): Promise<boolean> {
+  if (video.readyState >= level) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const done = (ok: boolean) => {
+      for (const type of PROGRESS) video.removeEventListener(type, onProgress);
+      video.removeEventListener("error", onError);
+      resolve(ok);
+    };
+    const onProgress = () => {
+      if (video.readyState >= level) done(true);
+    };
+    const onError = () => done(false);
+    for (const type of PROGRESS) video.addEventListener(type, onProgress);
+    video.addEventListener("error", onError);
+  });
+}
+
 export interface SplashVideoPool {
   /** Готовый ролик этого блюда. Ещё не готов — null, и ролик начинает
-   *  готовиться (первое воспроизведение категории). */
+   *  готовиться (если предзагрузка до него ещё не дошла). */
   take(slug: string): HTMLVideoElement | null;
   /** Ролик, как только он готов, но не дольше ms; не успел — null. */
   wait(slug: string, ms: number): Promise<HTMLVideoElement | null>;
-  /** Только скачать файл, с низким приоритетом: ни <video>, ни расшифровки.
-   *  Готово, когда файл в памяти (или не скачался). */
-  download(slug: string): Promise<void>;
+  /** Предзагрузка одного ролика: скачать файл с низким приоритетом, сделать
+   *  <video> и дождаться первого кадра (не дольше FIRST_FRAME_WAIT после
+   *  скачивания). Готово — можно браться за следующий. */
+  preload(slug: string): Promise<void>;
   dispose(): void;
 }
 
 interface Entry {
   video: HTMLVideoElement;
+  /** Первый кадр расшифрован (true) или ролик не разобрался (false). */
+  frame: Promise<boolean>;
   /** Ролик готов играть (true) или загрузка не удалась (false). */
   ready: Promise<boolean>;
 }
 
-/** Дождаться, пока ролик из памяти станет готов к показу. */
-function untilUsable(video: HTMLVideoElement): Promise<boolean> {
-  if (videoUsable(video)) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    const done = (ok: boolean) => {
-      video.removeEventListener("canplaythrough", onReady);
-      video.removeEventListener("error", onError);
-      resolve(ok);
-    };
-    const onReady = () => {
-      if (videoUsable(video)) done(true);
-    };
-    const onError = () => done(false);
-    video.addEventListener("canplaythrough", onReady);
-    video.addEventListener("error", onError);
-  });
-}
-
-/** host — где живут <video>: уголок заставки, его создают при первом показе. */
+/** host — где живут <video>: невидимый уголок в DOM заставки. */
 export function createSplashVideoPool(
   host: () => HTMLElement,
 ): SplashVideoPool {
-  /** Скачанные файлы: слаг → файл в памяти (null — не скачался). */
+  /** Скачанные и ещё не отданные ролику файлы: слаг → файл в памяти (null
+   *  — не скачался). Как только у ролика есть первый кадр, файл отсюда
+   *  уходит: дальше его держит адрес blob: самого ролика. */
   const files = new Map<string, Promise<Blob | null>>();
   const pool = new Map<string, Entry>();
-  const urls: string[] = [];
+  /** Открытые адреса blob: — закрываются, только когда ролик забыт или
+   *  страница ушла (см. шапку файла). */
+  const urls = new Set<string>();
   const abort = new AbortController();
   let disposed = false;
 
@@ -109,8 +149,13 @@ export function createSplashVideoPool(
     return loading;
   }
 
-  /** Первое воспроизведение категории: <video> из скачанного файла. */
-  function element(slug: string): Entry {
+  function closeUrl(url: string): void {
+    if (url && urls.delete(url)) URL.revokeObjectURL(url);
+  }
+
+  /** <video> из скачанного файла: создаёт предзагрузка, а если она до
+   *  этого ролика ещё не дошла — нажатие. */
+  function element(slug: string, priority: RequestPriority): Entry {
     const existing = pool.get(slug);
     if (existing) return existing;
     const video = document.createElement("video");
@@ -123,24 +168,35 @@ export function createSplashVideoPool(
     video.loop = false;
     host().appendChild(video);
 
-    const ready = file(slug, "auto")
+    let url = "";
+    const forget = () => {
+      closeUrl(url);
+      if (pool.get(slug)?.video !== video) return;
+      pool.delete(slug);
+      video.remove();
+    };
+    // Ролик сломался и после первого кадра: забываем его — следующее
+    // нажатие скачает файл заново, уже из кеша браузера
+    video.addEventListener("error", forget);
+
+    const frame = file(slug, priority)
       .then((blob) => {
         if (!blob || disposed) return false;
-        const url = URL.createObjectURL(blob);
-        urls.push(url);
+        url = URL.createObjectURL(blob);
+        urls.add(url);
         video.src = url;
         video.load();
-        return untilUsable(video);
+        return untilLevel(video, FIRST_FRAME);
       })
       .then((ok) => {
-        if (!ok && pool.get(slug)?.video === video) {
-          pool.delete(slug);
-          video.remove();
-        }
+        // Файл теперь держит адрес ролика; не разобрался — забываем всё
+        files.delete(slug);
+        if (!ok) forget();
         return ok;
       });
+    const ready = frame.then((ok) => ok && untilLevel(video, READY));
 
-    const entry = { video, ready };
+    const entry = { video, frame, ready };
     pool.set(slug, entry);
     return entry;
   }
@@ -148,13 +204,13 @@ export function createSplashVideoPool(
   return {
     take(slug) {
       if (!slug || disposed) return null;
-      const { video } = element(slug);
+      const { video } = element(slug, "auto");
       return videoUsable(video) ? video : null;
     },
 
     wait(slug, ms) {
       if (!slug || disposed) return Promise.resolve(null);
-      const { video, ready } = element(slug);
+      const { video, ready } = element(slug, "auto");
       return waitUpTo(
         ready.then((ok) => (ok && videoUsable(video) ? video : null)),
         ms,
@@ -162,9 +218,21 @@ export function createSplashVideoPool(
       );
     },
 
-    download(slug) {
+    preload(slug) {
       if (!slug || disposed) return Promise.resolve();
-      return file(slug, "low").then(() => {});
+      // Нажатие могло опередить очередь: ролик уже есть — ждём только его
+      // первый кадр. Предел — после скачивания, а не от начала: на медленной
+      // сети файлы иначе пошли бы параллельно.
+      const downloaded = pool.has(slug)
+        ? Promise.resolve(true)
+        : file(slug, "low").then((blob) => blob !== null);
+      return downloaded
+        .then((ok) =>
+          ok && !disposed
+            ? waitUpTo(element(slug, "low").frame, FIRST_FRAME_WAIT, false)
+            : false,
+        )
+        .then(() => {});
     },
 
     dispose() {
@@ -179,7 +247,7 @@ export function createSplashVideoPool(
       pool.clear();
       files.clear();
       for (const url of urls) URL.revokeObjectURL(url);
-      urls.length = 0;
+      urls.clear();
     },
   };
 }

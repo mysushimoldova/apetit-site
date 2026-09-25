@@ -12,16 +12,23 @@
 // поворота вшита в файл (60 кадров = 1.0 с). Никаких перемоток и подгонки
 // скорости по ходу — поверх ролика считаются только размер, высота и круг.
 //
-// Загрузка (решение архитектора 25.09.2026): когда меню показано и страница
-// простаивает, ролики и фото всех категорий точки тихо догружаются заранее
-// (videos.ts, photos.ts), поэтому заставка играет уже с первого нажатия.
+// Загрузка (решение архитектора 25.09.2026, B0): через секунду после
+// отрисовки меню (после load и LCP) ролики и фото всех категорий точки тихо
+// догружаются заранее (videos.ts, photos.ts), поэтому заставка играет уже с
+// первого нажатия. Простоя страницы не ждём: линии фона рисуются постоянно,
+// простоя почти нет, а в Safari requestIdleCallback нет вовсе.
 // Нажали раньше, чем блюдо догрузилось, — ждём его не дольше WAIT_MS, потом
 // обычный переход без заставки.
 //
-// До первого нажатия — только сеть: файлы по одному, каждый в своём куске
-// простоя (idleQueue). Кремовый экран в DOM, программы и текстуры видеокарты
-// — при первом воспроизведении вообще; <video>, расшифровка кадров и
-// калибровка ролика — при первом воспроизведении этой категории.
+// Порядок подготовки (решение архитектора 25.09.2026, вариант «б»):
+//  • файлы — по одному, следующий, как только готов предыдущий (fileQueue),
+//    fetch с priority "low";
+//  • ролик сразу после скачивания становится <video> и доходит до первого
+//    кадра, тоже по одному; потом его файл отпускается (videos.ts). Для
+//    этого кремовый экран заставки (скрытый) появляется в DOM уже тогда;
+//  • программы видеокарты — при первом касании любого чипа (pointerdown),
+//    пока палец ещё не отпущен (warm);
+//  • загрузка кадра в видеокарту и калибровка ролика — только при показе.
 //
 // Нажатие на другую категорию, пока заставка идёт или уходит: текущая
 // обрывается мгновенно, без ухода, и сразу играет заставка новой. С момента
@@ -50,15 +57,16 @@ import {
 } from "./catalog";
 import { splashRate } from "./geometry";
 import { createSplashPhotoPool } from "./photos";
-export { setSplashPlayer } from "./request";
+export { setSplashPlayer, setSplashWarmer } from "./request";
 import {
   setSplashPlayer,
+  setSplashWarmer,
   type SplashAnswer,
   type SplashRequest,
 } from "./request";
 import { splashVisual } from "./timeline";
 import { createSplashVideoPool } from "./videos";
-import { idleQueue, whenPageSettles } from "./wait";
+import { afterMenuShown, fileQueue } from "./wait";
 import type { SplashMedia } from "../layers/splash";
 
 /** Причина паузы движка, пока играет заставка (docs/MOTION.md §1). */
@@ -88,6 +96,8 @@ export interface SplashDeps {
 
 export interface SplashController {
   play(request: SplashRequest): SplashAnswer;
+  /** Собрать программы видеокарты заранее — касание чипа, ещё до нажатия. */
+  warm(): void;
   end(): void;
   isPlaying(): boolean;
   setSettings(next: SplashSettings): void;
@@ -517,7 +527,8 @@ export function createSplashController(deps: SplashDeps): SplashController {
     const mode = splashModeFor(request.category, available, deps.photos);
     if (mode.kind === "none") return refuse();
 
-    // Первое воспроизведение: только теперь собираем программы видеокарты
+    // Обычно программы уже собраны касанием чипа (warm); с клавиатуры
+    // касания нет — тогда собираем здесь
     if (!layer.prepare()) return refuse();
 
     const asPhoto = mode.kind === "photo";
@@ -536,22 +547,32 @@ export function createSplashController(deps: SplashDeps): SplashController {
     });
   }
 
-  // Когда меню показано и страница простаивает — тихо догрузить блюда всех
-  // категорий точки. При экономии трафика и там, где заставки не будет
-  // вовсе, не грузится ничего.
+  function warm(): void {
+    if (!canPlay()) return;
+    try {
+      layer.prepare();
+    } catch (error) {
+      crash(error);
+    }
+  }
+
+  // Через секунду после отрисовки меню — тихо догрузить блюда всех
+  // категорий точки: ролики — до первого готового кадра. При экономии
+  // трафика и там, где заставки не будет вовсе, не грузится ничего.
   // Фото — первыми: они в разы легче роликов.
   let stopQueue = () => {};
-  const stopPrefetch = whenPageSettles(() => {
+  const stopPrefetch = afterMenuShown(() => {
     if (!canPlay()) return;
     const plan = splashPrefetchFor(available, deps.photos);
-    stopQueue = idleQueue([
+    stopQueue = fileQueue([
       ...plan.photos.map((src) => () => photoPool.download(src)),
-      ...plan.videos.map((slug) => () => pool.download(slug)),
+      ...plan.videos.map((slug) => () => pool.preload(slug)),
     ]);
   });
 
   return {
     play,
+    warm,
     end,
     isPlaying: () => playing,
     setSettings(next) {
@@ -579,8 +600,10 @@ export function createSplashController(deps: SplashDeps): SplashController {
 export function mountSplash(deps: SplashDeps): () => void {
   const controller = createSplashController(deps);
   const unset = setSplashPlayer(controller.play);
+  const unwarm = setSplashWarmer(controller.warm);
   return () => {
     unset();
+    unwarm();
     controller.dispose();
   };
 }
