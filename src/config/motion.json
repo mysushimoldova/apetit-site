@@ -66,7 +66,8 @@
     "wordY": -220,
     "wordTop": true,
     "lines": 0.35,
-    "skip": true
+    "skip": true,
+    "warmMax": 4
   },
   "page": {
     "background": "#F7F2EA"

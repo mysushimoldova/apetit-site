@@ -17,7 +17,11 @@ import {
 import { CategoryIcon } from "@/components/icons/category-icon";
 import { watchProgrammaticScroll } from "@/lib/programmatic-scroll";
 import { pauseMotion, resumeMotion } from "@/motion/pause";
-import { requestSplash, warmSplash } from "@/motion/splash/request";
+import {
+  requestSplash,
+  showSplashChips,
+  warmSplash,
+} from "@/motion/splash/request";
 
 /** Причина паузы движка на время прокрутки к категории. */
 const SCROLL_PAUSE = "scroll";
@@ -98,6 +102,32 @@ export function CategoryChips({
       window.removeEventListener("resize", observe);
       observer?.disconnect();
     };
+  }, [items]);
+
+  // Какие чипы сейчас видны в ленте — по ним заставка держит тёплыми ролики
+  // (решение архитектора 25.09.2026). Видимым считается чип, который виден
+  // хотя бы наполовину: в такой уже можно целиться пальцем.
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof IntersectionObserver === "undefined") return;
+    const seen = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const slug = (entry.target as HTMLElement).dataset.slug ?? "";
+          if (entry.isIntersecting) seen.add(slug);
+          else seen.delete(slug);
+        }
+        showSplashChips(
+          items.map((item) => item.slug).filter((slug) => seen.has(slug)),
+        );
+      },
+      { root: nav, threshold: 0.5 },
+    );
+    for (const chip of nav.querySelectorAll("[data-slug]")) {
+      observer.observe(chip);
+    }
+    return () => observer.disconnect();
   }, [items]);
 
   // Активный чип всегда виден в ленте (прокручиваем только ленту, не страницу)

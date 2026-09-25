@@ -10,10 +10,13 @@ import { SPLASH_VIDEOS } from "../src/motion/splash/catalog";
 //
 // Загрузка (решение архитектора 25.09.2026, B0): при открытии страницы ролики
 // не грузятся. Через секунду после отрисовки меню ролики и фото всех
-// категорий точки тихо догружаются по одному с низким приоритетом, а каждый
-// ролик сразу доводится до первого кадра (вариант «б») — и заставка играет
-// уже с первого нажатия. Поэтому тесты сначала ждут конца этой предзагрузки
-// (waitPrefetched).
+// категорий точки тихо догружаются по одному с низким приоритетом. «Тёплыми»
+// — с готовым первым кадром — держатся не больше splash.warmMax роликов:
+// чипы, видные в ленте, и последняя открытая категория (решение архитектора
+// 25.09.2026). Тёплый чип играет заставку сразу; холодный — как только его
+// ролик разберётся, но не дольше 150 мс. Поэтому тесты сначала ждут конца
+// предзагрузки (waitPrefetched), а перед нажатием, где важны первые 50 мс,
+// подводят чип в ленту и ждут, пока он согреется (warmChip).
 
 const MENU = "/soroca";
 const CATEGORY = "drinks";
@@ -82,41 +85,120 @@ async function expectedVideos(page: Page): Promise<string[]> {
   });
 }
 
-/** Сколько роликов предзагрузка уже довела до первого кадра. */
-const framedVideos = (page: Page) =>
-  page.evaluate(
-    () =>
-      [
-        ...document.querySelectorAll<HTMLVideoElement>(".splash-videos video"),
-      ].filter((video) => video.readyState >= 2).length,
+/** Ролик первого блюда категории — тот, что сыграет заставка. */
+const videoOf = (category: string) => SPLASH_VIDEOS[category]?.[0] ?? null;
+
+/** Ролики, у которых сейчас есть <video>, и есть ли у них первый кадр. */
+const warmVideos = (page: Page) =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLVideoElement>(".splash-videos video"),
+    ].map((video) => ({
+      slug: video.dataset.slug ?? "",
+      framed: video.readyState >= 2,
+    })),
   );
 
 /**
- * Дождаться конца тихой предзагрузки: все ролики точки скачаны и у каждого
- * есть первый кадр. Скачан — по сети: запись о загрузке появляется, когда
- * файл скачан целиком. Первый кадр — по самим <video>. Файлы идут по одному,
- * фото — первыми, так что «готовы все ролики» и значит «готово всё».
+ * Какие ролики должны быть тёплыми, пока ни одна категория не открыта:
+ * чипы, видные в ленте хотя бы наполовину, слева направо, не больше
+ * warmMax. Считается по геометрии ленты — независимо от кода заставки.
+ */
+async function expectedWarm(page: Page): Promise<string[]> {
+  const visible = await page.evaluate(() => {
+    const nav = document.querySelector(".chips-row")!.getBoundingClientRect();
+    return [
+      ...document.querySelectorAll<HTMLElement>(".chips-row a[data-slug]"),
+    ]
+      .filter((item) => {
+        const rect = item.getBoundingClientRect();
+        const seen =
+          Math.min(rect.right, nav.right) - Math.max(rect.left, nav.left);
+        return seen >= rect.width / 2;
+      })
+      .map((item) => item.dataset.slug ?? "");
+  });
+  return visible
+    .flatMap((slug) => {
+      const video = videoOf(slug);
+      return video ? [video] : [];
+    })
+    .slice(0, splashConfig.warmMax);
+}
+
+/**
+ * Подвести чип в ленту (как пальцем) и дождаться, пока его ролик
+ * согреется: через 300 мс после прокрутки ленты он входит в тёплые и
+ * разбирается до первого кадра.
+ */
+async function warmChip(page: Page, slug: string): Promise<void> {
+  await chip(page, slug).scrollIntoViewIfNeeded();
+  const video = videoOf(slug);
+  await expect
+    .poll(
+      async () =>
+        (await warmVideos(page)).some(
+          (item) => item.slug === video && item.framed,
+        ),
+      { timeout: 5000, message: `${slug}: ролик не согрелся` },
+    )
+    .toBe(true);
+}
+
+/** Пометить <video> категории: по метке видно, что нажатие взяло именно
+ *  его, а не сделало новый. */
+const markVideo = (page: Page, category: string) =>
+  page.evaluate((slug) => {
+    document
+      .querySelector(`.splash-videos video[data-slug="${slug}"]`)
+      ?.setAttribute("data-mark", "");
+  }, videoOf(category));
+
+/** У категории ровно один <video>, и это помеченный. */
+const sameVideo = (page: Page, category: string) =>
+  page.evaluate((slug) => {
+    const all = document.querySelectorAll(
+      `.splash-videos video[data-slug="${slug}"]`,
+    );
+    return all.length === 1 && all[0].hasAttribute("data-mark");
+  }, videoOf(category));
+
+/**
+ * Дождаться конца тихой предзагрузки: все ролики точки скачаны, а тёплые —
+ * ровно чипы, видные в ленте (не больше warmMax), и у каждого есть первый
+ * кадр. Скачан — по сети: запись о загрузке появляется, когда файл скачан
+ * целиком. Первый кадр — по самим <video>. Файлы идут по одному, фото —
+ * первыми, так что «готовы все ролики» и значит «готово всё».
  */
 async function waitPrefetched(page: Page): Promise<void> {
   const expected = await expectedVideos(page);
   try {
     await expect
       .poll(
-        async () => ({
-          downloaded: await page.evaluate(
-            () =>
-              performance
-                .getEntriesByType("resource")
-                .filter((entry) => entry.name.includes("/splash/")).length,
-          ),
-          framed: await framedVideos(page),
-        }),
+        async () => {
+          const warm = await warmVideos(page);
+          return {
+            downloaded: await page.evaluate(
+              () =>
+                performance
+                  .getEntriesByType("resource")
+                  .filter((entry) => entry.name.includes("/splash/")).length,
+            ),
+            framed: warm.length > 0 && warm.every((item) => item.framed),
+            // Тёплые — ровно чипы, видные в ленте
+            same:
+              warm
+                .map((item) => item.slug)
+                .sort()
+                .join() === (await expectedWarm(page)).sort().join(),
+          };
+        },
         {
           timeout: 30_000,
           message: "тихая предзагрузка роликов не закончилась",
         },
       )
-      .toEqual({ downloaded: expected.length, framed: expected.length });
+      .toEqual({ downloaded: expected.length, framed: true, same: true });
   } catch (error) {
     // Предзагрузка не стартует, если заставки быть не может (например,
     // движок на уровне 4). Чтобы при сбое причина была видна сразу —
@@ -130,8 +212,14 @@ async function waitPrefetched(page: Page): Promise<void> {
         .filter((entry) => entry.name.includes("/img/products/")).length,
       splashDom: document.querySelectorAll(".splash").length,
     }));
+    const warm = {
+      warm: await warmVideos(page),
+      expectedWarm: await expectedWarm(page),
+    };
     const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`${reason}\nсостояние: ${JSON.stringify(state)}`);
+    throw new Error(
+      `${reason}\nсостояние: ${JSON.stringify({ ...state, ...warm })}`,
+    );
   }
 }
 
@@ -246,11 +334,12 @@ test("по одному ролику на категорию точки — ро
   expect(requests.sort()).toEqual(expected.sort());
 });
 
-// Вариант «б» (решение архитектора 25.09.2026). До касания у каждого ролика
-// точки уже есть <video> с первым кадром. Программ видеокарты для заставки
-// ещё нет: их собирает первое касание чипа (pointerdown), пока палец не
-// отпущен. Само нажатие новых <video> не создаёт.
-test("до касания ролики разобраны, программы — по касанию чипа", async ({
+// Вариант «б» (решение архитектора 25.09.2026). До касания у тёплых роликов
+// (чипы в ленте, не больше warmMax) уже есть <video> с первым кадром.
+// Программ видеокарты для заставки ещё нет: их собирает первое касание чипа
+// (pointerdown), пока палец не отпущен. Нажатие на тёплый чип новых <video>
+// не создаёт.
+test("до касания тёплые ролики разобраны, программы — по касанию чипа", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -270,11 +359,15 @@ test("до касания ролики разобраны, программы �
   await waitPrefetched(page);
   await page.waitForTimeout(500);
 
-  const expected = await expectedVideos(page);
   const videos = page.locator(".splash-videos video");
-  expect(await videos.count(), "по <video> на каждый ролик точки").toBe(
-    expected.length,
+  const warm = await videos.count();
+  expect(warm, "тёплых роликов — не больше warmMax").toBeLessThanOrEqual(
+    splashConfig.warmMax,
   );
+  expect(
+    warm,
+    "тёплые — не все ролики точки: файлы скачаны у всех",
+  ).toBeLessThan((await expectedVideos(page)).length);
   expect(
     await page.locator(".splash[data-on]").count(),
     "заставка скрыта",
@@ -283,7 +376,8 @@ test("до касания ролики разобраны, программы �
 
   // Палец на чипе и ещё не отпущен: программы уже собраны, заставки ещё нет
   const target = chip(page, CATEGORY);
-  await target.scrollIntoViewIfNeeded();
+  await warmChip(page, CATEGORY);
+  await markVideo(page, CATEGORY);
   const box = (await target.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -293,19 +387,26 @@ test("до касания ролики разобраны, программы �
   await page.mouse.up();
   await page.waitForTimeout(250);
   expect(await splashOn(page), "первое нажатие — заставка играет").toBe(true);
-  expect(await videos.count(), "нажатие новых <video> не делает").toBe(
-    expected.length,
-  );
+  expect(
+    await sameVideo(page, CATEGORY),
+    "нажатие новых <video> не делает",
+  ).toBe(true);
+  expect(await videos.count()).toBeLessThanOrEqual(splashConfig.warmMax);
   expect((await programs()) - before).toBe(2);
 
   await expect
     .poll(() => splashOn(page), { timeout: 5000, message: "заставка не ушла" })
     .toBe(false);
+  await warmChip(page, SECOND);
+  await markVideo(page, SECOND);
   await chip(page, SECOND).click();
   await page.waitForTimeout(250);
   expect(await splashOn(page)).toBe(true);
-  // Вторая категория — тот же запас роликов; программы уже собраны
-  expect(await videos.count()).toBe(expected.length);
+  // Вторая категория — тот же запас роликов; программы уже собраны. Число
+  // тёплых может и уменьшиться: лента уехала к выбранному чипу, и выпавшие
+  // через 300 мс отпускают декодер
+  expect(await sameVideo(page, SECOND)).toBe(true);
+  expect(await videos.count()).toBeLessThanOrEqual(splashConfig.warmMax);
   expect((await programs()) - before).toBe(2);
   expect(errors).toEqual([]);
 });
@@ -805,7 +906,12 @@ test("заставка играет у каждой категории с рол
     VIDEO_CATEGORIES.filter((slug) => slug !== "supe"),
   );
 
-  for (const slug of present) await checkCategory(page, slug);
+  // Чип подводим в ленту и ждём, пока он согреется: здесь проверяются первые
+  // 50 мс тёплого чипа. Холодный — отдельный тест ниже
+  for (const slug of present) {
+    await warmChip(page, slug);
+    await checkCategory(page, slug);
+  }
   expect(errors).toEqual([]);
 });
 
@@ -820,9 +926,129 @@ test("через 30 с простоя заставка по-прежнему с 
   await waitPrefetched(page);
   await page.waitForTimeout(30_000);
 
+  // Чипы, видные в ленте с самого начала, простояли тёплыми все 30 с —
+  // это и есть проверка. Остальные греются уже после простоя
   for (const slug of VIDEO_CATEGORIES) {
-    if (await chip(page, slug).count()) await checkCategory(page, slug);
+    if (!(await chip(page, slug).count())) continue;
+    await warmChip(page, slug);
+    await checkCategory(page, slug);
   }
+  expect(errors).toEqual([]);
+});
+
+// Нажатие на чип вне тёплого набора (решение архитектора 25.09.2026): его
+// файл уже в памяти, а ролик разбирается по нажатию — заставка ждёт его не
+// дольше 150 мс. Заставка обязана сыграть, и с блюдом, а по сети ничего не
+// идёт.
+test("нажатие на холодный чип — заставка с блюдом, файл из памяти", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/splash/")) requests.push(r.url());
+  });
+  const errors = await openMenu(page);
+  await waitPrefetched(page);
+
+  // Самый дальний от края чип с роликом: он точно не тёплый
+  const warm = await expectedWarm(page);
+  const slugs = await page
+    .locator(".chips-row a[data-slug]")
+    .evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-slug") ?? ""),
+    );
+  const cold = slugs.reverse().find((slug) => {
+    const video = videoOf(slug);
+    return video !== null && !warm.includes(video);
+  });
+  expect(cold, "в точке есть холодная категория").toBeTruthy();
+  const video = page.locator(
+    `.splash-videos video[data-slug="${videoOf(cold!)}"]`,
+  );
+  expect(await video.count(), "до нажатия ролик холодный").toBe(0);
+  const fetched = requests.length;
+
+  // Сколько прошло от нажатия до заставки — для отчёта
+  await page.evaluate(() => {
+    const w = window as Window & { __tap?: number; __splash?: number };
+    window.addEventListener("click", () => (w.__tap = performance.now()), {
+      capture: true,
+      once: true,
+    });
+    new MutationObserver((_, observer) => {
+      if (!document.documentElement.hasAttribute("data-splash")) return;
+      w.__splash = performance.now();
+      observer.disconnect();
+    }).observe(document.documentElement, { attributes: true });
+  });
+  await chip(page, cold!).click();
+  await expect
+    .poll(() => splashOn(page), {
+      timeout: 1000,
+      intervals: [10],
+      message: `${cold}: заставка не сыграла`,
+    })
+    .toBe(true);
+  const paint = await splashPaint(page);
+  expect(paint.painted, `${cold}: нарисованы круг и блюдо`).toBeGreaterThan(
+    0.03,
+  );
+  expect(paint.discYellow, `${cold}: блюдо закрывает часть круга`).toBeLessThan(
+    0.85,
+  );
+  const latency = await page.evaluate(() => {
+    const w = window as Window & { __tap?: number; __splash?: number };
+    return Math.round((w.__splash ?? 0) - (w.__tap ?? 0));
+  });
+  test.info().annotations.push({
+    type: "нажатие → заставка, мс",
+    description: String(latency),
+  });
+  expect(requests.length, "файл взят из памяти, не из сети").toBe(fetched);
+
+  await expect
+    .poll(() => splashOn(page), { timeout: 5000, message: "заставка не ушла" })
+    .toBe(false);
+  await expect(page.locator(`#${cold} .tiles > *`).first()).toBeVisible();
+
+  // Открытая категория осталась тёплой, а тёплых — не больше warmMax
+  await page.waitForTimeout(600);
+  expect(await video.count(), "открытая категория — тёплая").toBe(1);
+  expect(
+    await page.locator(".splash-videos video").count(),
+  ).toBeLessThanOrEqual(splashConfig.warmMax);
+  expect(errors).toEqual([]);
+});
+
+// Вкладка ушла в фон — все декодеры отпущены; вернулась — чипы, видные в
+// ленте, снова тёплые, и файлы по сети второй раз не идут.
+test("вкладка в фоне отпускает ролики, вернулась — видимые снова тёплые", async ({
+  page,
+}) => {
+  const errors = await openMenu(page);
+  await waitPrefetched(page);
+  const setVisibility = (state: "hidden" | "visible") =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, "visibilityState", {
+        value,
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, state);
+
+  await setVisibility("hidden");
+  expect(
+    await page.locator(".splash-videos video").count(),
+    "в фоне ни одного декодера",
+  ).toBe(0);
+  await page.waitForTimeout(600);
+  expect(await page.locator(".splash-videos video").count()).toBe(0);
+
+  await setVisibility("visible");
+  // Те же тёплые, что до ухода, и файлов по-прежнему ровно по одному
+  await waitPrefetched(page);
+  await warmChip(page, CATEGORY);
+  await checkCategory(page, CATEGORY);
   expect(errors).toEqual([]);
 });
 

@@ -62,3 +62,29 @@ export function setSplashWarmer(next: () => void): () => void {
 export function warmSplash(): void {
   warmer?.();
 }
+
+/** Категории, чьи чипы сейчас видны в ленте, — слева направо. */
+let shown: readonly string[] = [];
+let shownWatcher: ((categories: readonly string[]) => void) | null = null;
+
+/**
+ * Лента чипов сообщает, какие чипы сейчас видны. По ним заставка решает,
+ * какие ролики держать тёплыми (решение архитектора 25.09.2026). Заставка
+ * подключается позже ленты — последнее значение хранится до неё.
+ */
+export function showSplashChips(categories: readonly string[]): void {
+  shown = categories;
+  shownWatcher?.(categories);
+}
+
+/** Заставка слушает видимые чипы: сразу получает текущие. Возвращает
+ *  отключение. */
+export function watchSplashChips(
+  next: (categories: readonly string[]) => void,
+): () => void {
+  shownWatcher = next;
+  next(shown);
+  return () => {
+    if (shownWatcher === next) shownWatcher = null;
+  };
+}

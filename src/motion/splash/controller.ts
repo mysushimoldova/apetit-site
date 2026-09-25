@@ -23,9 +23,14 @@
 // Порядок подготовки (решение архитектора 25.09.2026, вариант «б»):
 //  • файлы — по одному, следующий, как только готов предыдущий (fileQueue),
 //    fetch с priority "low";
-//  • ролик сразу после скачивания становится <video> и доходит до первого
-//    кадра, тоже по одному; потом его файл отпускается (videos.ts). Для
-//    этого кремовый экран заставки (скрытый) появляется в DOM уже тогда;
+//  • файлы скачиваются для всех категорий точки, а «тёплыми» — <video> с
+//    готовым первым кадром, то есть со своим декодером — держим не больше
+//    splash.warmMax: видимые в ленте чипы и последнюю открытую категорию
+//    (warm.ts). Греются по одному, между скачиваниями. Для этого кремовый
+//    экран заставки (скрытый) появляется в DOM уже с первым роликом;
+//  • вкладка ушла в фон — все декодеры отпускаются (идущая заставка
+//    закрывается сразу: её всё равно никто не видит); вернулась — видимые
+//    греются снова;
 //  • программы видеокарты — при первом касании любого чипа (pointerdown),
 //    пока палец ещё не отпущен (warm);
 //  • загрузка кадра в видеокарту и калибровка ролика — только при показе.
@@ -63,10 +68,12 @@ import {
   setSplashWarmer,
   type SplashAnswer,
   type SplashRequest,
+  watchSplashChips,
 } from "./request";
 import { splashVisual } from "./timeline";
 import { createSplashVideoPool } from "./videos";
 import { afterMenuShown, fileQueue } from "./wait";
+import { createWarmKeeper } from "./warm";
 import type { SplashMedia } from "../layers/splash";
 
 /** Причина паузы движка, пока играет заставка (docs/MOTION.md §1). */
@@ -262,6 +269,18 @@ export function createSplashController(deps: SplashDeps): SplashController {
 
   const pool = createSplashVideoPool(() => ensureDom().videos);
   const photoPool = createSplashPhotoPool();
+  /** Какие ролики держать тёплыми: видимые чипы и последняя открытая. */
+  const keeper = createWarmKeeper({
+    pool,
+    videoFor: (category) => {
+      const mode = splashModeFor(category, available, deps.photos);
+      return mode.kind === "video" ? mode.slug : null;
+    },
+    max: () => settings.warmMax,
+    busy: () =>
+      media instanceof HTMLVideoElement ? (media.dataset.slug ?? null) : null,
+  });
+  const unwatchChips = watchSplashChips(keeper.setVisible);
 
   let disposed = false;
   /** Кадр заставки уже падал с ошибкой: до перезагрузки страницы заставок
@@ -532,6 +551,8 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (!layer.prepare()) return refuse();
 
     const asPhoto = mode.kind === "photo";
+    // Открытая категория остаётся тёплой, даже когда её чип уедет из ленты
+    if (!asPhoto) keeper.opened(request.category);
     const ready = asPhoto ? photoPool.take(mode.src) : pool.take(mode.slug);
     if (ready) return begin(request, ready, asPhoto);
 
@@ -557,18 +578,33 @@ export function createSplashController(deps: SplashDeps): SplashController {
   }
 
   // Через секунду после отрисовки меню — тихо догрузить блюда всех
-  // категорий точки: ролики — до первого готового кадра. При экономии
-  // трафика и там, где заставки не будет вовсе, не грузится ничего.
-  // Фото — первыми: они в разы легче роликов.
+  // категорий точки. После каждого ролика — согреть тёплые, чей файл уже
+  // есть, и только потом качать следующий. При экономии трафика и там, где
+  // заставки не будет вовсе, не грузится ничего. Фото — первыми: они в разы
+  // легче роликов.
   let stopQueue = () => {};
   const stopPrefetch = afterMenuShown(() => {
     if (!canPlay()) return;
     const plan = splashPrefetchFor(available, deps.photos);
     stopQueue = fileQueue([
       ...plan.photos.map((src) => () => photoPool.download(src)),
-      ...plan.videos.map((slug) => () => pool.preload(slug)),
+      ...plan.videos.map(
+        (slug) => () => pool.download(slug).then(() => keeper.settle()),
+      ),
     ]);
   });
+
+  // Вкладка в фоне — декодеры видеокарте не нужны. Идущую заставку в фоне
+  // никто не видит: закрываем её сразу, чтобы не рисовать отпущенный ролик.
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") {
+      if (playing) finish();
+      keeper.hide();
+    } else {
+      keeper.show();
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibility);
 
   return {
     play,
@@ -577,10 +613,14 @@ export function createSplashController(deps: SplashDeps): SplashController {
     isPlaying: () => playing,
     setSettings(next) {
       settings = next;
+      keeper.refresh();
     },
     dispose() {
       stopPrefetch();
       stopQueue();
+      unwatchChips();
+      document.removeEventListener("visibilitychange", onVisibility);
+      keeper.dispose();
       if (playing) finish();
       disposed = true;
       guard.dispose();

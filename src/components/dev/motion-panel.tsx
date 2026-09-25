@@ -84,7 +84,7 @@ function splashLine(config: MotionConfig): string {
     ` exit=${s.exit} | disc: d0=${disc.d0} d1=${disc.d1} dstart=${disc.dstart}` +
     ` dsoft=${disc.dsoft} delay=${disc.delay} discY=${disc.y}` +
     ` | wordY=${s.wordY} lines=${s.lines} wordTop=${s.wordTop} skip=${s.skip}` +
-    ` enabled=${s.enabled}`
+    ` enabled=${s.enabled} warmMax=${s.warmMax}`
   );
 }
 
@@ -472,6 +472,16 @@ export function MotionPanel({ saved }: { saved: MotionConfig }) {
                 label="Можно прервать касанием"
                 checked={value.splash.skip}
                 onChange={(next) => setSplash("skip", next)}
+              />
+
+              <p className="font-ui text-label text-smoke">Загрузка</p>
+              <Slider
+                label="Тёплых роликов"
+                hint="не больше стольких роликов держат готовый первый кадр"
+                range={SPLASH_RANGES.warmMax}
+                value={value.splash.warmMax}
+                digits={0}
+                onChange={(next) => setSplash("warmMax", next)}
               />
 
               <div className="flex flex-col gap-3">

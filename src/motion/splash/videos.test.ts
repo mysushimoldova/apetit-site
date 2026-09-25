@@ -42,9 +42,14 @@ class FakeVideo extends EventTarget {
   preload = "";
   loop = false;
   removed = false;
+  loads = 0;
   setAttribute() {}
-  removeAttribute() {}
-  load() {}
+  removeAttribute(name: string) {
+    if (name === "src") this.src = "";
+  }
+  load() {
+    this.loads++;
+  }
   pause() {}
   remove() {
     this.removed = true;
@@ -83,13 +88,14 @@ describe("ожидание уровня готовности", () => {
   });
 });
 
-// Вариант «б» (решение архитектора 25.09.2026): предзагрузка не только
-// качает файл, но и сразу делает из него <video> и ждёт первый кадр — по
-// одному ролику за раз. После первого кадра своя ссылка на файл убирается,
-// но адрес blob: ролика остаётся открытым: Chrome через 20–30 с простоя
-// усыпляет ролик и при нажатии перечитывает файл по этому адресу (замер
-// 25.09.2026, см. шапку videos.ts).
-describe("предзагрузка ролика", () => {
+// Файл и ролик — разные вещи (решение архитектора 25.09.2026, ответ на
+// вопрос 2 после B0). Файл (blob:) скачивается для каждой категории точки и
+// живёт, пока открыта страница. «Тёплый» ролик — <video> с первым кадром,
+// то есть свой декодер: его можно отпустить (src снят, load()), а файл
+// остаётся, и согреть ролик снова можно без сети. Адрес blob: не
+// закрывается: Chrome через 20–30 с простоя усыпляет ролик и при нажатии
+// перечитывает файл по этому адресу (замер 25.09.2026, см. шапку videos.ts).
+describe("файлы и тёплые ролики", () => {
   let videos: FakeVideo[];
   let fetches: string[];
   let revoked: string[];
@@ -131,41 +137,81 @@ describe("предзагрузка ролика", () => {
   /** Дать отработать цепочкам промисов. */
   const settle = () => vi.advanceTimersByTimeAsync(0);
 
-  it("после скачивания сразу <video>, готово — на первом кадре", async () => {
+  it("скачивание — только файл: ни одного <video>, декодер не занят", async () => {
     const pool = createSplashVideoPool(() => host);
-    let done = false;
-    void pool.preload("cola").then(() => (done = true));
-    await settle();
+    expect(pool.hasFile("cola")).toBe(false);
+    await expect(pool.download("cola")).resolves.toBe(true);
     expect(fetches).toEqual(["/splash/cola.mp4"]);
+    expect(pool.hasFile("cola")).toBe(true);
+    expect(videos).toHaveLength(0);
+    expect(pool.warmSlugs()).toEqual([]);
+  });
+
+  it("согрев — <video> из того же файла, готово на первом кадре", async () => {
+    const pool = createSplashVideoPool(() => host);
+    await pool.download("cola");
+    let done = false;
+    void pool.warm("cola").then(() => (done = true));
+    await settle();
+    expect(fetches, "второй раз по сети не идёт").toHaveLength(1);
     expect(videos).toHaveLength(1);
     expect(videos[0].src).toBe("blob:ролик-1");
+    expect(pool.warmSlugs()).toEqual(["cola"]);
     expect(done, "первого кадра ещё нет").toBe(false);
 
     videos[0].reach(2, "loadeddata");
     await settle();
     expect(done).toBe(true);
-  });
-
-  it("после первого кадра адрес ролика открыт, второй раз не качается", async () => {
-    const pool = createSplashVideoPool(() => host);
-    const preloaded = pool.preload("cola");
-    await settle();
-    videos[0].reach(2, "loadeddata");
-    await preloaded;
     expect(revoked, "адрес нужен ролику и после простоя").toEqual([]);
 
-    // Нажатие берёт тот же <video>, без нового скачивания
+    // Нажатие берёт тот же <video>
     videos[0].reach(4);
     await settle();
     expect(pool.take("cola")).toBe(videos[0]);
-    expect(fetches).toHaveLength(1);
     expect(videos).toHaveLength(1);
   });
 
-  it("первого кадра нет — очередь идёт дальше через FIRST_FRAME_WAIT", async () => {
+  it("отпустить — декодер свободен, файл и адрес остаются; снова согреть без сети", async () => {
     const pool = createSplashVideoPool(() => host);
+    await pool.download("cola");
+    const warmed = pool.warm("cola");
+    await settle();
+    videos[0].reach(2, "loadeddata");
+    await warmed;
+
+    pool.release("cola");
+    expect(videos[0].src, "src снят").toBe("");
+    expect(videos[0].loads, "load() после снятия src").toBe(2);
+    expect(videos[0].removed).toBe(true);
+    expect(pool.warmSlugs()).toEqual([]);
+    expect(pool.hasFile("cola"), "файл остался").toBe(true);
+    expect(revoked, "адрес не закрыт").toEqual([]);
+
+    void pool.warm("cola");
+    await settle();
+    expect(videos).toHaveLength(2);
+    expect(videos[1].src, "тот же адрес").toBe("blob:ролик-1");
+    expect(fetches).toHaveLength(1);
+  });
+
+  it("отпущенный во время согрева — ожидание кончается сразу", async () => {
+    const pool = createSplashVideoPool(() => host);
+    await pool.download("cola");
     let done = false;
-    void pool.preload("cola").then(() => (done = true));
+    void pool.warm("cola").then(() => (done = true));
+    await settle();
+    pool.release("cola");
+    await settle();
+    expect(done, "не ждём FIRST_FRAME_WAIT").toBe(true);
+    expect(pool.hasFile("cola")).toBe(true);
+    expect(revoked).toEqual([]);
+  });
+
+  it("первого кадра нет — согрев идёт дальше через FIRST_FRAME_WAIT", async () => {
+    const pool = createSplashVideoPool(() => host);
+    await pool.download("cola");
+    let done = false;
+    void pool.warm("cola").then(() => (done = true));
     await settle();
     await vi.advanceTimersByTimeAsync(FIRST_FRAME_WAIT - 1);
     expect(done).toBe(false);
@@ -178,30 +224,29 @@ describe("предзагрузка ролика", () => {
     expect(fetches).toHaveLength(1);
   });
 
-  it("нажатие опередило очередь — очередь не качает файл второй раз", async () => {
+  it("нажатие на холодный ролик — <video> из скачанного файла, без сети", async () => {
     const pool = createSplashVideoPool(() => host);
-    expect(pool.take("cola")).toBe(null);
+    await pool.download("cola");
+    expect(pool.take("cola"), "ещё не разобран").toBe(null);
     await settle();
-    videos[0].reach(2, "loadeddata");
-    await settle();
-    const preloaded = pool.preload("cola");
-    await settle();
-    await preloaded;
-    expect(fetches).toHaveLength(1);
     expect(videos).toHaveLength(1);
+    expect(videos[0].src).toBe("blob:ролик-1");
+    expect(fetches).toHaveLength(1);
   });
 
-  it("ролик сломался после предзагрузки — следующее нажатие делает новый", async () => {
+  it("ролик сломался после согрева — следующее нажатие делает новый", async () => {
     const pool = createSplashVideoPool(() => host);
-    const preloaded = pool.preload("cola");
+    await pool.download("cola");
+    const warmed = pool.warm("cola");
     await settle();
     videos[0].reach(4);
-    await preloaded;
+    await warmed;
     expect(pool.take("cola")).toBe(videos[0]);
 
     videos[0].dispatchEvent(new Event("error"));
     expect(videos[0].removed, "сломанный ролик убран из DOM").toBe(true);
     expect(revoked, "его адрес закрыт").toEqual(["blob:ролик-1"]);
+    expect(pool.hasFile("cola")).toBe(false);
     expect(pool.take("cola")).toBe(null);
     await settle();
     expect(videos).toHaveLength(2);
@@ -210,11 +255,24 @@ describe("предзагрузка ролика", () => {
 
   it("файл не разобрался — ролик забыт, адрес закрыт", async () => {
     const pool = createSplashVideoPool(() => host);
-    const preloaded = pool.preload("cola");
+    await pool.download("cola");
+    const warmed = pool.warm("cola");
     await settle();
     videos[0].dispatchEvent(new Event("error"));
-    await preloaded;
+    await warmed;
     expect(videos[0].removed).toBe(true);
     expect(revoked).toEqual(["blob:ролик-1"]);
+    expect(pool.warmSlugs()).toEqual([]);
+  });
+
+  it("уход со страницы — все адреса закрыты, декодеры отпущены", async () => {
+    const pool = createSplashVideoPool(() => host);
+    await pool.download("cola");
+    await pool.download("fanta");
+    void pool.warm("cola");
+    await settle();
+    pool.dispose();
+    expect(videos[0].src).toBe("");
+    expect(revoked.sort()).toEqual(["blob:ролик-1", "blob:ролик-2"]);
   });
 });
