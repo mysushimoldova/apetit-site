@@ -35,7 +35,8 @@
 //  • экономия трафика (saveData или сеть 2g) — тогда и не грузится ничего;
 //  • нет WebGL2 — слой не соберётся;
 //  • у категории нет ни ролика, ни фото в меню выбранной точки;
-//  • блюдо не успело догрузиться за WAIT_MS после нажатия.
+//  • блюдо не успело догрузиться за WAIT_MS после нажатия;
+//  • заставка уже сломалась в этот заход (см. crash()).
 import type { SplashSettings } from "../config-schema";
 import { engine } from "../engine";
 import { createSplashLayer, type SplashLayer } from "../layers/splash";
@@ -253,6 +254,9 @@ export function createSplashController(deps: SplashDeps): SplashController {
   const photoPool = createSplashPhotoPool();
 
   let disposed = false;
+  /** Кадр заставки уже падал с ошибкой: до перезагрузки страницы заставок
+   *  больше нет, и ошибка в консоли была ровно одна. */
+  let broken = false;
   /** Идёт клип заставки: блюдо на экране, считаются кадры. */
   let playing = false;
   /** Страница «под заставкой»: пауза движка, запрет прокрутки, запись в
@@ -355,8 +359,40 @@ export function createSplashController(deps: SplashDeps): SplashController {
     engine.requestFrame();
   }
 
+  /**
+   * Заставка сломалась: убрать её мгновенно и навсегда до перезагрузки.
+   * Страница не должна пострадать ни при какой ошибке — сетка на месте,
+   * движок снят с паузы, прокрутка свободна. Так было 25.09.2026: телефон
+   * взял из кеша старые настройки, и кадр падал сотни раз в секунду, вешая
+   * страницу. Каждый шаг уборки — отдельно: сбой одного не мешает остальным.
+   */
+  function crash(error: unknown): void {
+    if (!broken) {
+      broken = true;
+      console.error("Заставка категории отключена из-за ошибки:", error);
+    }
+    playing = false;
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    for (const step of [stopClip, release, () => engine.requestFrame()]) {
+      try {
+        step();
+      } catch {
+        // Уборка идёт дальше: остальное важнее
+      }
+    }
+  }
+
   function frame(now: number): void {
     if (!playing) return;
+    try {
+      drawFrame(now);
+    } catch (error) {
+      crash(error);
+    }
+  }
+
+  function drawFrame(now: number): void {
     raf = requestAnimationFrame(frame);
     const elapsed = now - startedAt;
 
@@ -385,7 +421,21 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (!visual.visible) finish();
   }
 
+  /** Запустить клип. false — сломался на старте: заставки не будет. */
   function begin(
+    request: SplashRequest,
+    ready: SplashMedia,
+    asPhoto: boolean,
+  ): boolean {
+    try {
+      start(request, ready, asPhoto);
+    } catch (error) {
+      crash(error);
+    }
+    return playing;
+  }
+
+  function start(
     request: SplashRequest,
     ready: SplashMedia,
     asPhoto: boolean,
@@ -446,7 +496,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
 
   /** Заставка сейчас вообще возможна (не зависит от категории). */
   function canPlay(): boolean {
-    if (disposed || !settings.enabled) return false;
+    if (disposed || broken || !settings.enabled) return false;
     if (prefersReducedMotion()) return false;
     if (savingData()) return false;
     // Уровень 4 — движок стоит вовсе (слабый телефон): заставки нет
@@ -472,10 +522,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
 
     const asPhoto = mode.kind === "photo";
     const ready = asPhoto ? photoPool.take(mode.src) : pool.take(mode.slug);
-    if (ready) {
-      begin(request, ready, asPhoto);
-      return true;
-    }
+    if (ready) return begin(request, ready, asPhoto);
 
     // Блюдо ещё догружается — ждём его совсем недолго
     const later = asPhoto
@@ -485,8 +532,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
       // Пока ждали, нажали другую категорию: решает уже она
       if (ticket !== asked) return false;
       if (!media || !canPlay()) return refuse();
-      begin(request, media, asPhoto);
-      return true;
+      return begin(request, media, asPhoto);
     });
   }
 

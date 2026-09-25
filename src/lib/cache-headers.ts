@@ -43,9 +43,22 @@ export interface HeaderRule {
   headers: Header[];
 }
 
-export function cacheRules(): HeaderRule[] {
+/** Сборка Next: куски кода, стили, шрифты. */
+const BUILD = "/_next/static/:path*";
+
+/**
+ * dev — правила для `next dev`. В разработке имя куска сборки не меняется,
+ * когда меняется код (в боевой сборке в имени — отпечаток содержимого).
+ * Годовой immutable на них заставлял телефон брать старые куски из кеша
+ * вперемешку с новыми: заставка получала настройки старого вида и вешала
+ * страницу (25.09.2026). Поэтому в dev правила для сборки нет — заголовки
+ * ей ставит сам Next. Фото и ролики остаются как в бою: заставка ждёт
+ * ролик не дольше 150 мс, и перепроверка у сервера при каждом нажатии
+ * съела бы это время.
+ */
+export function cacheRules(dev = false): HeaderRule[] {
   const headers: Header[] = [{ key: "Cache-Control", value: IMMUTABLE }];
-  return [
+  const rules: HeaderRule[] = [
     // Всё, кроме сборки, фото, роликов и API, — это страницы сайта
     {
       source: `/:path((?!${NOT_HTML}).*)`,
@@ -55,7 +68,7 @@ export function cacheRules(): HeaderRule[] {
     // Ролики заставки категории: имя файла = слаг блюда, содержимое под этим
     // адресом не меняется (docs/motion/splash-prompt.md)
     { source: "/splash/:path*", headers },
-    { source: "/_next/static/:path*", headers },
+    { source: BUILD, headers },
     // Ответы API не кешируются ни браузером, ни промежуточными серверами:
     // это заказы и служебные маршруты, общего у двух запросов там ничего
     // нет (проверка insecure-defaults перед релизом).
@@ -64,4 +77,5 @@ export function cacheRules(): HeaderRule[] {
       headers: [{ key: "Cache-Control", value: NO_STORE }],
     },
   ];
+  return dev ? rules.filter((rule) => rule.source !== BUILD) : rules;
 }

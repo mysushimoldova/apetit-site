@@ -766,3 +766,72 @@ test("прокрутка заблокирована ровно на время �
     .poll(() => page.evaluate(() => window.scrollY), { timeout: 2000 })
     .toBeGreaterThan(before);
 });
+
+// 25.09.2026: на iPhone в кадр заставки попали настройки старого вида, и
+// кадр падал сотни раз в секунду — страница висла. Какой бы ни была ошибка,
+// заставка обязана исчезнуть сразу и больше не мешать. Ломаем кадр нарочно:
+// --splash-lift ставит только кадр заставки. Ломается либо самый первый кадр
+// (он рисуется прямо при нажатии), либо третий — уже из обычного хода кадров.
+for (const broken of [1, 3]) {
+  test(`ошибка в кадре ${broken} заставки её мгновенно закрывает и не вешает страницу`, async ({
+    page,
+  }) => {
+    const errors = await openMenu(page);
+    await waitPrefetched(page);
+    await page.evaluate((from) => {
+      const own = CSSStyleDeclaration.prototype.setProperty;
+      const trap = window as unknown as { __splashFrames: number };
+      trap.__splashFrames = 0;
+      CSSStyleDeclaration.prototype.setProperty = function (name, ...rest) {
+        if (name === "--splash-lift") {
+          trap.__splashFrames += 1;
+          if (trap.__splashFrames >= from) {
+            throw new TypeError("кадр заставки сломан тестом");
+          }
+        }
+        return own.call(this, name, ...rest);
+      };
+    }, broken);
+    const frames = () =>
+      page.evaluate(
+        () => (window as unknown as { __splashFrames: number }).__splashFrames,
+      );
+
+    await chip(page, CATEGORY).click();
+    await page.waitForTimeout(500);
+
+    // Кадр упал один раз, дальше кадры не планируются
+    expect(await frames(), "кадров после ошибки").toBe(broken);
+    expect(await splashOn(page), "заставка закрыта").toBe(false);
+    await expect(page.locator(".splash[data-on]")).toHaveCount(0);
+    const motion = await page.evaluate(
+      () =>
+        (
+          window as unknown as { __apetitMotion?: () => { paused: string[] } }
+        ).__apetitMotion?.() ?? null,
+    );
+    expect(motion!.paused, "движок снят с паузы").not.toContain("splash");
+
+    // Страница на выбранной категории, и прокрутка своя
+    await expect
+      .poll(() => sectionTop(page, CATEGORY).then(Math.abs), { timeout: 3000 })
+      .toBeLessThan(140);
+    const before = await page.evaluate(() => window.scrollY);
+    await page.mouse.wheel(0, 400);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { timeout: 2000 })
+      .toBeGreaterThan(before);
+
+    // Следующий чип — обычный переход без заставки и без новых ошибок
+    await chip(page, SECOND).click();
+    await expect
+      .poll(() => sectionTop(page, SECOND).then(Math.abs), { timeout: 3000 })
+      .toBeLessThan(140);
+    expect(await frames()).toBe(broken);
+    expect(await splashOn(page)).toBe(false);
+
+    // В консоли ровно одна запись, и это наша
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("Заставка категории отключена");
+  });
+}

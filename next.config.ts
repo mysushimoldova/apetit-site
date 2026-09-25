@@ -29,14 +29,16 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Защитные заголовки (CSP, HSTS и др.) на все адреса — src/lib/security-headers.ts,
   // плюс правила кеша (src/lib/cache-headers.ts): страницы — минута у CDN,
-  // сборка, фото и ролики — год, API — никогда.
+  // сборка, фото и ролики — год (кроме next dev), API — никогда.
   async headers() {
+    const dev = process.env.NODE_ENV === "development";
     return [
       {
         source: "/:path*",
-        headers: securityHeaders(process.env.NODE_ENV === "development"),
+        headers: securityHeaders(dev),
       },
-      ...cacheRules(),
+      // В разработке — без годового кеша на файлы (src/lib/cache-headers.ts)
+      ...cacheRules(dev),
     ];
   },
 };
