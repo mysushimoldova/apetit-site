@@ -62,6 +62,9 @@ export function CategoryChips({
   // Идёт программная прокрутка к чипу: observer не трогает активный чип.
   // Хранит отмену ожидания конца прокрутки.
   const scrollLockRef = useRef<(() => void) | null>(null);
+  // Номер последнего нажатия: запоздалый ответ заставки о прошлом нажатии
+  // не должен увести страницу от категории, выбранной после него
+  const clickRef = useRef(0);
 
   // Активная секция — та, что пересекает линию под шапкой
   useEffect(() => {
@@ -113,20 +116,56 @@ export function CategoryChips({
     const section = document.getElementById(slug);
     if (!section) return; // без секции сработает обычный якорь
     event.preventDefault();
+    const click = ++clickRef.current;
 
     // Заставка категории (docs/motion/splash-prompt.md). Если она играет,
     // страница переходит к категории мгновенно — под заставкой: когда та
     // уйдёт, сетка уже на месте и ничего не «доезжает» на глазах.
     // Заставки нет (нет роликов, слабый телефон, «уменьшить движение») —
     // всё как раньше: плавный проезд и пауза движка на время него.
+    // Блюдо ещё догружается — ответ придёт чуть позже (не дольше 150 мс);
+    // если за это время нажали другой чип, решает уже он.
     const word = items.find((item) => item.slug === slug)?.label ?? "";
-    if (requestSplash({ category: slug, word })) {
-      section.scrollIntoView({ behavior: "auto", block: "start" });
-      history.replaceState(null, "", `#${slug}`);
-      setActive(slug);
-      return;
+    const answer = requestSplash({ category: slug, word });
+    if (answer === true) jump(section, slug);
+    else if (answer === false) glide(section, slug);
+    else {
+      void answer.then((played) => {
+        if (click !== clickRef.current) return;
+        if (played) jump(section, slug);
+        else glide(section, slug);
+      });
     }
+  };
 
+  /** Переход под заставкой: мгновенный, заставка закрывает его собой. */
+  const jump = (section: HTMLElement, slug: string) => {
+    scrollLockRef.current?.();
+    section.scrollIntoView({ behavior: "auto", block: "start" });
+    history.replaceState(null, "", `#${slug}`);
+    setActive(slug);
+    // Как и при проезде, чип выбранной категории держится: у нижних
+    // категорий (desert, sosuri) страница не может встать так, чтобы секция
+    // оказалась под шапкой, и observer после прыжка зажёг бы соседнюю.
+    // Держим, пока человек сам не тронет страницу. Касание заставки
+    // (pointerdown) не в счёт — это не прокрутка.
+    const events = ["wheel", "touchstart", "keydown"];
+    const release = () => {
+      clearTimeout(arm);
+      for (const type of events) window.removeEventListener(type, release);
+      if (scrollLockRef.current === release) scrollLockRef.current = null;
+    };
+    // Со следующего цикла: нажатие, которое привело сюда (Enter на чипе —
+    // это keydown), ещё всплывает до window
+    const arm = setTimeout(() => {
+      for (const type of events)
+        window.addEventListener(type, release, { passive: true });
+    }, 0);
+    scrollLockRef.current = release;
+  };
+
+  /** Обычный переход без заставки: плавный проезд к категории. */
+  const glide = (section: HTMLElement, slug: string) => {
     section.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "start",

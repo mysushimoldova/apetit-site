@@ -115,15 +115,10 @@ async function record(name, reducedMotion) {
   await slowScroll(page, SCREENS);
   await wait(STEP);
 
-  // 2. Вторая категория: первое нажатие грузит ролики заставки, второе —
-  //    показывает её. Сценарий должен показать именно заставку.
+  // 2. Вторая категория: заставка играет с первого нажатия — пока шла
+  //    прокрутка, ролики тихо догрузились (src/motion/splash/videos.ts)
   const chips = page.locator(".chips-row a");
-  const second = chips.nth(2);
-  await second.click();
-  await wait(2500);
-  await chips.nth(0).click();
-  await wait(1200);
-  await second.click();
+  await chips.nth(2).click();
   await wait(2200);
 
   // 3. Первый товар: открыть и закрыть

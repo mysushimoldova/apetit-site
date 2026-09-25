@@ -69,3 +69,31 @@ export function splashModeFor(
   if (src) return { kind: "photo", src };
   return { kind: "none" };
 }
+
+/** Что догрузить заранее, чтобы заставка играла с первого нажатия. */
+export interface SplashPrefetch {
+  videos: string[];
+  photos: string[];
+}
+
+/**
+ * Ровно то, что сыграет заставка каждой категории этой точки: по одному
+ * ролику или фото на категорию. Второй ролик категории не грузится — он
+ * играет, только если первого блюда нет в меню, а это уже учтено.
+ */
+export function splashPrefetchFor(
+  available: ReadonlySet<string>,
+  photos: SplashPhotos | undefined,
+): SplashPrefetch {
+  const categories = new Set([
+    ...Object.keys(SPLASH_VIDEOS),
+    ...Object.keys(photos ?? {}),
+  ]);
+  const plan: SplashPrefetch = { videos: [], photos: [] };
+  for (const category of categories) {
+    const mode = splashModeFor(category, available, photos);
+    if (mode.kind === "video") plan.videos.push(mode.slug);
+    if (mode.kind === "photo") plan.photos.push(mode.src);
+  }
+  return plan;
+}

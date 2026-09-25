@@ -305,6 +305,11 @@
 .splash[data-on] {
   display: block;
 }
+/* Заставка уходит (касание или конец показа): касания идут насквозь, лента
+   категорий под ней доступна сразу, не дожидаясь конца затухания */
+.splash[data-leaving] {
+  pointer-events: none;
+}
 .splash-word {
   position: fixed;
   inset-inline: 0;

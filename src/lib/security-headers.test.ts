@@ -47,6 +47,8 @@ describe("защитные заголовки (SPEC §9.4)", () => {
     expect(d["base-uri"]).toEqual(["'self'"]);
     expect(d["object-src"]).toEqual(["'none'"]);
     expect(d["connect-src"]).toEqual(["'self'"]);
+    // Ролики заставки: свои файлы и они же из памяти (blob:), больше ничего
+    expect(d["media-src"]).toEqual(["'self'", "blob:"]);
   });
 
   it("CSP: скрипты только свои; eval — только в разработке", () => {

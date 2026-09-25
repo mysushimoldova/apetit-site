@@ -11,7 +11,13 @@ export interface SplashRequest {
   word: string;
 }
 
-export type SplashPlayer = (request: SplashRequest) => boolean;
+/**
+ * true — заставка играет уже сейчас; false — заставки не будет; Promise —
+ * блюдо ещё догружается, решение придёт не позже чем через 150 мс.
+ */
+export type SplashAnswer = boolean | Promise<boolean>;
+
+export type SplashPlayer = (request: SplashRequest) => SplashAnswer;
 
 let player: SplashPlayer | null = null;
 
@@ -26,7 +32,8 @@ export function setSplashPlayer(next: SplashPlayer): () => void {
 /**
  * Попросить заставку сыграть. true — играет (переход к категории делаем
  * мгновенно, под ней), false — заставки нет: обычный плавный переход.
+ * Promise — ответ чуть позже: блюдо догружается (не дольше 150 мс).
  */
-export function requestSplash(request: SplashRequest): boolean {
+export function requestSplash(request: SplashRequest): SplashAnswer {
   return player ? player(request) : false;
 }

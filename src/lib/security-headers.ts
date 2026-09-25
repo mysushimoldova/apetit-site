@@ -30,8 +30,11 @@ export function contentSecurityPolicy(isDev: boolean): string {
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:"],
     "font-src": ["'self'"],
-    // Ролики заставки категории лежат у нас же, в /splash
-    "media-src": ["'self'"],
+    // Ролики заставки категории лежат у нас же, в /splash. blob: — это
+    // те же ролики: заставка скачивает их fetch-ем с низким приоритетом и
+    // отдаёт <video> из памяти (src/motion/splash/videos.ts). Адрес blob:
+    // может создать только скрипт самого сайта, чужой файл так не зайдёт.
+    "media-src": ["'self'", "blob:"],
     "connect-src": ["'self'"],
     // Боевой сайт не даёт вставлять себя в рамку. В разработке панель
     // /dev/motion показывает страницу меню в <iframe> своего же адреса,

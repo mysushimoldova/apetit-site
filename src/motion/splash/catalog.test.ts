@@ -4,6 +4,7 @@ import { PRODUCTS } from "@/data/menu/products";
 import {
   SPLASH_VIDEOS,
   splashModeFor,
+  splashPrefetchFor,
   splashVideoSrc,
   splashVideoFor,
 } from "./catalog";
@@ -90,5 +91,39 @@ describe("список роликов сходится с меню", () => {
         true,
       );
     }
+  });
+});
+
+describe("что догружать заранее", () => {
+  // Решение архитектора 25.09.2026: заставка играет с первого нажатия,
+  // поэтому, когда страница простаивает, догружается то, что сыграет
+  // заставка каждой категории, — и ничего сверх этого.
+  it("по одному ролику на категорию, первое доступное блюдо", () => {
+    const plan = splashPrefetchFor(ALL, undefined);
+    expect(plan.videos).toEqual(
+      Object.values(SPLASH_VIDEOS).map((slugs) => slugs[0]),
+    );
+    expect(plan.photos).toEqual([]);
+  });
+
+  it("первого блюда в точке нет — грузится второе", () => {
+    const plan = splashPrefetchFor(new Set(["kebab-cheese"]), undefined);
+    expect(plan.videos).toEqual(["kebab-cheese"]);
+  });
+
+  it("фото — только категориям, где ролик не сыграет", () => {
+    const plan = splashPrefetchFor(new Set(["cola"]), {
+      drinks: "/img/products/cola-800.webp",
+      pizza: "/img/products/pizza-800.webp",
+    });
+    expect(plan.videos).toEqual(["cola"]);
+    expect(plan.photos).toEqual(["/img/products/pizza-800.webp"]);
+  });
+
+  it("ни роликов, ни фото — грузить нечего", () => {
+    expect(splashPrefetchFor(new Set(), undefined)).toEqual({
+      videos: [],
+      photos: [],
+    });
   });
 });

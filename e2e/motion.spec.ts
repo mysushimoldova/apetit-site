@@ -199,6 +199,15 @@ test("движок стоит, пока открыта корзина", async ({
 });
 
 test("движок стоит, пока страница едет к категории", async ({ page }) => {
+  // Заставка играет с первого нажатия, и тогда страница не едет, а прыгает
+  // под ней. Проверяем именно проезд — поэтому заставку выключаем режимом
+  // экономии трафика: при нём переход всегда обычный.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { saveData: true, effectiveType: "4g" },
+    });
+  });
   await page.goto("/soroca");
   await waitForCanvas(page);
   await page
