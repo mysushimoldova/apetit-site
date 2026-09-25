@@ -23,6 +23,11 @@
 // Нужен WebGL2: texelFetch и textureSize в WebGL1 недоступны, а без них
 // эталоны не прочитать. Нет WebGL2 — слой молча ничего не рисует, и
 // заставки на сайте не будет (переход к категории обычный).
+//
+// Программы и текстуры собираются не при подключении слоя, а при первом
+// воспроизведении (prepare): сборка шейдеров — это десятки миллисекунд
+// главного потока, и при загрузке страницы её быть не должно (решение
+// архитектора 25.09.2026).
 import { createFullscreenTriangle, createProgram, isGL2 } from "../gl";
 import { splashDishWidth } from "../splash/geometry";
 import type { SplashVisual } from "../splash/timeline";
@@ -124,8 +129,12 @@ export interface SplashDraw extends SplashVisual {
 export interface SplashLayer extends Layer {
   /** Показывать заставку (null — не рисовать ничего). */
   setDraw(draw: SplashDraw | null): void;
-  /** Работает ли слой вообще: нет WebGL2 — заставки не будет. */
+  /** Работает ли слой вообще: нет WebGL2 — заставки не будет. Ничего не
+   *  собирает — это делает prepare(). */
   isSupported(): boolean;
+  /** Собрать программы и текстуры — при первом воспроизведении, один раз.
+   *  false — слой не собрался (или движка нет): заставки не будет. */
+  prepare(): boolean;
 }
 
 /** Ролик уже можно отдать видеокарте. */
@@ -150,6 +159,9 @@ function aspectOf(media: SplashMedia | null): number {
 }
 
 export function createSplashLayer(): SplashLayer {
+  /** Контекст движка: init() только запоминает его, собирает prepare(). */
+  let context: WebGL2RenderingContext | null = null;
+  let prepared = false;
   let buffer: WebGLBuffer | null = null;
   let program: WebGLProgram | null = null;
   let calProgram: WebGLProgram | null = null;
@@ -281,16 +293,32 @@ export function createSplashLayer(): SplashLayer {
     zIndex: 100,
 
     init(gl: GL) {
-      if (!isGL2(gl)) {
-        supported = false;
-        return;
-      }
+      // Новый контекст (в том числе после потери): прежние программы и
+      // текстуры к нему не относятся — соберём заново при показе
+      prepared = false;
+      program = null;
+      calProgram = null;
+      buffer = null;
+      texture = null;
+      calTexture = null;
+      calBuffer = null;
+      uploaded = null;
+      calFor = null;
+      context = isGL2(gl) ? gl : null;
+      supported = context !== null;
+    },
+
+    prepare() {
+      if (prepared) return supported;
+      const gl = context;
+      if (!gl || !supported) return false;
+      prepared = true;
       buffer = createFullscreenTriangle(gl);
       program = createProgram(gl, VERTEX, FRAGMENT);
       calProgram = createProgram(gl, CAL_VERTEX, CAL_FRAGMENT);
       if (!program || !calProgram || !buffer) {
         supported = false;
-        return;
+        return false;
       }
       attrib = gl.getAttribLocation(program, "p");
       calAttrib = gl.getAttribLocation(calProgram, "p");
@@ -339,6 +367,7 @@ export function createSplashLayer(): SplashLayer {
 
       gl.useProgram(program);
       gl.uniform1i(u.tex, 0);
+      return true;
     },
 
     render(gl: GL, frame: Frame) {
@@ -394,6 +423,8 @@ export function createSplashLayer(): SplashLayer {
       buffer = null;
       program = null;
       draw = null;
+      context = null;
+      prepared = false;
     },
 
     setDraw(next: SplashDraw | null) {

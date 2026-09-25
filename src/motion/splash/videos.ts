@@ -7,6 +7,11 @@
 // нажатие на категорию играет заставку. Никаких <link rel="preload"> и
 // ничего в <head>: ролики не в критическом пути страницы.
 //
+// До первого нажатия — только сеть (download): файл лежит в памяти, и всё.
+// Элемент <video>, его разбор и расшифровка кадров — только когда категорию
+// впервые играют (take / wait): при загрузке страницы главный поток этой
+// работой не занят вовсе.
+//
 // Почему fetch, а не просто <video preload>: у <video> нельзя задать
 // приоритет загрузки. Файл скачивается fetch-ем целиком и отдаётся ролику
 // из памяти (blob:), поэтому второй раз по сети он не идёт. Разрешение на
@@ -37,13 +42,14 @@ export function videoUsable(video: { readyState: number }): boolean {
 }
 
 export interface SplashVideoPool {
-  /** Готовый ролик этого блюда. Ещё не загружен — null, и загрузка
-   *  запускается (или продолжается) в фоне. */
+  /** Готовый ролик этого блюда. Ещё не готов — null, и ролик начинает
+   *  готовиться (первое воспроизведение категории). */
   take(slug: string): HTMLVideoElement | null;
   /** Ролик, как только он готов, но не дольше ms; не успел — null. */
   wait(slug: string, ms: number): Promise<HTMLVideoElement | null>;
-  /** Тихо загрузить эти ролики по одному, с низким приоритетом. */
-  prefetch(slugs: readonly string[]): void;
+  /** Только скачать файл, с низким приоритетом: ни <video>, ни расшифровки.
+   *  Готово, когда файл в памяти (или не скачался). */
+  download(slug: string): Promise<void>;
   dispose(): void;
 }
 
@@ -71,13 +77,40 @@ function untilUsable(video: HTMLVideoElement): Promise<boolean> {
   });
 }
 
-export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
+/** host — где живут <video>: уголок заставки, его создают при первом показе. */
+export function createSplashVideoPool(
+  host: () => HTMLElement,
+): SplashVideoPool {
+  /** Скачанные файлы: слаг → файл в памяти (null — не скачался). */
+  const files = new Map<string, Promise<Blob | null>>();
   const pool = new Map<string, Entry>();
   const urls: string[] = [];
   const abort = new AbortController();
   let disposed = false;
 
-  function load(slug: string, priority: RequestPriority): Entry {
+  /** Только сеть: файл целиком в память. Второй раз не качаем. */
+  function file(slug: string, priority: RequestPriority): Promise<Blob | null> {
+    const existing = files.get(slug);
+    if (existing) return existing;
+    const loading = fetch(splashVideoSrc(slug), {
+      priority,
+      signal: abort.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(`splash ${slug}: ${response.status}`);
+        return response.blob();
+      })
+      .catch(() => {
+        // Не скачалось — забываем: следующее нажатие попробует заново
+        if (files.get(slug) === loading) files.delete(slug);
+        return null;
+      });
+    files.set(slug, loading);
+    return loading;
+  }
+
+  /** Первое воспроизведение категории: <video> из скачанного файла. */
+  function element(slug: string): Entry {
     const existing = pool.get(slug);
     if (existing) return existing;
     const video = document.createElement("video");
@@ -88,27 +121,18 @@ export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
     video.setAttribute("aria-hidden", "true");
     video.preload = "auto";
     video.loop = false;
-    host.appendChild(video);
+    host().appendChild(video);
 
-    const ready = fetch(splashVideoSrc(slug), {
-      priority,
-      signal: abort.signal,
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error(`splash ${slug}: ${response.status}`);
-        return response.blob();
-      })
+    const ready = file(slug, "auto")
       .then((blob) => {
-        if (disposed) return false;
+        if (!blob || disposed) return false;
         const url = URL.createObjectURL(blob);
         urls.push(url);
         video.src = url;
         video.load();
         return untilUsable(video);
       })
-      .catch(() => false)
       .then((ok) => {
-        // Не загрузилось — забываем: следующее нажатие попробует заново
         if (!ok && pool.get(slug)?.video === video) {
           pool.delete(slug);
           video.remove();
@@ -124,13 +148,13 @@ export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
   return {
     take(slug) {
       if (!slug || disposed) return null;
-      const { video } = load(slug, "auto");
+      const { video } = element(slug);
       return videoUsable(video) ? video : null;
     },
 
     wait(slug, ms) {
       if (!slug || disposed) return Promise.resolve(null);
-      const { video, ready } = load(slug, "auto");
+      const { video, ready } = element(slug);
       return waitUpTo(
         ready.then((ok) => (ok && videoUsable(video) ? video : null)),
         ms,
@@ -138,14 +162,9 @@ export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
       );
     },
 
-    prefetch(slugs) {
-      // По одному: пока качается ролик, сеть остаётся свободной для того,
-      // что человек листает прямо сейчас
-      void slugs.reduce<Promise<unknown>>(
-        (previous, slug) =>
-          previous.then(() => (disposed ? false : load(slug, "low").ready)),
-        Promise.resolve(),
-      );
+    download(slug) {
+      if (!slug || disposed) return Promise.resolve();
+      return file(slug, "low").then(() => {});
     },
 
     dispose() {
@@ -158,6 +177,7 @@ export function createSplashVideoPool(host: HTMLElement): SplashVideoPool {
         video.remove();
       }
       pool.clear();
+      files.clear();
       for (const url of urls) URL.revokeObjectURL(url);
       urls.length = 0;
     },

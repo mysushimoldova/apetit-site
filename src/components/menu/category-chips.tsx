@@ -126,7 +126,7 @@ export function CategoryChips({
     // Блюдо ещё догружается — ответ придёт чуть позже (не дольше 150 мс);
     // если за это время нажали другой чип, решает уже он.
     const word = items.find((item) => item.slug === slug)?.label ?? "";
-    const answer = requestSplash({ category: slug, word });
+    const answer = requestSplash({ category: slug, word, url: `#${slug}` });
     if (answer === true) jump(section, slug);
     else if (answer === false) glide(section, slug);
     else {

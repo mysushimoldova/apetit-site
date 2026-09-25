@@ -67,28 +67,41 @@ async function openMenu(page: Page, url = MENU): Promise<string[]> {
   return errors;
 }
 
+/** Ролики, которые догрузит предзагрузка этой точки: по одному на категорию
+ *  с роликом (в Сороках есть первое блюдо каждой такой категории). */
+async function expectedVideos(page: Page): Promise<string[]> {
+  const slugs = await page
+    .locator(".chips-row a[data-slug]")
+    .evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-slug")),
+    );
+  return slugs.flatMap((slug) => {
+    const first = slug ? SPLASH_VIDEOS[slug]?.[0] : undefined;
+    return first ? [`/splash/${first}.mp4`] : [];
+  });
+}
+
 /**
- * Дождаться конца тихой предзагрузки: ролики есть и все готовы играть.
- * Ролики качаются строго по одному, и следующий встаёт в загрузку в тот же
- * миг, когда готов предыдущий, — поэтому «все, что есть, готовы» и значит
- * «догружены все». Фото стартуют вместе с первым роликом и весят в разы
- * меньше: к этому моменту они давно на месте.
+ * Дождаться конца тихой предзагрузки: все ролики точки скачаны. До нажатия
+ * предзагрузка только качает файлы — <video> ещё нет, поэтому смотрим на
+ * сеть: запись о загрузке появляется, когда файл скачан целиком. Файлы идут
+ * по одному, фото — первыми, так что «скачаны все ролики» и значит «скачано
+ * всё».
  */
 async function waitPrefetched(page: Page): Promise<void> {
+  const expected = await expectedVideos(page);
   await expect
     .poll(
       () =>
-        page.evaluate(() => {
-          const videos = [
-            ...document.querySelectorAll<HTMLVideoElement>(
-              ".splash-videos video",
-            ),
-          ];
-          return videos.length > 0 && videos.every((v) => v.readyState === 4);
-        }),
+        page.evaluate(
+          () =>
+            performance
+              .getEntriesByType("resource")
+              .filter((entry) => entry.name.includes("/splash/")).length,
+        ),
       { timeout: 30_000, message: "тихая предзагрузка роликов не закончилась" },
     )
-    .toBe(true);
+    .toBe(expected.length);
 }
 
 test("ролики не в критическом пути: не в HTML, после load и LCP, тихо и по одному", async ({
@@ -164,15 +177,53 @@ test("по одному ролику на категорию точки — ро
   await openMenu(page);
   await waitPrefetched(page);
 
-  const chips = await page.locator(".chips-row a[data-slug]").all();
-  const expected: string[] = [];
-  for (const item of chips) {
-    const slug = (await item.getAttribute("data-slug")) ?? "";
-    // В Сороках есть первое блюдо каждой категории с роликом
-    const first = SPLASH_VIDEOS[slug]?.[0];
-    if (first) expected.push(`/splash/${first}.mp4`);
-  }
+  const expected = await expectedVideos(page);
   expect(requests.sort()).toEqual(expected.sort());
+});
+
+// До первого нажатия — только сеть (решение архитектора 25.09.2026): ни
+// <video>, ни экрана заставки в DOM, ни программ видеокарты для неё. Всё
+// это — при первом воспроизведении, а <video> — только той категории, что
+// играет.
+test("до первого нажатия заставка только качает файлы", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as Window & { __programs?: number };
+    w.__programs = 0;
+    const original = WebGL2RenderingContext.prototype.createProgram;
+    WebGL2RenderingContext.prototype.createProgram = function () {
+      w.__programs = (w.__programs ?? 0) + 1;
+      return original.call(this);
+    };
+  });
+  const programs = () =>
+    page.evaluate(
+      () => (window as Window & { __programs?: number }).__programs ?? 0,
+    );
+  const errors = await openMenu(page);
+  await waitPrefetched(page);
+  await page.waitForTimeout(500);
+
+  expect(await page.locator("video").count(), "ни одного <video>").toBe(0);
+  expect(await page.locator(".splash").count(), "экрана заставки нет").toBe(0);
+  const before = await programs();
+
+  await chip(page, CATEGORY).click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page), "первое нажатие — заставка играет").toBe(true);
+  expect(await page.locator(".splash-videos video").count()).toBe(1);
+  // Две программы заставки: блюдо и пре-проход калибровки
+  expect((await programs()) - before).toBe(2);
+
+  await expect
+    .poll(() => splashOn(page), { timeout: 5000, message: "заставка не ушла" })
+    .toBe(false);
+  await chip(page, SECOND).click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page)).toBe(true);
+  // Вторая категория — свой <video>; программы уже собраны
+  expect(await page.locator(".splash-videos video").count()).toBe(2);
+  expect((await programs()) - before).toBe(2);
+  expect(errors).toEqual([]);
 });
 
 test("первое же нажатие — с заставкой; потом сетка на месте", async ({
@@ -372,6 +423,59 @@ test("кнопка «назад» закрывает заставку, а не �
   expect(await splashOn(page)).toBe(false);
   await expect(page).toHaveURL(/\/soroca/);
   await expect(page.locator(".chips-row")).toBeVisible();
+});
+
+// Адрес после заставки — как после обычного нажатия на чип: #категория
+// остаётся, обновление страницы и ссылка открывают её. Своя запись заставки
+// в истории не должна уносить метку с собой.
+test("после заставки в адресе #категория, обновление открывает её же", async ({
+  page,
+}) => {
+  await openMenu(page);
+  await waitPrefetched(page);
+
+  await chip(page, CATEGORY).click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page)).toBe(true);
+  await expect
+    .poll(() => splashOn(page), { timeout: 5000, message: "заставка не ушла" })
+    .toBe(false);
+  await expect(page).toHaveURL(new RegExp(`/soroca#${CATEGORY}$`));
+
+  await page.reload();
+  await page.waitForLoadState("load");
+  await expect(page).toHaveURL(new RegExp(`/soroca#${CATEGORY}$`));
+  await expect(chip(page, CATEGORY)).toHaveAttribute("aria-current", "true");
+  expect(Math.abs(await sectionTop(page, CATEGORY))).toBeLessThan(140);
+});
+
+test("смена заставки на ходу: в адресе вторая категория", async ({ page }) => {
+  await openMenu(page);
+  await waitPrefetched(page);
+
+  await chip(page, CATEGORY).click();
+  await page.waitForTimeout(300);
+  await chip(page, SECOND).focus();
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() => splashOn(page), { timeout: 5000, message: "заставка не ушла" })
+    .toBe(false);
+  await expect(page).toHaveURL(new RegExp(`/soroca#${SECOND}$`));
+});
+
+test("«назад» закрыл заставку — страница и адрес остались на категории", async ({
+  page,
+}) => {
+  await openMenu(page);
+  await waitPrefetched(page);
+
+  await chip(page, CATEGORY).click();
+  await page.waitForTimeout(250);
+  expect(await splashOn(page)).toBe(true);
+  await page.goBack();
+  await expect.poll(() => splashOn(page), { timeout: 1500 }).toBe(false);
+  await expect(page).toHaveURL(new RegExp(`/soroca#${CATEGORY}$`));
+  expect(Math.abs(await sectionTop(page, CATEGORY))).toBeLessThan(140);
 });
 
 test("«уменьшить движение» — заставки нет и ролики не грузятся", async ({

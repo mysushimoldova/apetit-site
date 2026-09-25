@@ -6,15 +6,10 @@
 // четверти высоты или быстро смахнули; иначе лист возвращается на место.
 // Альтернатива жесту для тех, кто не может тянуть, — крестик (WCAG 2.5.7).
 import { useEffect, useRef, type RefObject } from "react";
+import { isFlick, pushSample, type DragSample } from "./sheet-flick";
 
 /** Доля высоты листа, после которой отпущенный лист закрывается. */
 const CLOSE_DISTANCE = 0.25;
-/** Скорость смаха (px/мс), при которой лист закрывается даже с короткого хода.
- *  0.11 — решение архитектора 24.09.2026: прежние 0.4 требовали рывка, и
- *  обычный быстрый смах листом воспринимался как «не сработало». */
-const CLOSE_VELOCITY = 0.11;
-/** Палец остановился дольше — это уже не смах. */
-const FLICK_WINDOW_MS = 100;
 /** Возврат листа на место, мс (docs/MOTION.md §2 — мелкое изменение). */
 const SNAP_BACK_MS = 200;
 const DESKTOP = "(min-width: 1024px)";
@@ -47,9 +42,8 @@ export function useSheetDrag({
     let dragging = false;
     let startX = 0;
     let startY = 0;
-    let lastY = 0;
-    let lastT = 0;
-    let velocity = 0;
+    // Точки пальца за последние 100 мс — по ним считается скорость смаха
+    let samples: DragSample[] = [];
     let offset = 0;
 
     const setInline = (
@@ -91,9 +85,8 @@ export function useSheetDrag({
         return;
       const touch = e.touches[0];
       startX = touch.clientX;
-      startY = lastY = touch.clientY;
-      lastT = e.timeStamp;
-      velocity = 0;
+      startY = touch.clientY;
+      samples = [{ t: e.timeStamp, y: startY }];
       offset = 0;
       tracking = true;
     }
@@ -120,10 +113,7 @@ export function useSheetDrag({
         dragging = true;
       }
       e.preventDefault();
-      const dt = e.timeStamp - lastT;
-      if (dt > 0) velocity = (touch.clientY - lastY) / dt;
-      lastY = touch.clientY;
-      lastT = e.timeStamp;
+      pushSample(samples, { t: e.timeStamp, y: touch.clientY });
       offset = Math.max(0, dy);
       const progress = Math.min(1, offset / panel.offsetHeight);
       setInline(`translate3d(0, ${offset}px, 0)`, String(1 - progress), "none");
@@ -136,10 +126,7 @@ export function useSheetDrag({
       }
       tracking = false;
       dragging = false;
-      const flick =
-        e.type === "touchend" &&
-        e.timeStamp - lastT < FLICK_WINDOW_MS &&
-        velocity > CLOSE_VELOCITY;
+      const flick = e.type === "touchend" && isFlick(samples, e.timeStamp);
       const far = offset > panel.offsetHeight * CLOSE_DISTANCE;
       if (e.type === "touchend" && (far || flick)) {
         // Лист закроется из текущего положения: Sheet уберёт inline-стили

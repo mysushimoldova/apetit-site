@@ -18,6 +18,11 @@
 // Нажали раньше, чем блюдо догрузилось, — ждём его не дольше WAIT_MS, потом
 // обычный переход без заставки.
 //
+// До первого нажатия — только сеть: файлы по одному, каждый в своём куске
+// простоя (idleQueue). Кремовый экран в DOM, программы и текстуры видеокарты
+// — при первом воспроизведении вообще; <video>, расшифровка кадров и
+// калибровка ролика — при первом воспроизведении этой категории.
+//
 // Нажатие на другую категорию, пока заставка идёт или уходит: текущая
 // обрывается мгновенно, без ухода, и сразу играет заставка новой. С момента
 // ухода (касание или конец показа) заставка пропускает касания насквозь —
@@ -52,7 +57,7 @@ import {
 } from "./request";
 import { splashVisual } from "./timeline";
 import { createSplashVideoPool } from "./videos";
-import { whenPageSettles } from "./wait";
+import { idleQueue, whenPageSettles } from "./wait";
 import type { SplashMedia } from "../layers/splash";
 
 /** Причина паузы движка, пока играет заставка (docs/MOTION.md §1). */
@@ -148,8 +153,17 @@ interface BackGuard {
  *
  * На время своей записи браузер не должен сам возвращать прокрутку: иначе
  * после заставки страница уезжает туда, где стояла до перехода к категории.
+ *
+ * Адрес, который чип ставит под заставкой (#категория), лежит в своей
+ * записи и снялся бы вместе с ней. Поэтому, когда запись снята — своим
+ * шагом назад или кнопкой «назад», — адрес переносится в запись под ней
+ * (url()). Страница-то осталась на категории: как и без заставки, адрес
+ * это отражает, а обновление и ссылка открывают ту же категорию.
  */
-function createBackGuard(onBack: () => void): BackGuard {
+function createBackGuard(
+  onBack: () => void,
+  url: () => string | null,
+): BackGuard {
   /** Своя запись лежит сверху. */
   let armed = false;
   /** Свой шаг назад отправлен и ещё не дошёл. */
@@ -158,6 +172,12 @@ function createBackGuard(onBack: () => void): BackGuard {
   let wanted = false;
   let disposed = false;
   let restoration: ScrollRestoration = "auto";
+
+  /** Запись снята: адрес категории — в запись, ставшую текущей. */
+  function keepUrl(): void {
+    const next = url();
+    if (next) history.replaceState(history.state, "", next);
+  }
 
   function push(): void {
     restoration = history.scrollRestoration;
@@ -174,6 +194,7 @@ function createBackGuard(onBack: () => void): BackGuard {
       // она стояла до заставки.
       leaving = false;
       if (disposed) window.removeEventListener("popstate", onPop);
+      keepUrl();
       requestAnimationFrame(() => {
         if (!leaving && !armed) history.scrollRestoration = restoration;
       });
@@ -184,6 +205,7 @@ function createBackGuard(onBack: () => void): BackGuard {
     // Человек нажал «назад»: запись уже снята браузером
     armed = false;
     history.scrollRestoration = restoration;
+    keepUrl();
     onBack();
   };
   window.addEventListener("popstate", onPop);
@@ -211,12 +233,23 @@ function createBackGuard(onBack: () => void): BackGuard {
 export function createSplashController(deps: SplashDeps): SplashController {
   let settings = deps.settings;
   const available = deps.available;
-  const dom = buildDom();
+  /** Собственный DOM заставки — появляется при первом показе. */
+  let built: Dom | null = null;
+  const onPointer = () => {
+    if (settings.skip) end();
+  };
+  function ensureDom(): Dom {
+    if (!built) {
+      built = buildDom();
+      built.root.addEventListener("pointerdown", onPointer);
+    }
+    return built;
+  }
 
   const layer: SplashLayer = createSplashLayer();
   engine.add(layer);
 
-  const pool = createSplashVideoPool(dom.videos);
+  const pool = createSplashVideoPool(() => ensureDom().videos);
   const photoPool = createSplashPhotoPool();
 
   let disposed = false;
@@ -231,12 +264,17 @@ export function createSplashController(deps: SplashDeps): SplashController {
   let media: SplashMedia | null = null;
   /** Играем фото, а не ролик: у фото своя распаковка в шейдере. */
   let photo = false;
+  /** Адрес страницы после заставки — от последней сыгранной просьбы. */
+  let address: string | null = null;
   /** Номер последней просьбы сыграть. Ответ, опоздавший из-за загрузки,
    *  не должен перебить нажатие, сделанное после него. */
   let asked = 0;
 
   const blockScroll = (event: Event) => event.preventDefault();
-  const guard = createBackGuard(() => end());
+  const guard = createBackGuard(
+    () => end(),
+    () => address,
+  );
 
   function stopVideo(): void {
     if (!(media instanceof HTMLVideoElement)) return;
@@ -250,6 +288,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
   /** С этого момента заставка уходит и пропускает касания насквозь:
    *  лента категорий под ней уже доступна. */
   function markLeaving(): void {
+    const dom = ensureDom();
     if (!("leaving" in dom.root.dataset)) dom.root.dataset.leaving = "";
   }
 
@@ -269,6 +308,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
     media = null;
     photo = false;
     layer.setDraw(null);
+    const dom = ensureDom();
     dom.root.removeAttribute("data-on");
     dom.root.removeAttribute("data-leaving");
     dom.word.removeAttribute("data-on");
@@ -327,6 +367,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
     }
 
     const visual = splashVisual(elapsed, settings, exitAt);
+    const dom = ensureDom();
     // Экран, слово и блюдо уезжают вверх одним движением: доля одна и та же
     dom.root.style.setProperty("--splash-lift", `${-visual.liftShare * 101}%`);
     dom.word.style.setProperty(
@@ -344,7 +385,11 @@ export function createSplashController(deps: SplashDeps): SplashController {
     if (!visual.visible) finish();
   }
 
-  function begin(word: string, ready: SplashMedia, asPhoto: boolean): void {
+  function begin(
+    request: SplashRequest,
+    ready: SplashMedia,
+    asPhoto: boolean,
+  ): void {
     // Идёт другая заставка — обрываем мгновенно, без ухода. Страница при
     // этом остаётся «под заставкой»: новая встаёт на место старой в этом же
     // кадре, и сетка между ними не мелькает.
@@ -355,8 +400,10 @@ export function createSplashController(deps: SplashDeps): SplashController {
     photo = asPhoto;
     exitAt = settings.hold;
     startedAt = performance.now();
+    address = request.url ?? null;
+    const dom = ensureDom();
 
-    dom.word.textContent = word;
+    dom.word.textContent = request.word;
     dom.word.style.setProperty("--splash-word-y", `${settings.wordY}px`);
     if (settings.wordTop) dom.word.dataset.wordTop = "";
     else delete dom.word.dataset.wordTop;
@@ -420,10 +467,13 @@ export function createSplashController(deps: SplashDeps): SplashController {
     const mode = splashModeFor(request.category, available, deps.photos);
     if (mode.kind === "none") return refuse();
 
+    // Первое воспроизведение: только теперь собираем программы видеокарты
+    if (!layer.prepare()) return refuse();
+
     const asPhoto = mode.kind === "photo";
     const ready = asPhoto ? photoPool.take(mode.src) : pool.take(mode.slug);
     if (ready) {
-      begin(request.word, ready, asPhoto);
+      begin(request, ready, asPhoto);
       return true;
     }
 
@@ -435,7 +485,7 @@ export function createSplashController(deps: SplashDeps): SplashController {
       // Пока ждали, нажали другую категорию: решает уже она
       if (ticket !== asked) return false;
       if (!media || !canPlay()) return refuse();
-      begin(request.word, media, asPhoto);
+      begin(request, media, asPhoto);
       return true;
     });
   }
@@ -443,17 +493,16 @@ export function createSplashController(deps: SplashDeps): SplashController {
   // Когда меню показано и страница простаивает — тихо догрузить блюда всех
   // категорий точки. При экономии трафика и там, где заставки не будет
   // вовсе, не грузится ничего.
+  // Фото — первыми: они в разы легче роликов.
+  let stopQueue = () => {};
   const stopPrefetch = whenPageSettles(() => {
     if (!canPlay()) return;
     const plan = splashPrefetchFor(available, deps.photos);
-    pool.prefetch(plan.videos);
-    photoPool.prefetch(plan.photos);
+    stopQueue = idleQueue([
+      ...plan.photos.map((src) => () => photoPool.download(src)),
+      ...plan.videos.map((slug) => () => pool.download(slug)),
+    ]);
   });
-
-  const onPointer = () => {
-    if (settings.skip) end();
-  };
-  dom.root.addEventListener("pointerdown", onPointer);
 
   return {
     play,
@@ -464,15 +513,18 @@ export function createSplashController(deps: SplashDeps): SplashController {
     },
     dispose() {
       stopPrefetch();
+      stopQueue();
       if (playing) finish();
       disposed = true;
       guard.dispose();
-      dom.root.removeEventListener("pointerdown", onPointer);
       pool.dispose();
       photoPool.dispose();
       engine.remove(layer.id);
-      dom.root.remove();
-      dom.word.remove();
+      if (built) {
+        built.root.removeEventListener("pointerdown", onPointer);
+        built.root.remove();
+        built.word.remove();
+      }
     },
   };
 }

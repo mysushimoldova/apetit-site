@@ -27,7 +27,7 @@ export function waitUpTo<T>(
 const LCP_WAIT = 3000;
 
 /** Потолок ожидания простоя: requestIdleCallback с timeout. */
-const IDLE_TIMEOUT = 4000;
+export const IDLE_TIMEOUT = 4000;
 
 /** Без requestIdleCallback (Safari) — просто пауза после load и LCP. */
 const IDLE_FALLBACK = 1000;
@@ -88,5 +88,76 @@ export function whenPageSettles(run: () => void): () => void {
     if (idle && typeof window.cancelIdleCallback === "function") {
       window.cancelIdleCallback(idle);
     }
+  };
+}
+
+/** Меньше стольких миллисекунд простоя в куске — файл ждёт следующего.
+ *  В куске только запуск скачивания (доли миллисекунды), а простои между
+ *  кадрами, пока фон рисуется, бывают всего по 1–3 мс. */
+const MIN_IDLE_MS = 1;
+
+/**
+ * Запустить задачи по одной: каждую — в своём куске простоя
+ * (requestIdleCallback), и только если в куске есть хотя бы MIN_IDLE_MS.
+ * Следующая задача ставится, когда предыдущая закончилась (файл скачан),
+ * а не весь список за раз. Упавшая задача очередь не останавливает.
+ * Если длинного простоя так и нет, задача всё равно идёт через IDLE_TIMEOUT
+ * от первой просьбы — отсчёт не начинается заново с каждым коротким куском.
+ * Без requestIdleCallback (Safari) — пауза IDLE_FALLBACK между задачами.
+ * Возвращает отмену.
+ */
+export function idleQueue(
+  tasks: ReadonlyArray<() => Promise<unknown>>,
+): () => void {
+  let cancelled = false;
+  let next = 0;
+  let idle = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  /** Когда текущая задача впервые попросила простой. */
+  let askedAt = 0;
+  const hasIdle = typeof requestIdleCallback === "function";
+
+  const run = (deadline?: IdleDeadline) => {
+    idle = 0;
+    timer = undefined;
+    if (cancelled || next >= tasks.length) return;
+    // Кусок почти кончился — ждём следующего, чтобы не залезть в кадр
+    const waited = performance.now() - askedAt;
+    if (
+      deadline &&
+      !deadline.didTimeout &&
+      deadline.timeRemaining() < MIN_IDLE_MS &&
+      waited < IDLE_TIMEOUT
+    ) {
+      ask(IDLE_TIMEOUT - waited);
+      return;
+    }
+    const task = tasks[next++];
+    void task()
+      .catch(() => {})
+      .then(() => {
+        if (!cancelled) schedule();
+      });
+  };
+
+  /** Попросить кусок простоя; timeout — сколько ещё осталось ждать. */
+  function ask(timeout: number): void {
+    if (hasIdle) idle = requestIdleCallback(run, { timeout });
+    else timer = setTimeout(run, IDLE_FALLBACK);
+  }
+
+  /** Поставить следующую задачу: отсчёт ожидания — с этого момента. */
+  function schedule(): void {
+    if (cancelled || next >= tasks.length) return;
+    askedAt = performance.now();
+    ask(IDLE_TIMEOUT);
+  }
+
+  schedule();
+  return () => {
+    cancelled = true;
+    if (idle && typeof cancelIdleCallback === "function")
+      cancelIdleCallback(idle);
+    clearTimeout(timer);
   };
 }

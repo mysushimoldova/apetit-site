@@ -7,77 +7,107 @@
 // отдаёт их прямо из кеша: плитка этой категории уже была на экране.
 //
 // При открытии сайта заставка ничего не грузит. Когда страница показана и
-// простаивает, картинки догружаются с низким приоритетом — и уже первое
-// нажатие на категорию играет заставку. Так же, как с роликами.
+// простаивает, файлы скачиваются с низким приоритетом в кеш браузера (у
+// /img/ он вечный, src/lib/cache-headers.ts) — и только. Картинка и её
+// расшифровка — при первом воспроизведении категории, уже из кеша.
 import { waitUpTo } from "./wait";
 
 export interface SplashPhotoPool {
-  /** Готовая картинка для этого адреса; ещё не загружена — null, и
-   *  загрузка начинается (или продолжается) в фоне. */
+  /** Готовая (расшифрованная) картинка для этого адреса; ещё не готова —
+   *  null, и она начинает готовиться (первое воспроизведение категории). */
   take(src: string): HTMLImageElement | null;
   /** Картинка, как только она готова, но не дольше ms; не успела — null. */
   wait(src: string, ms: number): Promise<HTMLImageElement | null>;
-  /** Тихо загрузить эти картинки с низким приоритетом. */
-  prefetch(srcs: readonly string[]): void;
+  /** Только скачать файл в кеш браузера, с низким приоритетом. */
+  download(src: string): Promise<void>;
   dispose(): void;
 }
 
+interface Entry {
+  image: HTMLImageElement;
+  /** Картинка расшифрована и её можно отдать видеокарте. */
+  ready: Promise<boolean>;
+  decoded: boolean;
+}
+
 /** Картинка догрузилась и её можно отдать видеокарте. */
-function ready(image: HTMLImageElement): boolean {
+function loaded(image: HTMLImageElement): boolean {
   return image.complete && image.naturalWidth > 0;
 }
 
-function untilReady(image: HTMLImageElement): Promise<boolean> {
-  if (ready(image)) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    image.addEventListener("load", () => resolve(ready(image)), {
-      once: true,
-    });
-    image.addEventListener("error", () => resolve(false), { once: true });
-  });
-}
-
 export function createSplashPhotoPool(): SplashPhotoPool {
-  const pool = new Map<string, HTMLImageElement>();
+  const pool = new Map<string, Entry>();
+  const files = new Map<string, Promise<void>>();
+  const abort = new AbortController();
 
-  function element(
-    src: string,
-    priority: HTMLImageElement["fetchPriority"],
-  ): HTMLImageElement {
+  /** Первое воспроизведение категории: картинка из кеша, расшифровка вне
+   *  главного потока (decode), а не в кадре заставки. */
+  function element(src: string): Entry {
     const existing = pool.get(src);
     if (existing) return existing;
     const image = new Image();
     image.decoding = "async";
-    image.fetchPriority = priority;
     image.src = src;
-    pool.set(src, image);
-    return image;
+    const entry: Entry = {
+      image,
+      ready: Promise.resolve(false),
+      decoded: false,
+    };
+    entry.ready = image
+      .decode()
+      .then(
+        () => true,
+        () => loaded(image),
+      )
+      .then((ok) => {
+        entry.decoded = ok;
+        // Не загрузилась — забываем: следующее нажатие попробует заново
+        if (!ok && pool.get(src) === entry) pool.delete(src);
+        return ok;
+      });
+    pool.set(src, entry);
+    return entry;
   }
 
   return {
     take(src) {
       if (!src) return null;
-      const image = element(src, "auto");
-      return ready(image) ? image : null;
+      const entry = element(src);
+      return entry.decoded ? entry.image : null;
     },
 
     wait(src, ms) {
       if (!src) return Promise.resolve(null);
-      const image = element(src, "auto");
+      const { image, ready } = element(src);
       return waitUpTo(
-        untilReady(image).then((ok) => (ok ? image : null)),
+        ready.then((ok) => (ok ? image : null)),
         ms,
         null,
       );
     },
 
-    prefetch(srcs) {
-      for (const src of srcs) element(src, "low");
+    download(src) {
+      if (!src) return Promise.resolve();
+      const existing = files.get(src);
+      if (existing) return existing;
+      // Тело читаем до конца: иначе файл не ляжет в кеш целиком
+      const loading = fetch(src, { priority: "low", signal: abort.signal })
+        .then((response) => response.blob())
+        .then(
+          () => {},
+          () => {
+            files.delete(src);
+          },
+        );
+      files.set(src, loading);
+      return loading;
     },
 
     dispose() {
-      for (const image of pool.values()) image.src = "";
+      abort.abort();
+      for (const { image } of pool.values()) image.src = "";
       pool.clear();
+      files.clear();
     },
   };
 }

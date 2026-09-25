@@ -207,26 +207,33 @@ test("свайп вниз закрывает лист, короткий медл
   await expect(sheet).toBeHidden();
 });
 
-// Порог смаха 0.11 px/мс (решение архитектора 24.09.2026, было 0.4): спокойный
-// смах пальцем обязан закрывать лист, а не возвращать его на место.
-test("спокойный смах вниз тоже закрывает лист", async ({ page }) => {
+// Короткий смах закрывает лист скоростью, а не ходом (решение архитектора
+// 24.09.2026, порог 0.11 px/мс). Точную скорость — спокойный смах 0.2 px/мс,
+// дрожание датчика, замедление перед отрывом — проверяет
+// src/components/sheet/sheet-flick.test.ts с точным временем касаний. Здесь —
+// что жест в настоящем браузере доходит до этого расчёта. Время касаниям
+// браузер ставит сам, по кадрам (время из Input.dispatchTouchEvent он
+// игнорирует), поэтому тест не ждёт таймерами: движения идут подряд, по 20 px
+// на кадр. Прежний вариант с паузами по 50 мс на деле давал 0.12 px/мс вместо
+// задуманных 0.2 и под нагрузкой падал ниже порога.
+test("короткий смах вниз закрывает лист", async ({ page }) => {
   const sheet = await openProduct(page, "Kebab Cheese");
   const client = await page.context().newCDPSession(page);
   const box = (await sheet.locator(".sheet-panel").boundingBox())!;
   const x = box.x + box.width / 2;
   const y = box.y + 20;
+  // 60 px — меньше четверти высоты: ходом лист бы не закрылся
+  expect(60).toBeLessThan(box.height * 0.25);
 
   await client.send("Input.dispatchTouchEvent", {
     type: "touchStart",
     touchPoints: [{ x, y }],
   });
-  // 10 px за 50 мс — это 0.2 px/мс: быстрее нового порога и медленнее старого
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 3; i++) {
     await client.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [{ x, y: y + i * 10 }],
+      touchPoints: [{ x, y: y + i * 20 }],
     });
-    await page.waitForTimeout(50);
   }
   await client.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
